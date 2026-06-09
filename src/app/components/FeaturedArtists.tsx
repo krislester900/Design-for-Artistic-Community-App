@@ -48,13 +48,39 @@ export function FeaturedArtists({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-          {filteredArtists.map((artist) => (
-            <ArtistCard key={artist.name} {...artist} onNavigate={onNavigate} />
-          ))}
-        </div>
+        {filteredArtists.length > 0 ? (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+            {filteredArtists.map((artist) => (
+              <ArtistCard
+                key={artist.name}
+                {...artist}
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyStateCard
+            title="Aucun artiste publié pour le moment"
+            description="Les profils apparaîtront ici dès qu'un premier créateur sera ajouté à la plateforme."
+          />
+        )}
       </div>
     </section>
+  );
+}
+
+function EmptyStateCard({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-border bg-card/60 p-10 text-center">
+      <h3 className="mb-2 text-2xl font-display text-foreground">{title}</h3>
+      <p className="mx-auto max-w-2xl text-muted-foreground">{description}</p>
+    </div>
   );
 }
 

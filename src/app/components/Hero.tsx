@@ -5,6 +5,7 @@ import {
   type CategorySlug,
   type SectionId,
 } from "../data/community";
+import { openCategoryPage, openStaticPage } from "../lib/page-links";
 
 interface HeroProps {
   categories: Category[];
@@ -59,9 +60,9 @@ export function Hero({ categories, onNavigate }: HeroProps) {
           </button>
           <button
             className="rounded-lg border border-border bg-card/50 px-8 py-4 font-medium text-foreground backdrop-blur transition-all hover:bg-card"
-            onClick={() => onNavigate("join")}
+            onClick={() => openStaticPage("database")}
           >
-            Partagez votre art
+            Voir la base
           </button>
         </div>
 
@@ -70,9 +71,7 @@ export function Hero({ categories, onNavigate }: HeroProps) {
             <button
               key={category.slug}
               className="rounded-full border border-border bg-background/60 px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-              onClick={() =>
-                onNavigate(category.targetSectionId, category.slug)
-              }
+              onClick={() => openCategoryPage(category.slug)}
             >
               {category.title}
             </button>

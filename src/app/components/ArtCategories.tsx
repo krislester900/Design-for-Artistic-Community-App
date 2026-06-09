@@ -17,6 +17,7 @@ import {
   type Discussion,
   type SectionId,
 } from "../data/community";
+import { openCategoryPage } from "../lib/page-links";
 
 const categoryIcons = {
   music: Music,
@@ -42,7 +43,6 @@ export function ArtCategories({
   artworks,
   discussions,
   selectedCategory,
-  onNavigate,
 }: ArtCategoriesProps) {
   return (
     <section id="categories" className="px-6 py-20 scroll-mt-28">
@@ -82,9 +82,7 @@ export function ArtCategories({
                     ? "border-primary shadow-lg shadow-primary/10"
                     : "border-border hover:border-primary/50"
                 }`}
-                onClick={() =>
-                  onNavigate(category.targetSectionId, category.slug)
-                }
+                onClick={() => openCategoryPage(category.slug)}
               >
                 <div className="absolute inset-0 opacity-30 transition-opacity group-hover:opacity-40">
                   <ImageWithFallback
@@ -126,7 +124,7 @@ export function ArtCategories({
 
                     <div className="flex items-center justify-between text-primary">
                       <span className="text-sm font-medium">
-                        Voir le parcours relié
+                        Ouvrir la page dédiée
                       </span>
                       <span className="text-xs uppercase tracking-[0.2em]">
                         {category.targetSectionId}

@@ -40,15 +40,22 @@ export function ArtShowcase({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredArtworks.map((artwork) => (
-            <ArtworkCard
-              key={`${artwork.title}-${artwork.artist}`}
-              {...artwork}
-              onNavigate={onNavigate}
-            />
-          ))}
-        </div>
+        {filteredArtworks.length > 0 ? (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {filteredArtworks.map((artwork) => (
+              <ArtworkCard
+                key={`${artwork.title}-${artwork.artist}`}
+                {...artwork}
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyStateCard
+            title="Aucune œuvre publiée pour le moment"
+            description="La galerie se remplira automatiquement dès qu'une première création sera mise en ligne."
+          />
+        )}
 
         <div className="mt-12 text-center">
           <button
@@ -60,6 +67,21 @@ export function ArtShowcase({
         </div>
       </div>
     </section>
+  );
+}
+
+function EmptyStateCard({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-border bg-card/60 p-10 text-center">
+      <h3 className="mb-2 text-2xl font-display text-foreground">{title}</h3>
+      <p className="mx-auto max-w-2xl text-muted-foreground">{description}</p>
+    </div>
   );
 }
 

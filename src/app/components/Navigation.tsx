@@ -1,10 +1,11 @@
-import { Palette, User } from "lucide-react";
+import { Database, Palette, User } from "lucide-react";
 import {
   type CategorySlug,
   type SectionId,
   categoryLabels,
   navigationItems,
 } from "../data/community";
+import { openStaticPage } from "../lib/page-links";
 
 interface NavigationProps {
   selectedCategory: CategorySlug;
@@ -37,7 +38,14 @@ export function Navigation({ selectedCategory, onNavigate }: NavigationProps) {
             <button
               key={item.label}
               className="group flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-              onClick={() => onNavigate(item.sectionId, item.category)}
+              onClick={() => {
+                if (item.sectionId === "forum") {
+                  openStaticPage("community");
+                  return;
+                }
+
+                onNavigate(item.sectionId, item.category);
+              }}
             >
               <span className="group-hover:text-primary transition-colors">
                 {item.label}
@@ -49,9 +57,12 @@ export function Navigation({ selectedCategory, onNavigate }: NavigationProps) {
         <div className="flex items-center gap-3">
           <button
             className="hidden rounded-lg border border-border px-4 py-2 text-sm transition-colors hover:border-primary hover:text-primary md:block"
-            onClick={() => onNavigate("categories", "all")}
+            onClick={() => openStaticPage("database")}
           >
-            Réinitialiser
+            <span className="inline-flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              Base
+            </span>
           </button>
           <button
             className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-primary-foreground transition-opacity hover:opacity-90"

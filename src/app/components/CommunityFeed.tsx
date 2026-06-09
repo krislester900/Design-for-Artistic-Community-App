@@ -8,6 +8,7 @@ import {
   type SectionId,
   type Trend,
 } from "../data/community";
+import { openStaticPage } from "../lib/page-links";
 
 interface CommunityFeedProps {
   discussions: Discussion[];
@@ -50,53 +51,87 @@ export function CommunityFeed({
           </div>
           <button
             className="rounded-lg bg-primary px-6 py-3 text-primary-foreground transition-opacity hover:opacity-90"
-            onClick={() => onNavigate("join", selectedCategory)}
+            onClick={() => openStaticPage("community")}
           >
-            Créer un sujet
+            Ouvrir la page communauté
           </button>
         </div>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
           <div className="space-y-4 lg:col-span-2">
-            {filteredDiscussions.map((discussion) => (
-              <DiscussionCard
-                key={discussion.title}
-                {...discussion}
-                onNavigate={onNavigate}
+            {filteredDiscussions.length > 0 ? (
+              filteredDiscussions.map((discussion) => (
+                <DiscussionCard
+                  key={discussion.title}
+                  {...discussion}
+                  onNavigate={onNavigate}
+                />
+              ))
+            ) : (
+              <EmptyStatePanel
+                title="Aucune discussion ouverte"
+                description="Les conversations de la communauté apparaîtront ici après les premiers échanges."
               />
-            ))}
+            )}
           </div>
 
           <div className="space-y-6">
             <div className="rounded-xl border border-border bg-card p-6">
               <h3 className="mb-4 text-xl font-display">Tendances du moment</h3>
               <div className="space-y-3">
-                {filteredTrends.map((trend) => (
-                  <TrendTag
-                    key={trend.tag}
-                    {...trend}
-                    onNavigate={onNavigate}
-                  />
-                ))}
+                {filteredTrends.length > 0 ? (
+                  filteredTrends.map((trend) => (
+                    <TrendTag
+                      key={trend.tag}
+                      {...trend}
+                      onNavigate={onNavigate}
+                    />
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Aucune tendance pour le moment.
+                  </p>
+                )}
               </div>
             </div>
 
             <div className="rounded-xl border border-border bg-card p-6">
               <h3 className="mb-4 text-xl font-display">Événements à venir</h3>
               <div className="space-y-4">
-                {filteredEvents.map((event) => (
-                  <EventCard
-                    key={event.title}
-                    {...event}
-                    onNavigate={onNavigate}
-                  />
-                ))}
+                {filteredEvents.length > 0 ? (
+                  filteredEvents.map((event) => (
+                    <EventCard
+                      key={event.title}
+                      {...event}
+                      onNavigate={onNavigate}
+                    />
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Aucun événement planifié pour le moment.
+                  </p>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+function EmptyStatePanel({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-border bg-card/60 p-10 text-center">
+      <h3 className="mb-2 text-2xl font-display text-foreground">{title}</h3>
+      <p className="mx-auto max-w-2xl text-muted-foreground">{description}</p>
+    </div>
   );
 }
 

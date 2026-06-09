@@ -1,10 +1,17 @@
-import { Palette, Compass, MessageCircle, Sparkles } from "lucide-react";
+import {
+  Database,
+  Palette,
+  Compass,
+  MessageCircle,
+  Sparkles,
+} from "lucide-react";
 import {
   footerSections,
   getCategoryLabel,
   type CategorySlug,
   type SectionId,
 } from "../data/community";
+import { openCategoryPage, openStaticPage } from "../lib/page-links";
 
 interface FooterProps {
   selectedCategory: CategorySlug;
@@ -47,12 +54,17 @@ export function Footer({ selectedCategory, onNavigate }: FooterProps) {
               <QuickAction
                 icon={<MessageCircle className="h-5 w-5" />}
                 label="Forum"
-                onClick={() => onNavigate("forum", selectedCategory)}
+                onClick={() => openStaticPage("community")}
               />
               <QuickAction
                 icon={<Sparkles className="h-5 w-5" />}
                 label="Rejoindre"
                 onClick={() => onNavigate("join", selectedCategory)}
+              />
+              <QuickAction
+                icon={<Database className="h-5 w-5" />}
+                label="Base"
+                onClick={() => openStaticPage("database")}
               />
             </div>
           </div>
@@ -65,7 +77,14 @@ export function Footer({ selectedCategory, onNavigate }: FooterProps) {
                   <FooterLink
                     key={link.text}
                     text={link.text}
-                    onClick={() => onNavigate(link.sectionId, link.category)}
+                    onClick={() => {
+                      if (link.category && link.category !== "all") {
+                        openCategoryPage(link.category);
+                        return;
+                      }
+
+                      onNavigate(link.sectionId, link.category);
+                    }}
                   />
                 ))}
               </ul>
@@ -87,9 +106,9 @@ export function Footer({ selectedCategory, onNavigate }: FooterProps) {
             </button>
             <button
               className="transition-colors hover:text-primary"
-              onClick={() => onNavigate("showcase", selectedCategory)}
+              onClick={() => openStaticPage("database")}
             >
-              Continuer l'exploration
+              Voir la base
             </button>
             <button
               className="transition-colors hover:text-primary"

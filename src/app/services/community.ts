@@ -9,11 +9,11 @@ import {
   type EventItem,
   type Trend,
   mockCommunityData,
-} from '../data/community';
-import { hasSupabaseEnv, supabase } from '../lib/supabase';
+} from "../data/community";
+import { hasSupabaseEnv, supabase } from "../lib/supabase";
 
 function sortCategories(items: Category[]) {
-  return [...items].sort((a, b) => a.title.localeCompare(b.title, 'fr'));
+  return [...items].sort((a, b) => a.title.localeCompare(b.title, "fr"));
 }
 
 function sortArtists(items: Artist[]) {
@@ -25,11 +25,13 @@ function sortArtworks(items: Artwork[]) {
 }
 
 function sortDiscussions(items: Discussion[]) {
-  return [...items].sort((a, b) => Number(b.trending) - Number(a.trending) || b.replies - a.replies);
+  return [...items].sort(
+    (a, b) => Number(b.trending) - Number(a.trending) || b.replies - a.replies,
+  );
 }
 
 function sortStats(items: CommunityStat[]) {
-  return [...items].sort((a, b) => a.label.localeCompare(b.label, 'fr'));
+  return [...items].sort((a, b) => a.label.localeCompare(b.label, "fr"));
 }
 
 function getMockData(): CommunityData {
@@ -49,21 +51,65 @@ export async function getCommunityData(): Promise<{
   data: CommunityData;
 }> {
   if (!hasSupabaseEnv || !supabase) {
-    return { source: 'mock', data: getMockData() };
+    return { source: "mock", data: getMockData() };
   }
 
   try {
-    const [categoriesResult, artistsResult, artworksResult, discussionsResult, trendsResult, eventsResult, statsResult] = await Promise.all([
-      supabase.from('categories').select('slug, title, short_label, description, image, color, target_section_id').order('sort_order', { ascending: true }),
-      supabase.from('artists').select('name, category_slug, role, image, featured_work, likes').order('likes', { ascending: false }),
-      supabase.from('artworks').select('image, title, artist_name, category_slug, medium, likes, views, height').order('views', { ascending: false }),
-      supabase.from('forum_discussions').select('title, author_name, category_slug, replies, time_label, trending').order('trending', { ascending: false }).order('replies', { ascending: false }),
-      supabase.from('trend_tags').select('tag, count_label, category_slug').order('sort_order', { ascending: true }),
-      supabase.from('community_events').select('title, date_label, category_slug').order('sort_order', { ascending: true }),
-      supabase.from('community_stats').select('number_label, label').order('sort_order', { ascending: true }),
+    const [
+      categoriesResult,
+      artistsResult,
+      artworksResult,
+      discussionsResult,
+      trendsResult,
+      eventsResult,
+      statsResult,
+    ] = await Promise.all([
+      supabase
+        .from("categories")
+        .select(
+          "slug, title, short_label, description, image, color, target_section_id",
+        )
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("artists")
+        .select("name, category_slug, role, image, featured_work, likes")
+        .order("likes", { ascending: false }),
+      supabase
+        .from("artworks")
+        .select(
+          "image, title, artist_name, category_slug, medium, likes, views, height",
+        )
+        .order("views", { ascending: false }),
+      supabase
+        .from("forum_discussions")
+        .select(
+          "title, author_name, category_slug, replies, time_label, trending",
+        )
+        .order("trending", { ascending: false })
+        .order("replies", { ascending: false }),
+      supabase
+        .from("trend_tags")
+        .select("tag, count_label, category_slug")
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("community_events")
+        .select("title, date_label, category_slug")
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("community_stats")
+        .select("number_label, label")
+        .order("sort_order", { ascending: true }),
     ]);
 
-    const results = [categoriesResult, artistsResult, artworksResult, discussionsResult, trendsResult, eventsResult, statsResult];
+    const results = [
+      categoriesResult,
+      artistsResult,
+      artworksResult,
+      discussionsResult,
+      trendsResult,
+      eventsResult,
+      statsResult,
+    ];
     const firstError = results.find((result) => result.error)?.error;
 
     if (firstError) {
@@ -71,17 +117,20 @@ export async function getCommunityData(): Promise<{
     }
 
     return {
-      source: 'supabase',
+      source: "supabase",
       data: {
-        categories: (categoriesResult.data ?? []).map((item) => ({
-          slug: item.slug,
-          title: item.title,
-          shortLabel: item.short_label,
-          description: item.description,
-          image: item.image,
-          color: item.color,
-          targetSectionId: item.target_section_id,
-        })),
+        categories:
+          (categoriesResult.data ?? []).length > 0
+            ? (categoriesResult.data ?? []).map((item) => ({
+                slug: item.slug,
+                title: item.title,
+                shortLabel: item.short_label,
+                description: item.description,
+                image: item.image,
+                color: item.color,
+                targetSectionId: item.target_section_id,
+              }))
+            : mockCommunityData.categories,
         artists: (artistsResult.data ?? []).map((item) => ({
           name: item.name,
           category: item.category_slug,
@@ -118,14 +167,17 @@ export async function getCommunityData(): Promise<{
           date: item.date_label,
           category: item.category_slug,
         })),
-        communityStats: (statsResult.data ?? []).map((item) => ({
-          number: item.number_label,
-          label: item.label,
-        })),
+        communityStats:
+          (statsResult.data ?? []).length > 0
+            ? (statsResult.data ?? []).map((item) => ({
+                number: item.number_label,
+                label: item.label,
+              }))
+            : mockCommunityData.communityStats,
       },
     };
   } catch (error) {
-    console.error('Supabase unavailable, fallback to mock data:', error);
-    return { source: 'mock', data: getMockData() };
+    console.error("Supabase unavailable, fallback to mock data:", error);
+    return { source: "mock", data: getMockData() };
   }
 }
