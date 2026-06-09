@@ -1,23 +1,68 @@
 export function ArtisticPattern() {
   return (
-    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-5">
+    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden opacity-[0.08]">
       <svg className="absolute w-full h-full" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <pattern id="victorian-pattern" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
-            <circle cx="50" cy="50" r="2" fill="currentColor" className="text-primary" />
-            <path d="M 30 30 Q 50 20 70 30" stroke="currentColor" strokeWidth="0.5" fill="none" className="text-secondary" />
-            <path d="M 30 70 Q 50 80 70 70" stroke="currentColor" strokeWidth="0.5" fill="none" className="text-accent" />
-            <rect x="45" y="10" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="0.5" className="text-primary" transform="rotate(45 50 15)" />
-            <rect x="45" y="80" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="0.5" className="text-secondary" transform="rotate(45 50 85)" />
+          <pattern
+            id="street-pattern"
+            x="0"
+            y="0"
+            width="140"
+            height="140"
+            patternUnits="userSpaceOnUse"
+          >
+            <path
+              d="M 0 118 L 140 -22"
+              stroke="currentColor"
+              strokeWidth="1"
+              fill="none"
+              className="text-foreground"
+            />
+            <path
+              d="M 20 140 L 140 20"
+              stroke="currentColor"
+              strokeWidth="0.8"
+              fill="none"
+              className="text-primary"
+            />
+            <circle cx="24" cy="32" r="4" fill="currentColor" className="text-secondary" />
+            <circle cx="32" cy="38" r="1.4" fill="currentColor" className="text-secondary" />
+            <circle cx="38" cy="28" r="1.8" fill="currentColor" className="text-secondary" />
+            <rect
+              x="88"
+              y="78"
+              width="26"
+              height="26"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1"
+              className="text-accent"
+              transform="rotate(12 101 91)"
+            />
+            <path
+              d="M 90 34 C 104 26 118 52 132 40"
+              stroke="currentColor"
+              strokeWidth="1.2"
+              fill="none"
+              className="text-primary"
+            />
           </pattern>
         </defs>
-        <rect width="100%" height="100%" fill="url(#victorian-pattern)" />
+        <rect width="100%" height="100%" fill="url(#street-pattern)" />
       </svg>
 
-      {/* Floating decorative elements */}
-      <div className="absolute top-20 left-10 w-64 h-64 bg-gradient-to-br from-primary/5 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
-      <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-br from-secondary/5 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDuration: '10s', animationDelay: '2s' }} />
-      <div className="absolute top-1/2 left-1/3 w-96 h-96 bg-gradient-to-br from-accent/5 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDuration: '12s', animationDelay: '4s' }} />
+      <div
+        className="absolute left-10 top-20 h-64 w-64 rounded-full bg-gradient-to-br from-primary/8 to-transparent blur-3xl animate-pulse"
+        style={{ animationDuration: "8s" }}
+      />
+      <div
+        className="absolute bottom-20 right-20 h-80 w-80 rounded-full bg-gradient-to-br from-secondary/8 to-transparent blur-3xl animate-pulse"
+        style={{ animationDuration: "10s", animationDelay: "2s" }}
+      />
+      <div
+        className="absolute left-1/3 top-1/2 h-96 w-96 rounded-full bg-gradient-to-br from-accent/8 to-transparent blur-3xl animate-pulse"
+        style={{ animationDuration: "12s", animationDelay: "4s" }}
+      />
     </div>
   );
 }

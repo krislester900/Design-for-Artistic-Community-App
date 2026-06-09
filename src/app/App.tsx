@@ -43,21 +43,21 @@ export default function App() {
         <main className="pt-20">
           <Hero categories={data.categories} onNavigate={handleNavigate} />
 
-          <div className="sticky top-20 z-40 border-y border-border bg-background/80 backdrop-blur-xl">
-            <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-4 md:flex-row md:items-center md:justify-between">
+          <div className="sticky top-20 z-40 px-6 py-4">
+            <div className="street-panel mx-auto flex max-w-7xl flex-col gap-3 px-6 py-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.25em] text-primary">
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">
                   Parcours connecté
                 </p>
-                <p className="text-sm text-muted-foreground">
+                <p className="mt-2 text-sm text-muted-foreground">
                   Univers actif :{" "}
-                  <span className="font-medium text-foreground">
+                  <span className="font-semibold uppercase tracking-[0.12em] text-foreground">
                     {getCategoryLabel(selectedCategory)}
                   </span>
                 </p>
-                <p className="text-xs text-muted-foreground/80">
+                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground/80">
                   Source de données :{" "}
-                  <span className="font-medium text-foreground">
+                  <span className="font-semibold text-foreground">
                     {source === "supabase" ? "Supabase" : "Mock local"}
                   </span>
                   {isLoading ? " · chargement..." : ""}
@@ -66,13 +66,13 @@ export default function App() {
 
               <div className="flex flex-wrap gap-3">
                 <button
-                  className="rounded-lg border border-border px-4 py-2 text-sm transition-colors hover:border-primary hover:text-primary"
+                  className="rounded-xl border border-border bg-background/50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition-colors hover:border-primary hover:text-primary"
                   onClick={() => handleNavigate("categories", "all")}
                 >
                   Voir tous les univers
                 </button>
                 <button
-                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                  className="rounded-xl border border-primary/30 bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground shadow-[0_10px_28px_rgba(255,106,26,0.25)] transition-all hover:-translate-y-0.5"
                   onClick={() => handleNavigate("showcase", selectedCategory)}
                 >
                   Continuer la découverte

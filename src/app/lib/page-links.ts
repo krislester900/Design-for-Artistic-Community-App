@@ -10,6 +10,9 @@ export type StaticPageId =
   | "animation"
   | "community"
   | "database"
+  | "login"
+  | "signup"
+  | "profile"
   | "admin";
 
 export const staticPagePaths: Record<StaticPageId, string> = {
@@ -22,6 +25,9 @@ export const staticPagePaths: Record<StaticPageId, string> = {
   animation: "/animation.html",
   community: "/community.html",
   database: "/database.html",
+  login: "/connexion.html",
+  signup: "/inscription.html",
+  profile: "/profil.html",
   admin: "/admin.html",
 };
 

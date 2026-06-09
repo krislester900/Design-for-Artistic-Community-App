@@ -40,17 +40,20 @@ export function CommunityFeed({
       <div className="mx-auto max-w-7xl">
         <div className="mb-12 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <h2 className="mb-2 text-4xl font-display italic md:text-5xl">
+            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.32em] text-primary">
+              Community noise
+            </p>
+            <h2 className="street-title mb-2 text-4xl md:text-5xl">
               Le forum créatif
             </h2>
-            <p className="font-accent italic text-muted-foreground">
+            <p className="street-copy">
               {selectedCategory === "all"
                 ? "Échangez, apprenez et grandissez ensemble."
                 : `Sujets et tendances reliés à l'univers ${getCategoryLabel(selectedCategory).toLowerCase()}.`}
             </p>
           </div>
           <button
-            className="rounded-lg bg-primary px-6 py-3 text-primary-foreground transition-opacity hover:opacity-90"
+            className="rounded-xl border border-primary/30 bg-primary px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground shadow-[0_12px_30px_rgba(255,106,26,0.25)] transition-all hover:-translate-y-0.5"
             onClick={() => openStaticPage("community")}
           >
             Ouvrir la page communauté
@@ -76,8 +79,8 @@ export function CommunityFeed({
           </div>
 
           <div className="space-y-6">
-            <div className="rounded-xl border border-border bg-card p-6">
-              <h3 className="mb-4 text-xl font-display">Tendances du moment</h3>
+            <div className="street-panel-soft p-6">
+              <h3 className="street-title mb-4 text-xl">Tendances du moment</h3>
               <div className="space-y-3">
                 {filteredTrends.length > 0 ? (
                   filteredTrends.map((trend) => (
@@ -95,8 +98,8 @@ export function CommunityFeed({
               </div>
             </div>
 
-            <div className="rounded-xl border border-border bg-card p-6">
-              <h3 className="mb-4 text-xl font-display">Événements à venir</h3>
+            <div className="street-panel-soft p-6">
+              <h3 className="street-title mb-4 text-xl">Événements à venir</h3>
               <div className="space-y-4">
                 {filteredEvents.length > 0 ? (
                   filteredEvents.map((event) => (
@@ -128,8 +131,8 @@ function EmptyStatePanel({
   description: string;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-border bg-card/60 p-10 text-center">
-      <h3 className="mb-2 text-2xl font-display text-foreground">{title}</h3>
+    <div className="street-panel rounded-2xl border-dashed p-10 text-center">
+      <h3 className="street-title mb-2 text-2xl">{title}</h3>
       <p className="mx-auto max-w-2xl text-muted-foreground">{description}</p>
     </div>
   );
@@ -148,24 +151,24 @@ function DiscussionCard({
 }) {
   return (
     <button
-      className="group w-full cursor-pointer rounded-xl border border-border bg-card p-6 text-left transition-all hover:border-primary/50 hover:bg-card/80"
+      className="street-panel-soft group w-full cursor-pointer p-6 text-left transition-all hover:-translate-y-0.5 hover:border-primary/55"
       onClick={() => onNavigate("showcase", category)}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <div className="mb-2 flex items-center gap-3">
-            <span className="rounded-full border border-secondary/30 bg-secondary/20 px-3 py-1 text-xs text-secondary-foreground">
+            <span className="street-chip border-secondary/30 bg-secondary/16 text-secondary">
               {getCategoryLabel(category)}
             </span>
             {trending && (
-              <span className="flex items-center gap-1 text-xs text-primary">
+              <span className="flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-primary">
                 <TrendingUp className="h-3 w-3" />
                 Tendance
               </span>
             )}
           </div>
 
-          <h3 className="mb-2 text-lg font-medium transition-colors group-hover:text-primary">
+          <h3 className="street-title mb-2 text-2xl transition-colors group-hover:text-primary">
             {title}
           </h3>
 
@@ -197,10 +200,10 @@ function TrendTag({
 }) {
   return (
     <button
-      className="flex w-full items-center justify-between rounded-lg p-3 text-left transition-colors hover:bg-muted"
+      className="flex w-full items-center justify-between rounded-xl border border-border/70 bg-background/40 p-3 text-left transition-colors hover:border-primary/45 hover:bg-muted/60"
       onClick={() => onNavigate("showcase", category)}
     >
-      <span className="font-medium text-primary">{tag}</span>
+      <span className="font-semibold uppercase tracking-[0.12em] text-primary">{tag}</span>
       <span className="text-sm text-muted-foreground">{count} posts</span>
     </button>
   );
@@ -216,7 +219,7 @@ function EventCard({
 }) {
   return (
     <button
-      className="w-full rounded-lg border border-border p-3 text-left transition-colors hover:border-primary/50"
+      className="w-full rounded-xl border border-border bg-background/45 p-3 text-left transition-colors hover:border-primary/50"
       onClick={() => onNavigate("join", category)}
     >
       <div className="mb-1 flex items-center gap-2 text-primary">
