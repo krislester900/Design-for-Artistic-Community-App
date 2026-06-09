@@ -1,72 +1,102 @@
-import { Music, Palette, Instagram, Twitter, Youtube, Github } from 'lucide-react';
+import { Palette, Compass, MessageCircle, Sparkles } from "lucide-react";
+import {
+  footerSections,
+  getCategoryLabel,
+  type CategorySlug,
+  type SectionId,
+} from "../data/community";
 
-export function Footer() {
+interface FooterProps {
+  selectedCategory: CategorySlug;
+  onNavigate: (sectionId: SectionId, category?: CategorySlug) => void;
+}
+
+export function Footer({ selectedCategory, onNavigate }: FooterProps) {
   return (
     <footer className="border-t border-border bg-card/50 backdrop-blur">
-      <div className="max-w-7xl mx-auto px-6 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
+      <div className="mx-auto max-w-7xl px-6 py-16">
+        <div className="mb-12 grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-4">
           <div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary via-secondary to-accent rounded-lg flex items-center justify-center">
-                <Palette className="w-6 h-6 text-primary-foreground" />
+            <button
+              className="mb-4 flex items-center gap-3"
+              onClick={() => onNavigate("hero")}
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary via-secondary to-accent">
+                <Palette className="h-6 w-6 text-primary-foreground" />
               </div>
               <h3 className="text-2xl font-display italic tracking-wide text-primary">
                 Artéïa
               </h3>
-            </div>
-            <p className="text-muted-foreground font-accent italic mb-6">
-              L'univers où l'art prend vie. Rejoignez une communauté passionnée par la création sous toutes ses formes.
+            </button>
+            <p className="mb-6 font-accent italic text-muted-foreground">
+              Une plateforme artistique où chaque univers est connecté aux
+              créateurs, aux œuvres et aux discussions de la communauté.
             </p>
+            <div className="mb-4 rounded-xl border border-border bg-background/60 p-4 text-sm text-muted-foreground">
+              Univers actif :{" "}
+              <span className="font-medium text-foreground">
+                {getCategoryLabel(selectedCategory)}
+              </span>
+            </div>
             <div className="flex items-center gap-3">
-              <SocialLink icon={<Instagram className="w-5 h-5" />} />
-              <SocialLink icon={<Twitter className="w-5 h-5" />} />
-              <SocialLink icon={<Youtube className="w-5 h-5" />} />
-              <SocialLink icon={<Github className="w-5 h-5" />} />
+              <QuickAction
+                icon={<Compass className="h-5 w-5" />}
+                label="Explorer"
+                onClick={() => onNavigate("categories")}
+              />
+              <QuickAction
+                icon={<MessageCircle className="h-5 w-5" />}
+                label="Forum"
+                onClick={() => onNavigate("forum", selectedCategory)}
+              />
+              <QuickAction
+                icon={<Sparkles className="h-5 w-5" />}
+                label="Rejoindre"
+                onClick={() => onNavigate("join", selectedCategory)}
+              />
             </div>
           </div>
 
-          <div>
-            <h4 className="font-display text-lg mb-4">Explorer</h4>
-            <ul className="space-y-3">
-              <FooterLink text="Musique" />
-              <FooterLink text="Art Visuel" />
-              <FooterLink text="Manga & BD" />
-              <FooterLink text="Films" />
-              <FooterLink text="Littérature" />
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-display text-lg mb-4">Communauté</h4>
-            <ul className="space-y-3">
-              <FooterLink text="Forum" />
-              <FooterLink text="Événements" />
-              <FooterLink text="Artistes" />
-              <FooterLink text="Tendances" />
-              <FooterLink text="Guides" />
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-display text-lg mb-4">À propos</h4>
-            <ul className="space-y-3">
-              <FooterLink text="Notre mission" />
-              <FooterLink text="Équipe" />
-              <FooterLink text="Carrières" />
-              <FooterLink text="Blog" />
-              <FooterLink text="Contact" />
-            </ul>
-          </div>
+          {footerSections.map((section) => (
+            <div key={section.title}>
+              <h4 className="mb-4 text-lg font-display">{section.title}</h4>
+              <ul className="space-y-3">
+                {section.links.map((link) => (
+                  <FooterLink
+                    key={link.text}
+                    text={link.text}
+                    onClick={() => onNavigate(link.sectionId, link.category)}
+                  />
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
 
-        <div className="pt-8 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex flex-col items-center justify-between gap-4 border-t border-border pt-8 md:flex-row">
           <p className="text-sm text-muted-foreground">
-            © 2026 Artéïa. Tous droits réservés. Fait avec passion pour les créateurs.
+            © 2026 Artéïa. Tous droits réservés. Une expérience cohérente pour
+            les créateurs.
           </p>
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
-            <button className="hover:text-primary transition-colors">Confidentialité</button>
-            <button className="hover:text-primary transition-colors">Conditions</button>
-            <button className="hover:text-primary transition-colors">Cookies</button>
+            <button
+              className="transition-colors hover:text-primary"
+              onClick={() => onNavigate("categories", "all")}
+            >
+              Réinitialiser le parcours
+            </button>
+            <button
+              className="transition-colors hover:text-primary"
+              onClick={() => onNavigate("showcase", selectedCategory)}
+            >
+              Continuer l'exploration
+            </button>
+            <button
+              className="transition-colors hover:text-primary"
+              onClick={() => onNavigate("join", selectedCategory)}
+            >
+              Publier mon projet
+            </button>
           </div>
         </div>
       </div>
@@ -74,18 +104,33 @@ export function Footer() {
   );
 }
 
-function SocialLink({ icon }: { icon: React.ReactNode }) {
+function QuickAction({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
   return (
-    <button className="w-10 h-10 rounded-lg border border-border bg-background hover:bg-primary hover:border-primary hover:text-primary-foreground transition-all flex items-center justify-center">
+    <button
+      className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-background transition-all hover:border-primary hover:bg-primary hover:text-primary-foreground"
+      aria-label={label}
+      onClick={onClick}
+    >
       {icon}
     </button>
   );
 }
 
-function FooterLink({ text }: { text: string }) {
+function FooterLink({ text, onClick }: { text: string; onClick: () => void }) {
   return (
     <li>
-      <button className="text-muted-foreground hover:text-primary transition-colors">
+      <button
+        className="text-muted-foreground transition-colors hover:text-primary"
+        onClick={onClick}
+      >
         {text}
       </button>
     </li>

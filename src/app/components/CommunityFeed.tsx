@@ -1,100 +1,96 @@
-import { MessageCircle, TrendingUp, Clock } from 'lucide-react';
+import { MessageCircle, TrendingUp, Clock, CalendarDays } from "lucide-react";
+import {
+  getCategoryLabel,
+  isCategoryMatch,
+  type CategorySlug,
+  type Discussion,
+  type EventItem,
+  type SectionId,
+  type Trend,
+} from "../data/community";
 
-const discussions = [
-  {
-    title: 'Techniques d\'encrage pour le manga moderne',
-    author: 'Yuki Tanaka',
-    category: 'Manga',
-    replies: 127,
-    time: 'Il y a 2h',
-    trending: true
-  },
-  {
-    title: 'Composition musicale : harmonie entre classique et électro',
-    author: 'Sophie Martin',
-    category: 'Musique',
-    replies: 94,
-    time: 'Il y a 5h',
-    trending: true
-  },
-  {
-    title: 'L\'influence de Vagabond sur le manga contemporain',
-    author: 'Kenji Watanabe',
-    category: 'Manga',
-    replies: 203,
-    time: 'Il y a 8h',
-    trending: false
-  },
-  {
-    title: 'Créer des atmosphères victoriennnes dans vos illustrations',
-    author: 'Emma Clarke',
-    category: 'Art',
-    replies: 76,
-    time: 'Il y a 12h',
-    trending: false
-  },
-  {
-    title: 'Comment auto-publier son premier court-métrage ?',
-    author: 'Marco Rossi',
-    category: 'Film',
-    replies: 145,
-    time: 'Hier',
-    trending: true
-  }
-];
+interface CommunityFeedProps {
+  discussions: Discussion[];
+  trends: Trend[];
+  events: EventItem[];
+  selectedCategory: CategorySlug;
+  onNavigate: (sectionId: SectionId, category?: CategorySlug) => void;
+}
 
-export function CommunityFeed() {
+export function CommunityFeed({
+  discussions,
+  trends,
+  events,
+  selectedCategory,
+  onNavigate,
+}: CommunityFeedProps) {
+  const filteredDiscussions = discussions.filter((discussion) =>
+    isCategoryMatch(selectedCategory, discussion.category),
+  );
+  const filteredTrends = trends.filter((trend) =>
+    isCategoryMatch(selectedCategory, trend.category),
+  );
+  const filteredEvents = events.filter((event) =>
+    isCategoryMatch(selectedCategory, event.category),
+  );
+
   return (
-    <section className="py-20 px-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-end justify-between mb-12">
+    <section id="forum" className="px-6 py-20 scroll-mt-28">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-12 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <h2 className="text-4xl md:text-5xl font-display italic mb-2">
+            <h2 className="mb-2 text-4xl font-display italic md:text-5xl">
               Le forum créatif
             </h2>
-            <p className="text-muted-foreground font-accent italic">
-              Échangez, apprenez et grandissez ensemble
+            <p className="font-accent italic text-muted-foreground">
+              {selectedCategory === "all"
+                ? "Échangez, apprenez et grandissez ensemble."
+                : `Sujets et tendances reliés à l'univers ${getCategoryLabel(selectedCategory).toLowerCase()}.`}
             </p>
           </div>
-          <button className="hidden md:block px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity">
+          <button
+            className="rounded-lg bg-primary px-6 py-3 text-primary-foreground transition-opacity hover:opacity-90"
+            onClick={() => onNavigate("join", selectedCategory)}
+          >
             Créer un sujet
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-4">
-            {discussions.map((discussion, index) => (
-              <DiscussionCard key={index} {...discussion} />
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+          <div className="space-y-4 lg:col-span-2">
+            {filteredDiscussions.map((discussion) => (
+              <DiscussionCard
+                key={discussion.title}
+                {...discussion}
+                onNavigate={onNavigate}
+              />
             ))}
           </div>
 
           <div className="space-y-6">
-            <div className="border border-border rounded-xl p-6 bg-card">
-              <h3 className="font-display text-xl mb-4">Tendances du jour</h3>
+            <div className="rounded-xl border border-border bg-card p-6">
+              <h3 className="mb-4 text-xl font-display">Tendances du moment</h3>
               <div className="space-y-3">
-                <TrendTag tag="#MangaIndé" count="2.4k" />
-                <TrendTag tag="#BeethovenModerne" count="1.8k" />
-                <TrendTag tag="#StreetArtPoetry" count="1.2k" />
-                <TrendTag tag="#CinémaExpérimental" count="987" />
-                <TrendTag tag="#IllustrationVictorian" count="765" />
+                {filteredTrends.map((trend) => (
+                  <TrendTag
+                    key={trend.tag}
+                    {...trend}
+                    onNavigate={onNavigate}
+                  />
+                ))}
               </div>
             </div>
 
-            <div className="border border-border rounded-xl p-6 bg-card">
-              <h3 className="font-display text-xl mb-4">Événements à venir</h3>
+            <div className="rounded-xl border border-border bg-card p-6">
+              <h3 className="mb-4 text-xl font-display">Événements à venir</h3>
               <div className="space-y-4">
-                <EventCard
-                  title="Webinaire : L'art du storytelling"
-                  date="15 Juin"
-                />
-                <EventCard
-                  title="Concours de composition musicale"
-                  date="22 Juin"
-                />
-                <EventCard
-                  title="Expo virtuelle : Manga & BD"
-                  date="1 Juillet"
-                />
+                {filteredEvents.map((event) => (
+                  <EventCard
+                    key={event.title}
+                    {...event}
+                    onNavigate={onNavigate}
+                  />
+                ))}
               </div>
             </div>
           </div>
@@ -110,67 +106,92 @@ function DiscussionCard({
   category,
   replies,
   time,
-  trending
-}: {
-  title: string;
-  author: string;
-  category: string;
-  replies: number;
-  time: string;
-  trending: boolean;
+  trending,
+  onNavigate,
+}: Discussion & {
+  onNavigate: (sectionId: SectionId, category?: CategorySlug) => void;
 }) {
   return (
-    <div className="group border border-border rounded-xl p-6 bg-card hover:border-primary/50 hover:bg-card/80 transition-all cursor-pointer">
+    <button
+      className="group w-full cursor-pointer rounded-xl border border-border bg-card p-6 text-left transition-all hover:border-primary/50 hover:bg-card/80"
+      onClick={() => onNavigate("showcase", category)}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="px-3 py-1 bg-secondary/20 border border-secondary/30 rounded-full text-xs text-secondary-foreground">
-              {category}
+          <div className="mb-2 flex items-center gap-3">
+            <span className="rounded-full border border-secondary/30 bg-secondary/20 px-3 py-1 text-xs text-secondary-foreground">
+              {getCategoryLabel(category)}
             </span>
             {trending && (
               <span className="flex items-center gap-1 text-xs text-primary">
-                <TrendingUp className="w-3 h-3" />
+                <TrendingUp className="h-3 w-3" />
                 Tendance
               </span>
             )}
           </div>
 
-          <h3 className="text-lg font-medium mb-2 group-hover:text-primary transition-colors">
+          <h3 className="mb-2 text-lg font-medium transition-colors group-hover:text-primary">
             {title}
           </h3>
 
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <span>Par {author}</span>
             <span className="flex items-center gap-1">
-              <Clock className="w-3 h-3" />
+              <Clock className="h-3 w-3" />
               {time}
             </span>
           </div>
         </div>
 
         <div className="flex items-center gap-2 text-muted-foreground">
-          <MessageCircle className="w-5 h-5" />
+          <MessageCircle className="h-5 w-5" />
           <span className="font-medium">{replies}</span>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
-function TrendTag({ tag, count }: { tag: string; count: string }) {
+function TrendTag({
+  tag,
+  count,
+  category,
+  onNavigate,
+}: Trend & {
+  onNavigate: (sectionId: SectionId, category?: CategorySlug) => void;
+}) {
   return (
-    <button className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors text-left">
-      <span className="text-primary font-medium">{tag}</span>
+    <button
+      className="flex w-full items-center justify-between rounded-lg p-3 text-left transition-colors hover:bg-muted"
+      onClick={() => onNavigate("showcase", category)}
+    >
+      <span className="font-medium text-primary">{tag}</span>
       <span className="text-sm text-muted-foreground">{count} posts</span>
     </button>
   );
 }
 
-function EventCard({ title, date }: { title: string; date: string }) {
+function EventCard({
+  title,
+  date,
+  category,
+  onNavigate,
+}: EventItem & {
+  onNavigate: (sectionId: SectionId, category?: CategorySlug) => void;
+}) {
   return (
-    <div className="p-3 rounded-lg border border-border hover:border-primary/50 transition-colors cursor-pointer">
-      <p className="text-sm font-medium mb-1">{title}</p>
+    <button
+      className="w-full rounded-lg border border-border p-3 text-left transition-colors hover:border-primary/50"
+      onClick={() => onNavigate("join", category)}
+    >
+      <div className="mb-1 flex items-center gap-2 text-primary">
+        <CalendarDays className="h-4 w-4" />
+        <span className="text-xs uppercase tracking-[0.2em]">
+          {getCategoryLabel(category)}
+        </span>
+      </div>
+      <p className="mb-1 text-sm font-medium">{title}</p>
       <p className="text-xs text-muted-foreground">{date}</p>
-    </div>
+    </button>
   );
 }
