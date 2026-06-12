@@ -60,6 +60,8 @@
   --destructive-foreground: oklch(0.637 0.237 25.331);
   --border: oklch(0.269 0 0);
   --input: oklch(0.269 0 0);
+  --input-background: #1a1a1e;
+  --switch-background: #3a3a42;
   --ring: oklch(0.439 0 0);
   --font-weight-medium: 500; 
   --font-weight-normal: 400;
@@ -117,4 +119,391 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   WOW-FACTOR CHAT ANIMATIONS
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Smooth scrollbar ─── */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(128, 128, 128, 0.15) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar { width: 5px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.15);
+  border-radius: 10px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.3);
+}
+
+/* ─── 1. MESSAGE ENTRANCE — Cinematic slide + blur + elastic scale ─── */
+@keyframes msg-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+    filter: blur(6px);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateY(-3px) scale(1.008);
+    filter: blur(0);
+  }
+  75% {
+    transform: translateY(1px) scale(0.998);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+.message-enter {
+  animation: msg-enter 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ─── 2. MESSAGE HOVER — Glow border + subtle lift ─── */
+.chat-message-hover {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 8px;
+}
+.chat-message-hover:hover {
+  background-color: rgba(99, 102, 241, 0.04);
+  transform: translateX(3px);
+  box-shadow: inset 3px 0 0 0 rgba(99, 102, 241, 0.25);
+}
+
+/* ─── 3. REACTION POP — Elastic bounce with rotation ─── */
+@keyframes reaction-pop {
+  0% { transform: scale(0) rotate(-20deg); opacity: 0; }
+  40% { transform: scale(1.4) rotate(8deg); opacity: 1; }
+  65% { transform: scale(0.88) rotate(-3deg); }
+  85% { transform: scale(1.08) rotate(1deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.reaction-enter {
+  animation: reaction-pop 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ─── 4. STICKER SEND — Dramatic bounce entrance ─── */
+@keyframes sticker-send {
+  0% { transform: scale(0) rotate(-25deg); opacity: 0; }
+  35% { transform: scale(1.5) rotate(10deg); opacity: 1; }
+  55% { transform: scale(0.8) rotate(-4deg); }
+  75% { transform: scale(1.15) rotate(2deg); }
+  90% { transform: scale(0.97) rotate(-1deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.sticker-enter {
+  animation: sticker-send 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ─── 5. TYPING INDICATOR — Smooth bouncing dots ─── */
+@keyframes typing-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.3;
+  }
+  30% {
+    transform: translateY(-8px);
+    opacity: 1;
+  }
+}
+.typing-dot-1 { animation: typing-bounce 1.4s ease-in-out infinite 0s; }
+.typing-dot-2 { animation: typing-bounce 1.4s ease-in-out infinite 0.2s; }
+.typing-dot-3 { animation: typing-bounce 1.4s ease-in-out infinite 0.4s; }
+
+/* ─── 6. RECORDING PULSE — Expanding concentric rings ─── */
+@keyframes recording-ring {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  50% { box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+.recording-pulse {
+  animation: recording-ring 1.2s ease-out infinite;
+}
+
+/* ─── 7. WAVEFORM — Organic breathing bars ─── */
+@keyframes wave-bar {
+  0%, 100% { height: 3px; }
+  50% { height: 20px; }
+}
+.waveform-bar-idle {
+  animation: wave-bar 1.2s ease-in-out infinite;
+}
+
+/* ─── 8. UNREAD BADGE — Glowing pulse ─── */
+@keyframes badge-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  50% { box-shadow: 0 0 8px 2px rgba(239, 68, 68, 0.25); }
+}
+.badge-pulse {
+  animation: badge-glow 2s ease-in-out infinite;
+}
+
+/* ─── 9. PICKER ENTRANCE — Spring slide-up with blur ─── */
+@keyframes picker-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.92);
+    filter: blur(4px);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.02);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+.picker-enter {
+  animation: picker-enter 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ─── 10. SIDEBAR ACTIVE — Animated glow bar ─── */
+@keyframes sidebar-glow {
+  0% {
+    box-shadow: inset 3px 0 0 0 var(--primary), 0 0 0 0 rgba(99, 102, 241, 0);
+  }
+  50% {
+    box-shadow: inset 3px 0 0 0 var(--primary), 0 0 12px 0 rgba(99, 102, 241, 0.12);
+  }
+  100% {
+    box-shadow: inset 3px 0 0 0 var(--primary), 0 0 0 0 rgba(99, 102, 241, 0);
+  }
+}
+.sidebar-active-glow {
+  animation: sidebar-glow 2.5s ease-in-out infinite;
+}
+
+/* ─── 11. SEND BUTTON — Satisfying press & bounce ─── */
+@keyframes send-press {
+  0% { transform: scale(1); }
+  30% { transform: scale(0.82); }
+  60% { transform: scale(1.1); }
+  80% { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+.send-press {
+  animation: send-press 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ─── 12. GRADIENT ANIMATED BACKGROUND ─── */
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.animated-gradient {
+  background: linear-gradient(135deg, 
+    rgba(99, 102, 241, 0.05), 
+    rgba(168, 85, 247, 0.03), 
+    rgba(99, 102, 241, 0.05)
+  );
+  background-size: 200% 200%;
+  animation: gradient-shift 12s ease infinite;
+}
+
+/* ─── 13. STICKER HOVER — Playful rotation bounce ─── */
+@keyframes sticker-bounce {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.18) rotate(-4deg); }
+  50% { transform: scale(1.25) rotate(4deg); }
+  75% { transform: scale(1.12) rotate(-2deg); }
+}
+.sticker-hover:hover {
+  animation: sticker-bounce 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ─── 14. EMOJI HOVER — Quick pop ─── */
+@keyframes emoji-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+.emoji-hover:hover {
+  animation: emoji-pop 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ─── 15. GLASS MORPHISM ─── */
+.glass-overlay {
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+}
+
+/* ─── 16. GRADIENT TEXT ─── */
+.chat-gradient-text {
+  background: linear-gradient(135deg, var(--primary), oklch(0.646 0.222 41.116));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── 17. PICKER SHADOW ─── */
+.picker-shadow {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.04),
+    0 4px 6px -1px rgba(0, 0, 0, 0.07),
+    0 20px 25px -5px rgba(0, 0, 0, 0.12),
+    0 8px 10px -6px rgba(0, 0, 0, 0.08);
+}
+
+/* ─── 18. FOCUS RING ─── */
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ─── 19. CHANNEL SWITCH CROSSFADE ─── */
+@keyframes channel-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.channel-enter {
+  animation: channel-fade-in 0.3s ease-out both;
+}
+
+/* ─── 20. ATTACHMENT CHIP — Slide in ─── */
+@keyframes chip-slide {
+  from {
+    opacity: 0;
+    transform: translateX(-8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+.chip-enter {
+  animation: chip-slide 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ─── 21. VOICE BARS — Organic wave pattern ─── */
+@keyframes voice-wave-1 { 0%, 100% { height: 4px; } 50% { height: 18px; } }
+@keyframes voice-wave-2 { 0%, 100% { height: 8px; } 50% { height: 24px; } }
+@keyframes voice-wave-3 { 0%, 100% { height: 12px; } 50% { height: 28px; } }
+@keyframes voice-wave-4 { 0%, 100% { height: 6px; } 50% { height: 20px; } }
+@keyframes voice-wave-5 { 0%, 100% { height: 10px; } 50% { height: 22px; } }
+
+/* ─── 22. REPLY INDICATOR — Smooth slide ─── */
+@keyframes reply-slide {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+    max-height: 60px;
+  }
+}
+.reply-enter {
+  animation: reply-slide 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ─── 23. MEMBERS PANEL — Slide from right ─── */
+@keyframes panel-slide-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.panel-enter {
+  animation: panel-slide-right 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ─── 24. MESSAGE GROUP STAGGER ─── */
+.message-stagger:nth-child(1) { animation-delay: 0ms; }
+.message-stagger:nth-child(2) { animation-delay: 30ms; }
+.message-stagger:nth-child(3) { animation-delay: 60ms; }
+.message-stagger:nth-child(4) { animation-delay: 90ms; }
+.message-stagger:nth-child(5) { animation-delay: 120ms; }
+
+/* ─── 25. RIPPLE EFFECT ─── */
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+.ripple {
+  position: relative;
+  overflow: hidden;
+}
+.ripple::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+  transform: scale(0);
+  opacity: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.ripple:active::after {
+  animation: ripple 0.5s ease-out;
+}
+
+/* ─── 26. SKELETON LOADING — Shimmer effect ─── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(128, 128, 128, 0.06) 25%,
+    rgba(128, 128, 128, 0.12) 50%,
+    rgba(128, 128, 128, 0.06) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* ─── DARK MODE ─── */
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+}
+.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+.dark .chat-message-hover:hover {
+  background-color: rgba(99, 102, 241, 0.04);
+  box-shadow: inset 3px 0 0 0 rgba(99, 102, 241, 0.2);
+}
+.dark .glass-overlay {
+  background: rgba(0, 0, 0, 0.55);
+}
+.dark .skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
 }

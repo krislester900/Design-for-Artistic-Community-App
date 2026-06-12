@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   BookOpen,
   Clapperboard,
@@ -7,6 +8,7 @@ import {
   Home,
   Layers3,
   LockKeyhole,
+  LogOut,
   MessageCircle,
   Music4,
   Pen,
@@ -34,6 +36,10 @@ import {
   staticPagePaths,
   type StaticPageId,
 } from "../lib/page-links";
+import { ThemeToggle } from "../components/ui/ThemeToggle.tsx";
+import { ArtworkUploadForm } from "../profile/ArtworkUploadForm.tsx";
+import { signIn, signUp, signOut as doSignOut, getCurrentSession, onAuthChange, type AuthUser } from "../services/auth";
+import { hasSupabaseEnv } from "../lib/supabase";
 
 type MultiPageAppProps = {
   page: string;
@@ -183,7 +189,8 @@ export function MultiPageApp({ page }: MultiPageAppProps) {
               })}
             </nav>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <ThemeToggle />
               {utilityLinks.map((link) => {
                 const active = link.id === page;
                 return (
@@ -817,16 +824,86 @@ function EmptyPanel({
 
 function AuthPageSection({ page }: { page: StaticPageId }) {
   const isLoginPage = page === "login";
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  useEffect(() => {
+    getCurrentSession().then(({ user }) => {
+      if (user) setAuthUser(user);
+    });
+    const sub = onAuthChange((user) => setAuthUser(user));
+    return () => sub.unsubscribe();
+  }, []);
+
+  function showMessage(type: "success" | "error", text: string) {
+    setMessage({ type, text });
+    setTimeout(() => setMessage(null), 5000);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) {
+      showMessage("error", "Email et mot de passe requis.");
+      return;
+    }
+    setIsSubmitting(true);
+    setMessage(null);
+    try {
+      if (isLoginPage) {
+        const { user, error } = await signIn(email.trim(), password);
+        if (error) {
+          showMessage("error", error);
+        } else if (user) {
+          setAuthUser(user);
+          showMessage("success", "Connecté ! Bienvenue dans Artéïa.");
+        }
+      } else {
+        const { user, error } = await signUp(email.trim(), password);
+        if (error) {
+          showMessage("error", error);
+        } else if (user) {
+          showMessage("success", "Compte créé ! Vérifie tes emails pour confirmer ton inscription.");
+        }
+      }
+    } catch (err) {
+      showMessage("error", err instanceof Error ? err.message : "Erreur de connexion.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleLogout() {
+    await doSignOut();
+    setAuthUser(null);
+  }
+
+  const inputCls = "w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-primary";
 
   return (
     <>
       <section className="px-6 py-10">
         <div className="mx-auto grid max-w-7xl gap-6 md:grid-cols-3">
-          <StatCard label="Acces" value={isLoginPage ? "24/7" : "Nouveau"} />
-          <StatCard label="Parcours" value={isLoginPage ? "Secure" : "Createur"} />
-          <StatCard label="Etat" value="Pret" />
+          <StatCard label="Acces" value={authUser ? "Connecte" : (isLoginPage ? "24/7" : "Nouveau")} />
+          <StatCard label="Parcours" value={authUser ? "Actif" : (isLoginPage ? "Secure" : "Createur")} />
+          <StatCard label="Etat" value={authUser ? "Authentifie" : "Pret"} />
         </div>
       </section>
+
+      {message && (
+        <section className="px-6 py-0">
+          <div className={`mx-auto max-w-7xl rounded-xl border px-5 py-4 text-sm backdrop-blur ${
+            message.type === "success"
+              ? "border-primary/30 bg-primary/10 text-primary"
+              : "border-red-500/30 bg-red-500/10 text-red-300"
+          }`}>
+            {message.text}
+          </div>
+        </section>
+      )}
 
       <section className="px-6 py-10">
         <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.95fr_1.05fr]">
@@ -836,50 +913,125 @@ function AuthPageSection({ page }: { page: StaticPageId }) {
               <span>{isLoginPage ? "Connexion" : "Inscription"}</span>
             </div>
             <h2 className="street-title mb-4 text-3xl">
-              {isLoginPage ? "Reprendre le controle de ton univers" : "Donne une forme a ta presence creative"}
+              {authUser
+                ? `Connecte en tant que ${authUser.email}`
+                : isLoginPage
+                  ? "Reprendre le controle de ton univers"
+                  : "Donne une forme a ta presence creative"}
             </h2>
             <p className="street-copy text-lg leading-8">
-              {isLoginPage
-                ? "Retrouve ton espace, tes projets, tes brouillons et les liens entre tes univers artistiques dans une entree plus forte et plus vivante."
-                : "Cree ton identite, choisis ton terrain, commence a publier et a faire exister ton univers dans une scene qui a deja du souffle."}
+              {authUser
+                ? "Tu es authentifie. Tes soumissions seront envoyees directement a la base Supabase."
+                : isLoginPage
+                  ? "Retrouve ton espace, tes projets, tes brouillons et les liens entre tes univers artistiques dans une entree plus forte et plus vivante."
+                  : "Cree ton identite, choisis ton terrain, commence a publier et a faire exister ton univers dans une scene qui a deja du souffle."}
             </p>
             <div className="mt-8 grid gap-4 md:grid-cols-2">
               <InfoCard
-                title="Finition"
-                body="Le formulaire reste statique pour l'instant, mais le rendu est pense comme une vraie porte d'entree produit."
+                title={hasSupabaseEnv ? "Supabase actif" : "Configuration requise"}
+                body={hasSupabaseEnv
+                  ? "Supabase est configure. Les formulaires envoient les donnees directement a la base."
+                  : "Ajoute VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY dans .env pour activer la base."}
               />
               <InfoCard
-                title="Vision"
-                body="L'ambiance visuelle raconte deja la promesse du projet avant meme que l'utilisateur ne clique."
+                title="Profil"
+                body={authUser
+                  ? "Tu peux maintenant publier des oeuvres, creer des profils artistes et lancer des discussions."
+                  : "Connecte-toi ou cree un compte pour commencer a contribuer."}
               />
             </div>
           </div>
 
           <div className="street-panel p-8">
-            <h2 className="street-title mb-6 text-3xl">
-              {isLoginPage ? "Entrer" : "Commencer"}
-            </h2>
-            <div className="grid gap-5">
-              <FieldCard label="Email" value="ton.nom@arteia.fr" />
-              <FieldCard
-                label={isLoginPage ? "Mot de passe" : "Nom creatif"}
-                value={isLoginPage ? "••••••••••••" : "Ton alias ou nom d'artiste"}
-              />
-              {!isLoginPage && (
-                <FieldCard label="Univers principal" value="Musique, manga, animation..." />
-              )}
-              <div className="flex flex-wrap gap-3 pt-2">
-                <button className="rounded-xl border border-primary/30 bg-primary px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground transition-opacity hover:opacity-90">
-                  {isLoginPage ? "Se connecter" : "Creer mon compte"}
-                </button>
+            {authUser ? (
+              <div className="space-y-6">
+                <h2 className="street-title mb-4 text-3xl flex items-center gap-3">
+                  <ShieldCheck className="h-6 w-6 text-primary" />
+                  Authentifie
+                </h2>
+                <p className="text-muted-foreground">
+                  Tu es connecte avec <span className="font-medium text-foreground">{authUser.email}</span>.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Va sur la page <a href={getStaticPagePath("profile")} className="text-primary underline">Profil</a> pour soumettre du contenu, ou utilise l'admin si tu as les droits.
+                </p>
                 <button
-                  className="rounded-xl border border-border bg-card/60 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-foreground transition-colors hover:border-primary hover:text-primary"
-                  onClick={() => openStaticPage(isLoginPage ? "signup" : "login")}
+                  onClick={handleLogout}
+                  className="inline-flex items-center gap-2 rounded-xl border border-border bg-card/60 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-foreground transition-colors hover:border-red-500 hover:text-red-400"
                 >
-                  {isLoginPage ? "Pas encore inscrit" : "J'ai deja un compte"}
+                  <LogOut className="h-4 w-4" />
+                  Se deconnecter
                 </button>
               </div>
-            </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <h2 className="street-title mb-4 text-3xl">
+                  {isLoginPage ? "Entrer" : "Commencer"}
+                </h2>
+                <div>
+                  <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-muted-foreground">Email *</label>
+                  <input
+                    className={inputCls}
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="ton.email@arteia.fr"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                    {isLoginPage ? "Mot de passe *" : "Mot de passe *"}
+                  </label>
+                  <input
+                    className={inputCls}
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    minLength={6}
+                  />
+                </div>
+                {!isLoginPage && (
+                  <div>
+                    <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                      Nom creatif (optionnel)
+                    </label>
+                    <input
+                      className={inputCls}
+                      type="text"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      placeholder="Ton alias ou nom d'artiste"
+                    />
+                  </div>
+                )}
+                {!hasSupabaseEnv && (
+                  <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-xs text-yellow-400">
+                    ⚠️ Supabase non configure. Ajoute les variables dans .env pour activer l'auth.
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !hasSupabaseEnv}
+                    className="rounded-xl border border-primary/30 bg-primary px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+                  >
+                    {isSubmitting
+                      ? "En cours..."
+                      : (isLoginPage ? "Se connecter" : "Creer mon compte")}
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-xl border border-border bg-card/60 px-6 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-foreground transition-colors hover:border-primary hover:text-primary"
+                    onClick={() => openStaticPage(isLoginPage ? "signup" : "login")}
+                  >
+                    {isLoginPage ? "Pas encore inscrit ?" : "J'ai deja un compte"}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       </section>
@@ -888,70 +1040,12 @@ function AuthPageSection({ page }: { page: StaticPageId }) {
 }
 
 function ProfilePageSection() {
-  const stats = [
-    { label: "Projets visibles", value: "03" },
-    { label: "Univers relies", value: "06" },
-    { label: "Interactions", value: "128" },
-  ];
-
   return (
-    <>
-      <section className="px-6 py-10">
-        <div className="mx-auto grid max-w-7xl gap-6 md:grid-cols-3">
-          {stats.map((stat) => (
-            <StatCard key={stat.label} label={stat.label} value={stat.value} />
-          ))}
-        </div>
-      </section>
-
-      <section className="px-6 py-10">
-        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.85fr_1.15fr]">
-          <div className="street-panel overflow-hidden p-8">
-            <div className="relative overflow-hidden rounded-[1.5rem] border border-border bg-background/50 p-6">
-              <div className="absolute right-[-20px] top-[-20px] h-28 w-28 rounded-full bg-primary/18 blur-3xl" />
-              <div className="mb-6 flex items-center gap-4">
-                <div className="flex h-18 w-18 items-center justify-center rounded-3xl border border-primary/25 bg-primary/12">
-                  <UserRound className="h-8 w-8 text-primary" />
-                </div>
-                <div>
-                  <h3 className="street-title text-2xl">Kris / Creative Core</h3>
-                  <p className="text-sm uppercase tracking-[0.18em] text-muted-foreground">
-                    Profil createur vivant
-                  </p>
-                </div>
-              </div>
-              <p className="street-copy text-base leading-7">
-                Ce profil sert de base a un futur espace personnel riche: bio,
-                projets, univers, collaborations, drafts et progression du
-                parcours creatif.
-              </p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                {["musique", "manga", "animation", "films"].map((item) => (
-                  <span key={item} className="street-chip">
-                    {item}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-6">
-            <InfoCard
-              title="Identite"
-              body="Le profil devient une page a part entiere, avec sa propre ambiance et une sensation de presence plus forte."
-            />
-            <InfoCard
-              title="Projets"
-              body="On peut y afficher demain des travaux en cours, des drafts, des inspirations, des publications et des connexions entre univers."
-            />
-            <InfoCard
-              title="Projection"
-              body="L'utilisateur doit sentir que son espace est deja pret a accueillir quelque chose de grand, meme avant la premiere vraie donnee."
-            />
-          </div>
-        </div>
-      </section>
-    </>
+    <section className="px-6 py-10">
+      <div className="mx-auto max-w-4xl">
+        <ArtworkUploadForm />
+      </div>
+    </section>
   );
 }
 

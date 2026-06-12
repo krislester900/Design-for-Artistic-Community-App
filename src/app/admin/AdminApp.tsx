@@ -26,6 +26,7 @@ import {
   syncDefaultCategories,
   upsertStat,
 } from "./admin-service";
+import { ThemeToggle } from "../components/ui/ThemeToggle.tsx";
 
 const initialArtist = {
   name: "",
@@ -185,7 +186,8 @@ export function AdminApp() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <ThemeToggle />
             <a
               href={getStaticPagePath("home")}
               className="rounded-lg border border-border px-4 py-2 text-sm transition-colors hover:border-primary hover:text-primary"
