@@ -81,7 +81,7 @@ export function ChatSidebar({
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/50 px-4 py-4">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-bold uppercase tracking-[0.18em] bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+          <h2 className="text-sm font-bold uppercase tracking-[0.18em] bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent" style={{ fontFamily: "'Alien Block', cursive" }}>
             Artéïa
           </h2>
           {totalUnread > 0 && (

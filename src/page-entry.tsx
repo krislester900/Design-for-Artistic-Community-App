@@ -1,9 +1,9 @@
 import { createRoot } from "react-dom/client";
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import "./styles/index.css";
 import { ThemeProvider } from "./app/components/ui/ThemeProvider.tsx";
 import { MultiPageApp } from "./app/pages/MultiPageApp.tsx";
-import { LoadingScreen } from "./app/components/LoadingScreen.tsx";
+import { ArtLoadingScreen } from "./app/components/ArtLoadingScreen.tsx";
 
 const page = document.body.dataset.page;
 
@@ -14,14 +14,10 @@ if (!page) {
 function PageRoot() {
   const [ready, setReady] = useState(false);
 
-  useEffect(() => {
-    // Minimum 2.6s loading animation, then hide
-    const timer = setTimeout(() => setReady(true), 2600);
-    return () => clearTimeout(timer);
-  }, []);
+  const handleComplete = useCallback(() => setReady(true), []);
 
   if (!ready) {
-    return <LoadingScreen />;
+    return <ArtLoadingScreen onComplete={handleComplete} />;
   }
 
   return (

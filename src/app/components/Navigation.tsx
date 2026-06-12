@@ -24,7 +24,7 @@ export function Navigation({ selectedCategory, onNavigate }: NavigationProps) {
             <Palette className="h-6 w-6 text-primary-foreground" />
           </div>
           <div className="text-left">
-            <h1 className="font-display text-2xl uppercase tracking-[0.18em] text-foreground">
+            <h1 className="text-2xl uppercase tracking-[0.18em] text-foreground" style={{ fontFamily: "'Alien Block', cursive" }}>
               Artéïa
             </h1>
             <p className="hidden text-[11px] uppercase tracking-[0.24em] text-muted-foreground md:block">

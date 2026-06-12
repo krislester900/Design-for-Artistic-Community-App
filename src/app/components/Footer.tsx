@@ -31,7 +31,7 @@ export function Footer({ selectedCategory, onNavigate }: FooterProps) {
               <div className="flex h-11 w-11 -rotate-3 items-center justify-center rounded-2xl border border-foreground/10 bg-gradient-to-br from-primary via-primary to-accent shadow-[0_12px_30px_rgba(255,106,26,0.22)]">
                 <Palette className="h-6 w-6 text-primary-foreground" />
               </div>
-              <h3 className="font-display text-2xl uppercase tracking-[0.18em] text-foreground">
+              <h3 className="text-2xl uppercase tracking-[0.18em] text-foreground" style={{ fontFamily: "'Alien Block', cursive" }}>
                 Artéïa
               </h3>
             </button>

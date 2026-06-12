@@ -160,7 +160,7 @@ export function MultiPageApp({ page }: MultiPageAppProps) {
                 <Sparkles className="h-5 w-5 text-primary-foreground" />
               </div>
               <div>
-                <div className="font-display text-2xl uppercase tracking-[0.18em] text-foreground">
+                <div className="text-2xl uppercase tracking-[0.18em] text-foreground" style={{ fontFamily: "'Alien Block', cursive" }}>
                   Artéïa
                 </div>
                 <div className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">

@@ -1,20 +1,17 @@
 import { createRoot } from "react-dom/client";
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import "./styles/index.css";
 import { ThemeProvider } from "./app/components/ui/ThemeProvider.tsx";
 import { AdminApp } from "./app/admin/AdminApp.tsx";
-import { LoadingScreen } from "./app/components/LoadingScreen.tsx";
+import { ArtLoadingScreen } from "./app/components/ArtLoadingScreen.tsx";
 
 function AdminRoot() {
   const [ready, setReady] = useState(false);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setReady(true), 2600);
-    return () => clearTimeout(timer);
-  }, []);
+  const handleComplete = useCallback(() => setReady(true), []);
 
   if (!ready) {
-    return <LoadingScreen />;
+    return <ArtLoadingScreen onComplete={handleComplete} />;
   }
 
   return (
