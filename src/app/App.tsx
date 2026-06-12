@@ -8,6 +8,7 @@ import { CommunityFeed } from "./components/CommunityFeed";
 import { JoinCTA } from "./components/JoinCTA";
 import { Footer } from "./components/Footer";
 import { ArtisticPattern } from "./components/ArtisticPattern";
+import { ScrollReveal } from "./components/ScrollReveal";
 import { useCommunityData } from "./hooks/useCommunityData";
 import {
   type CategorySlug,
@@ -81,35 +82,45 @@ export default function App() {
             </div>
           </div>
 
-          <ArtCategories
-            categories={data.categories}
-            artists={data.artists}
-            artworks={data.artworks}
-            discussions={data.discussions}
-            selectedCategory={selectedCategory}
-            onNavigate={handleNavigate}
-          />
-          <FeaturedArtists
-            artists={data.artists}
-            selectedCategory={selectedCategory}
-            onNavigate={handleNavigate}
-          />
-          <ArtShowcase
-            artworks={data.artworks}
-            selectedCategory={selectedCategory}
-            onNavigate={handleNavigate}
-          />
-          <CommunityFeed
-            discussions={data.discussions}
-            trends={data.trends}
-            events={data.events}
-            selectedCategory={selectedCategory}
-            onNavigate={handleNavigate}
-          />
-          <JoinCTA
-            communityStats={data.communityStats}
-            onNavigate={handleNavigate}
-          />
+          <ScrollReveal>
+            <ArtCategories
+              categories={data.categories}
+              artists={data.artists}
+              artworks={data.artworks}
+              discussions={data.discussions}
+              selectedCategory={selectedCategory}
+              onNavigate={handleNavigate}
+            />
+          </ScrollReveal>
+          <ScrollReveal delay={0.1}>
+            <FeaturedArtists
+              artists={data.artists}
+              selectedCategory={selectedCategory}
+              onNavigate={handleNavigate}
+            />
+          </ScrollReveal>
+          <ScrollReveal delay={0.15}>
+            <ArtShowcase
+              artworks={data.artworks}
+              selectedCategory={selectedCategory}
+              onNavigate={handleNavigate}
+            />
+          </ScrollReveal>
+          <ScrollReveal delay={0.1}>
+            <CommunityFeed
+              discussions={data.discussions}
+              trends={data.trends}
+              events={data.events}
+              selectedCategory={selectedCategory}
+              onNavigate={handleNavigate}
+            />
+          </ScrollReveal>
+          <ScrollReveal delay={0.15} direction="none">
+            <JoinCTA
+              communityStats={data.communityStats}
+              onNavigate={handleNavigate}
+            />
+          </ScrollReveal>
         </main>
 
         <Footer

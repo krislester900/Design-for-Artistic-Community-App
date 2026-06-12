@@ -4,6 +4,9 @@ import {
   Compass,
   MessageCircle,
   Sparkles,
+  Instagram,
+  Twitter,
+  Youtube,
 } from "lucide-react";
 import {
   footerSections,
@@ -94,27 +97,28 @@ export function Footer({ selectedCategory, onNavigate }: FooterProps) {
 
         <div className="flex flex-col items-center justify-between gap-4 border-t border-border pt-8 md:flex-row">
           <p className="text-sm uppercase tracking-[0.12em] text-muted-foreground">
-            © 2026 Artéïa. Cree par Kris N'dri sous l'inspiration de Fatmé
-            Sleiman.
+            © 2026 Artéïa. Créé par Kris N'dri sous l'inspiration de Fatmé Sleiman.
           </p>
+          <div className="flex items-center gap-4">
+            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-background/60 transition-all hover:border-primary hover:bg-primary hover:text-primary-foreground" aria-label="Instagram">
+              <Instagram className="h-4 w-4" />
+            </a>
+            <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-background/60 transition-all hover:border-primary hover:bg-primary hover:text-primary-foreground" aria-label="Twitter">
+              <Twitter className="h-4 w-4" />
+            </a>
+            <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-background/60 transition-all hover:border-primary hover:bg-primary hover:text-primary-foreground" aria-label="YouTube">
+              <Youtube className="h-4 w-4" />
+            </a>
+          </div>
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
-            <button
-              className="transition-colors hover:text-primary"
-              onClick={() => onNavigate("categories", "all")}
-            >
-              Réinitialiser le parcours
+            <button className="transition-colors hover:text-primary" onClick={() => onNavigate("categories", "all")}>
+              Réinitialiser
             </button>
-            <button
-              className="transition-colors hover:text-primary"
-              onClick={() => openStaticPage("database")}
-            >
-              Voir la base
+            <button className="transition-colors hover:text-primary" onClick={() => openStaticPage("database")}>
+              Base
             </button>
-            <button
-              className="transition-colors hover:text-primary"
-              onClick={() => openStaticPage("profile")}
-            >
-              Publier mon projet
+            <button className="transition-colors hover:text-primary" onClick={() => openStaticPage("profile")}>
+              Publier
             </button>
           </div>
         </div>
