@@ -1,22 +1,36 @@
 
   <!DOCTYPE html>
-  <html lang="en">
+  <html lang="fr">
     <head>
-      
       <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Design for Artistic Community App</title>
-      <meta name="description" content="Connect with fellow artists and enthusiasts to share music, animations, independent films, and manga, fostering a vibrant community centered on creativity." />
-      <meta name="robots" content="noindex, nofollow" />
-      <style>html, body { height: 100%; margin: 0; } #root { height: 100%; }</style>
-      
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+      <title>Artéïa - Revue d'Art Contemporain</title>
+      <meta name="description" content="Connecte-toi avec des artistes et passionnés pour partager musique, animations, films indépendants et manga, dans une communauté créative vibrante." />
+      <meta name="theme-color" content="#ff6a1a" />
+      <meta name="apple-mobile-web-app-capable" content="yes" />
+      <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+      <meta name="apple-mobile-web-app-title" content="Artéïa" />
+      <meta name="mobile-web-app-capable" content="yes" />
+      <meta name="application-name" content="Artéïa" />
+      <link rel="manifest" href="/manifest.json" />
+      <link rel="icon" type="image/svg+xml" href="/icons/icon-192x192.svg" />
+      <link rel="apple-touch-icon" href="/icons/icon-192x192.svg" />
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Alien+Block&family=Josefin+Sans:ital,wght@0,100..700;1,100..700&family=Oswald:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
+      <style>html, body { height: 100%; margin: 0; overscroll-behavior: none; -webkit-overflow-scrolling: touch; } #root { height: 100%; }</style>
+      <script>
+        // Register service worker for offline support
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').catch(() => {});
+          });
+        }
+      </script>
     </head>
-
     <body>
-      
       <div id="root"></div>
       <script type="module" src="/src/main.tsx"></script>
-      
     </body>
   </html>
   

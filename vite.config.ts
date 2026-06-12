@@ -21,21 +21,21 @@ function figmaAssetResolver() {
 export default defineConfig({
   plugins: [
     figmaAssetResolver(),
-    // The React and Tailwind plugins are both required for Make, even if
-    // Tailwind is not being actively used – do not remove them
     react(),
     tailwindcss(),
   ],
   resolve: {
     alias: {
-      // Alias @ to the src directory
       '@': path.resolve(__dirname, './src'),
     },
   },
 
-  // Multi-Page App (MPA) configuration
-  // Each HTML file is an entry point so Vite bundles its scripts correctly
   build: {
+    // Enable source maps for production debugging
+    sourcemap: false,
+    // Minify aggressively
+    minify: 'terser',
+    // Split chunks for better caching
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
@@ -52,9 +52,31 @@ export default defineConfig({
         profil: path.resolve(__dirname, 'profil.html'),
         admin: path.resolve(__dirname, 'admin.html'),
       },
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/') || id.includes('node_modules/motion') || id.includes('node_modules/framer-motion') || id.includes('node_modules/scheduler')) {
+            return 'vendor';
+          }
+          if (id.includes('node_modules/lucide-react') || id.includes('node_modules/clsx') || id.includes('node_modules/tailwind-merge')) {
+            return 'ui';
+          }
+          if (id.includes('node_modules/supabase') || id.includes('node_modules/@supabase')) {
+            return 'supabase';
+          }
+        },
+      },
     },
+    // CSS code splitting
+    cssCodeSplit: true,
+    // Optimize for mobile
+    target: 'es2020',
   },
 
-  // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
+
+  // Development server for mobile testing
+  server: {
+    host: true,
+    port: 5173,
+  },
 })

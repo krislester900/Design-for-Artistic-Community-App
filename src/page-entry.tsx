@@ -1,11 +1,16 @@
 import { createRoot } from "react-dom/client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, lazy, Suspense } from "react";
 import "./styles/index.css";
 import { ThemeProvider } from "./app/components/ui/ThemeProvider.tsx";
-import { MultiPageApp } from "./app/pages/MultiPageApp.tsx";
 import { ArtLoadingScreen } from "./app/components/ArtLoadingScreen.tsx";
 
-const page = document.body.dataset.page;
+// Lazy load the heavy MultiPageApp
+const MultiPageApp = lazy(async () => {
+  const mod = await import("./app/pages/MultiPageApp.tsx");
+  return { default: mod.MultiPageApp };
+});
+
+const page = document.body.dataset.page ?? "";
 
 if (!page) {
   throw new Error("Missing data-page attribute on body.");
@@ -22,7 +27,9 @@ function PageRoot() {
 
   return (
     <ThemeProvider>
-      <MultiPageApp page={page} />
+      <Suspense fallback={<ArtLoadingScreen />}>
+        <MultiPageApp page={page} />
+      </Suspense>
     </ThemeProvider>
   );
 }

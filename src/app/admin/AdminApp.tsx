@@ -177,7 +177,7 @@ export function AdminApp() {
               <ShieldCheck className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-2xl font-display italic tracking-wide text-primary">
+              <h1 className="text-2xl italic tracking-wide text-primary" style={{ fontFamily: "'Alien Block', cursive" }}>
                 Admin Artéïa
               </h1>
               <p className="text-sm text-muted-foreground">
