@@ -1,0 +1,37 @@
+Artéïa Mobile App — 4 écrans principaux (360×800px, thème dark)
+
+🎨 DESIGN TOKENS
+Primary:#FF6A1A Secondary:#D9FF38 Accent:#28D8FF Bg:#09090D Card:#15151B Muted:#B8B4C5 Border:rgba(255,255,255,0.11)
+Font-display:AlienBlock 28px|H1:SpaceGrotesk 700 24px|H2:SpaceGrotesk 600 18px|Body:JosefinSans 400 15px|Caption:11px
+Spacing:xs4 sm8 md16 lg24 xl32. Radius:md12 lg16 xl24 full.
+Shadows:Card 0 2px 8px rgba(0,0,0,0.4)|Glow 0 0 20px #FF6A1A40
+
+📱 ÉCRAN 1 — ACCUEIL
+Header(56px): logo"Artéïa" AlienBlock + avatar gradient circle
+Hero(200px): card xl24, gradient primary/10→accent/5, badge"Bienvenue"primary pill, H1"Ta créativité, ton univers", caption muted
+QuickActions(4cols×80px): icône 44px dans cercle gradient coloré(violet/orange/blue/emerald), label 10px. Musique|ArtVisuel|Manga|Cinéma
+À la une: scroll horizontal 3 cards 160×220px. Image 120px+gradient, titre+artiste+❤️badge primary pill
+Feed récent: 5 rows, avatar 40px gradient circle, titre semibold + sous-titre muted, ❤️count droite, divider
+BottomBar(64px+inset): 4 tabs icône24px+label10px. Actif:primary+dot4px. Inactif:muted/40
+
+📱 ÉCRAN 2 — EXPLORER
+Search bar: h44px, icône Search gauche, card bg, placeholder muted/30
+Catégories(3×2 grid): 6 cards 100×100px, gradient unique par catégorie(violet/orange/blue/emerald/rose/cyan), icône48px, nom+compteur
+Filtres chips: horizontal scroll, [Tous][Tendance][Nouveau][Populaire]. Actif:primary/15 bg+primary border. Inactif:card bg+muted text
+Artistes(2colonnes): cards avec image140px+overlay gradient, nom+role+catégorie chip coloré
+
+📱 ÉCRAN 3 — COMMUNAUTÉ
+Chat list: avatar48px circle, online dot green8px, nom semibold + last message truncated + time right, unread badge primary pill20px
+Chat view: header 56px avec bouton retour+avatar+nom+status"En ligne"+icônesphone/video
+Messages: bulle reçue card bg border rounded-bl4px. Bulle envoyée primary gradient rounded-br4px. Author name en primary. Timestamp10px.
+Input bar: icônesSmile+Paperclip+muted, input rounded-2xl card/60, boutonSend/Mic toggle selon texte. Send:primary gradient+glow shadow
+
+📱 ÉCRAN 4 — PROFIL
+Profil card: gradient primary/10→accent/5, avatar80px avec border3px gradient primary→accent, nom H1, email caption
+Stats row(3colonnes): nombre24px bold+label10px uppercase muted. Œuvres|Followers|Suivis
+Menu items: 5 rows icône20px colorée(red/amber/primary/cyan/muted)+label+chevron muted/30, divider inset48px
+Logout: bg red-500/5, text+icône red-400
+Version: caption muted/50 centered"Artéïa v1.0.0"
+
+🎬 ANIMATIONS
+Tab switch:200ms ease-out, opacity+translateY(8px→0). Card enter:300ms, stagger50ms. Press:scale(0.97)100ms. Tab indicator:spring bounce.
