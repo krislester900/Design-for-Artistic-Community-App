@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigation } from "./components/Navigation";
 import { Hero } from "./components/Hero";
 import { ArtCategories } from "./components/ArtCategories";
@@ -10,15 +10,37 @@ import { Footer } from "./components/Footer";
 import { ArtisticPattern } from "./components/ArtisticPattern";
 import { ScrollReveal } from "./components/ScrollReveal";
 import { useCommunityData } from "./hooks/useCommunityData";
+import { MobileApp } from "./mobile/MobileApp";
+import { ArtLoadingScreen } from "./components/ArtLoadingScreen";
 import {
   type CategorySlug,
   type SectionId,
   getCategoryLabel,
 } from "./data/community";
 
+function isCapacitorApp(): boolean {
+  return !!(window as any).Capacitor || !!(window as any).cordova || (window as any).__capacitor !== undefined;
+}
+
 export default function App() {
   const [selectedCategory, setSelectedCategory] = useState<CategorySlug>("all");
   const { data, source, isLoading } = useCommunityData();
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // Detect if running inside Capacitor (APK)
+    setIsMobile(isCapacitorApp());
+  }, []);
+
+  // Show loading while detecting
+  if (isMobile === null) {
+    return <ArtLoadingScreen onComplete={() => {}} />;
+  }
+
+  // Render mobile app if running in Capacitor
+  if (isMobile) {
+    return <MobileApp />;
+  }
 
   const handleNavigate = (
     sectionId: SectionId,
