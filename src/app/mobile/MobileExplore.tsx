@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Search, Music4, Palette, BookOpen, Film, Pen, Clapperboard, Sparkles } from "lucide-react";
 import type { CommunityData, CategorySlug } from "../data/community";
 import { getCategoryLabel } from "../data/community";
+import { MobileUniverse } from "./MobileUniverse";
 
 interface Props {
   data: CommunityData;
@@ -52,6 +53,7 @@ const FILTERS = ["Tous", "Tendance", "Nouveau", "Populaire"];
 export function MobileExplore({ data }: Props) {
   const [activeFilter, setActiveFilter] = useState("Tous");
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeUniverse, setActiveUniverse] = useState<string | null>(null);
 
   const filteredArtists = data.artists.filter((a) => {
     if (searchQuery) {
@@ -60,6 +62,10 @@ export function MobileExplore({ data }: Props) {
     }
     return true;
   });
+
+  if (activeUniverse) {
+    return <MobileUniverse slug={activeUniverse} onBack={() => setActiveUniverse(null)} />;
+  }
 
   return (
     <div className="px-4 py-6 space-y-8 pb-24">
@@ -92,6 +98,7 @@ export function MobileExplore({ data }: Props) {
             return (
               <button
                 key={cat.slug}
+                onClick={() => setActiveUniverse(cat.slug)}
                 className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-card border border-border/30 active:scale-95 active:border-primary/30 transition-all duration-100 touch-manipulation"
               >
                 <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${CATEGORY_GRADIENTS[cat.slug] || "from-primary/20 to-accent/15"} ${CATEGORY_COLORS[cat.slug]?.split(" ")[1] || "text-primary"}`}>
