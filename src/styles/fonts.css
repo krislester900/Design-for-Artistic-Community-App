@@ -1,10 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Alien+Block&family=Josefin+Sans:ital,wght@0,100..700;1,100..700&family=Oswald:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Alien+Block&family=Josefin+Sans:ital,wght@0,100..700;1,100..700&family=Outfit:wght@100..900&display=swap');
 
 :root {
-  --font-display: 'Oswald', sans-serif;
+  --font-display: 'Outfit', sans-serif;
   --font-body: 'Josefin Sans', sans-serif;
-  --font-accent: 'Space Grotesk', sans-serif;
-  --font-brand: 'Playfair Display', Georgia, serif;
+  --font-accent: 'Outfit', sans-serif;
+  --font-brand: 'Alien Block', cursive;
   --font-alien: 'Alien Block', cursive;
 }
 
@@ -26,5 +26,12 @@ h1, h2, h3 {
   font-family: "Josefin Sans", sans-serif;
   font-optical-sizing: auto;
   font-weight: 100 700;
+  font-style: normal;
+}
+
+.outfit-regular {
+  font-family: "Outfit", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 100 900;
   font-style: normal;
 }
