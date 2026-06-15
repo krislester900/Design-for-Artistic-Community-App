@@ -21,6 +21,7 @@ import { MobileCommunity } from "./MobileCommunity";
 import { MobileProfile } from "./MobileProfile";
 import { MobileSearch } from "./MobileSearch";
 import { MobileNotifications } from "./MobileNotifications";
+import { MobileDrawer } from "./MobileDrawer";
 import { ThemeToggle } from "../components/ui/ThemeToggle";
 
 type Tab = "home" | "explore" | "community" | "profile" | "search" | "notifications";
@@ -47,6 +48,7 @@ export function MobileApp() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [notificationCount] = useState(3); // mock
   const [isChatActive, setIsChatActive] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const { data, source, isLoading: isDataLoading } = useCommunityData();
   const prevTabRef = useRef<Tab>("home");
 
@@ -119,6 +121,13 @@ export function MobileApp() {
       {/* Header */}
       <header className="flex items-center justify-between px-5 py-3 bg-background/95 backdrop-blur-xl border-b border-border/30 shrink-0 relative z-10">
         <div className="flex items-center gap-2">
+          <button onClick={() => setIsDrawerOpen(true)} className="flex h-8 w-8 items-center justify-center rounded-xl bg-card/60 border border-border/30 active:scale-90 transition-all">
+            <svg className="h-4 w-4 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-lg shadow-primary/20">
             <Sparkles className="h-4 w-4 text-primary-foreground" />
           </div>
@@ -169,6 +178,14 @@ export function MobileApp() {
           <Plus className="h-6 w-6" />
         </button>
       )}
+
+      {/* Drawer */}
+      <MobileDrawer 
+        isOpen={isDrawerOpen} 
+        onClose={() => setIsDrawerOpen(false)} 
+        activeTab={activeTab}
+        onNavigate={(tab) => switchTab(tab as Tab)}
+      />
 
       {/* Bottom tab bar — Hidden when chat is active */}
       {!isChatActive && (
