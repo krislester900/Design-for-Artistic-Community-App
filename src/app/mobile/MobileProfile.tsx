@@ -1,9 +1,14 @@
 /**
- * MobileProfile — Écran Profil (Spec v2)
- * Avatar gradient, stats, menu items, logout
+ * MobileProfile — Profil complexe avec stats, galerie, activité, paramètres
  */
 import { useState, useEffect } from "react";
-import { User, Settings, LogOut, Heart, Palette, Bookmark, Bell, ChevronRight } from "lucide-react";
+import { 
+  User, Settings, LogOut, Heart, Palette, Bookmark, Bell, ChevronRight, 
+  Camera, Edit3, Share2, Grid3X3, List, Clock, Star, Trophy, Flame,
+  Image, Music, Film, BookOpen, Clapperboard, Pen, TrendingUp,
+  Moon, Sun, Globe, Shield, HelpCircle, MessageCircle, Users,
+  ChevronDown, ExternalLink, Copy, Check, Plus, Eye
+} from "lucide-react";
 import { signIn, signUp, signInWithGoogle, signOut as doSignOut, getCurrentSession, onAuthChange, type AuthUser } from "../services/auth";
 import { hasSupabaseEnv } from "../lib/supabase";
 
@@ -11,23 +16,59 @@ interface MenuItem {
   icon: typeof Heart;
   label: string;
   color: string;
+  badge?: number;
+  action?: () => void;
 }
 
-const MENU_ITEMS: MenuItem[] = [
-  { icon: Heart, label: "Favoris", color: "text-red-400" },
-  { icon: Bookmark, label: "Enregistrés", color: "text-amber-400" },
-  { icon: Palette, label: "Mes créations", color: "text-primary" },
-  { icon: Bell, label: "Notifications", color: "text-cyan-400" },
-  { icon: Settings, label: "Paramètres", color: "text-muted-foreground" },
+interface GalleryItem {
+  id: string;
+  title: string;
+  category: string;
+  emoji: string;
+  likes: number;
+  views: number;
+  gradient: string;
+}
+
+interface ActivityItem {
+  id: string;
+  type: "like" | "comment" | "follow" | "publish";
+  user: string;
+  content: string;
+  time: string;
+  emoji: string;
+}
+
+const GALLERY_ITEMS: GalleryItem[] = [
+  { id: "1", title: "Portrait Neon", category: "Art Visuel", emoji: "🎨", likes: 234, views: 1200, gradient: "from-orange-500 to-red-500" },
+  { id: "2", title: "Beat Session", category: "Musique", emoji: "🎵", likes: 189, views: 890, gradient: "from-violet-500 to-purple-500" },
+  { id: "3", title: "Manga Panel", category: "Manga", emoji: "📚", likes: 312, views: 1560, gradient: "from-blue-500 to-cyan-500" },
+  { id: "4", title: "Court-Métrage", category: "Films", emoji: "🎬", likes: 156, views: 780, gradient: "from-emerald-500 to-teal-500" },
+  { id: "5", title: "Poème Urbain", category: "Littérature", emoji: "✍️", likes: 98, views: 450, gradient: "from-rose-500 to-pink-500" },
+  { id: "6", title: "Motion Loop", category: "Animation", emoji: "🎞️", likes: 267, views: 1340, gradient: "from-cyan-500 to-blue-500" },
+];
+
+const ACTIVITY_ITEMS: ActivityItem[] = [
+  { id: "1", type: "like", user: "ArtDiva", content: "a aimé Portrait Neon", time: "Il y a 2h", emoji: "❤️" },
+  { id: "2", type: "comment", user: "MusicPro", content: "a commenté Beat Session", time: "Il y a 4h", emoji: "💬" },
+  { id: "3", type: "follow", user: "MangaKing", content: "te suit", time: "Il y a 6h", emoji: "👤" },
+  { id: "4", type: "publish", user: "Toi", content: "as publié Motion Loop", time: "Il y a 1j", emoji: "✨" },
+  { id: "5", type: "like", user: "FilmArt", content: "a aimé Court-Métrage", time: "Il y a 2j", emoji: "❤️" },
 ];
 
 export function MobileProfile() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [showAuth, setShowAuth] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showGallery, setShowGallery] = useState<"grid" | "list">("grid");
+  const [activeTab, setActiveTab] = useState<"gallery" | "activity" | "stats">("gallery");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+  const [darkMode, setDarkMode] = useState(true);
+  const [notifications, setNotifications] = useState(true);
+  const [language, setLanguage] = useState("Français");
 
   useEffect(() => {
     getCurrentSession().then(({ user }) => { if (user) setAuthUser(user); });
@@ -65,6 +106,91 @@ export function MobileProfile() {
     setAuthUser(null);
   }
 
+  // Settings view
+  if (showSettings) {
+    return (
+      <div className="px-4 py-6 space-y-6 pb-24">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setShowSettings(false)} className="text-primary text-sm font-medium touch-manipulation">
+            ← Retour
+          </button>
+          <h1 className="text-xl font-bold text-foreground" style={{ fontFamily: "'Outfit', sans-serif" }}>Paramètres</h1>
+        </div>
+
+        {/* Theme */}
+        <div className="rounded-2xl bg-card/60 border border-border/30 overflow-hidden divide-y divide-border/20">
+          <div className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-3">
+              {darkMode ? <Moon className="h-5 w-5 text-primary" /> : <Sun className="h-5 w-5 text-amber-400" />}
+              <span className="text-sm font-medium text-foreground">Mode sombre</span>
+            </div>
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${darkMode ? "bg-primary" : "bg-muted"}`}
+            >
+              <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform duration-200 ${darkMode ? "translate-x-5" : "translate-x-0.5"}`} />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-3">
+              <Bell className="h-5 w-5 text-cyan-400" />
+              <span className="text-sm font-medium text-foreground">Notifications</span>
+            </div>
+            <button
+              onClick={() => setNotifications(!notifications)}
+              className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${notifications ? "bg-primary" : "bg-muted"}`}
+            >
+              <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform duration-200 ${notifications ? "translate-x-5" : "translate-x-0.5"}`} />
+            </button>
+          </div>
+
+          <button className="flex items-center justify-between p-4 w-full active:bg-card/60 transition-colors">
+            <div className="flex items-center gap-3">
+              <Globe className="h-5 w-5 text-green-400" />
+              <span className="text-sm font-medium text-foreground">Langue</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{language}</span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground/30" />
+            </div>
+          </button>
+        </div>
+
+        {/* Account */}
+        <div className="rounded-2xl bg-card/60 border border-border/30 overflow-hidden divide-y divide-border/20">
+          <button className="flex items-center justify-between p-4 w-full active:bg-card/60 transition-colors">
+            <div className="flex items-center gap-3">
+              <Shield className="h-5 w-5 text-primary" />
+              <span className="text-sm font-medium text-foreground">Confidentialité</span>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground/30" />
+          </button>
+
+          <button className="flex items-center justify-between p-4 w-full active:bg-card/60 transition-colors">
+            <div className="flex items-center gap-3">
+              <HelpCircle className="h-5 w-5 text-amber-400" />
+              <span className="text-sm font-medium text-foreground">Aide & Support</span>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground/30" />
+          </button>
+
+          <button className="flex items-center justify-between p-4 w-full active:bg-card/60 transition-colors">
+            <div className="flex items-center gap-3">
+              <ExternalLink className="h-5 w-5 text-cyan-400" />
+              <span className="text-sm font-medium text-foreground">Conditions d'utilisation</span>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground/30" />
+          </button>
+        </div>
+
+        <div className="p-3 rounded-xl bg-card/40 border border-border/30 text-center">
+          <p className="text-[10px] text-muted-foreground/50 uppercase tracking-[0.2em]">Artéïa v1.0.0</p>
+        </div>
+      </div>
+    );
+  }
+
   // Auth form view
   if (showAuth && !authUser) {
     return (
@@ -72,7 +198,7 @@ export function MobileProfile() {
         <button onClick={() => setShowAuth(false)} className="text-primary text-sm font-medium mb-6 touch-manipulation">
           ← Retour au profil
         </button>
-        <h2 className="text-xl font-bold text-foreground mb-6">Connexion</h2>
+        <h2 className="text-xl font-bold text-foreground mb-6" style={{ fontFamily: "'Outfit', sans-serif" }}>Connexion</h2>
 
         {message && (
           <div className="rounded-xl bg-primary/10 border border-primary/20 p-3 mb-4 text-xs text-primary leading-relaxed">
@@ -80,7 +206,6 @@ export function MobileProfile() {
           </div>
         )}
 
-        {/* Google Sign-In */}
         {hasSupabaseEnv && (
           <button
             onClick={handleGoogleSignIn}
@@ -96,7 +221,6 @@ export function MobileProfile() {
           </button>
         )}
 
-        {/* Divider */}
         {hasSupabaseEnv && (
           <div className="flex items-center gap-3 mb-3">
             <div className="flex-1 border-t border-border/40" />
@@ -105,7 +229,6 @@ export function MobileProfile() {
           </div>
         )}
 
-        {/* Email/Password form */}
         <form onSubmit={handleSignIn} className="space-y-3">
           <input
             className="w-full h-11 rounded-xl border border-border/50 bg-card/60 px-3 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/5 placeholder:text-muted-foreground/30"
@@ -136,12 +259,11 @@ export function MobileProfile() {
   if (!authUser) {
     return (
       <div className="px-4 py-6 space-y-6 pb-24">
-        {/* Avatar + Info */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/10 via-background to-accent/5 border border-border/30 p-6 text-center">
           <div className="relative mx-auto mb-4 h-20 w-20 flex items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent shadow-xl shadow-primary/20">
             <User className="h-9 w-9 text-primary-foreground" />
           </div>
-          <h1 className="text-xl font-bold text-foreground">Invité</h1>
+          <h1 className="text-xl font-bold text-foreground" style={{ fontFamily: "'Outfit', sans-serif" }}>Invité</h1>
           <p className="text-xs text-muted-foreground mt-1">Connecte-toi pour commencer à créer</p>
           <button
             onClick={() => setShowAuth(true)}
@@ -151,7 +273,6 @@ export function MobileProfile() {
           </button>
         </div>
 
-        {/* Version info */}
         <div className="p-3 rounded-xl bg-card/40 border border-border/30 text-center">
           <p className="text-[10px] text-muted-foreground/50 uppercase tracking-[0.2em]">Artéïa v1.0.0</p>
         </div>
@@ -164,52 +285,251 @@ export function MobileProfile() {
     <div className="px-4 py-6 space-y-6 pb-24">
       {/* Profile Header Card */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/10 via-background to-accent/5 border border-border/30 p-6">
-        {/* Background glow */}
         <div className="absolute -top-10 -right-10 h-24 w-24 rounded-full bg-primary/15 blur-2xl" />
         <div className="absolute -bottom-8 -left-8 h-20 w-20 rounded-full bg-accent/10 blur-2xl" />
 
-        {/* Avatar with gradient border */}
-        <div className="relative mx-auto mb-4">
-          <div className="h-20 w-20 rounded-full bg-gradient-to-br from-primary via-primary to-accent p-[3px] shadow-xl shadow-primary/20">
-            <div className="flex h-full w-full items-center justify-center rounded-full bg-background">
-              <span className="text-2xl font-bold text-primary">
-                {authUser.display_name?.charAt(0) || authUser.email?.charAt(0)?.toUpperCase() || "C"}
-              </span>
+        <div className="relative flex items-start gap-4">
+          <div className="relative">
+            <div className="h-20 w-20 rounded-full bg-gradient-to-br from-primary via-primary to-accent p-[3px] shadow-xl shadow-primary/20">
+              <div className="flex h-full w-full items-center justify-center rounded-full bg-background">
+                <span className="text-2xl font-bold text-primary">
+                  {authUser.display_name?.charAt(0) || authUser.email?.charAt(0)?.toUpperCase() || "C"}
+                </span>
+              </div>
             </div>
+            <button className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-primary flex items-center justify-center shadow-lg">
+              <Camera className="h-3.5 w-3.5 text-primary-foreground" />
+            </button>
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-foreground truncate" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                {authUser.display_name || "Créateur"}
+              </h1>
+              <button className="shrink-0 h-7 w-7 rounded-full bg-card/60 border border-border/30 flex items-center justify-center">
+                <Edit3 className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">{authUser.email}</p>
+            <p className="text-[11px] text-muted-foreground/60 mt-1">Artiste multidisciplinaire · Paris 🇫🇷</p>
           </div>
         </div>
 
-        <h1 className="text-center text-xl font-bold text-foreground">
-          {authUser.display_name || "Créateur"}
-        </h1>
-        <p className="text-center text-xs text-muted-foreground mt-1 truncate px-4">
-          {authUser.email}
-        </p>
+        {/* Action buttons */}
+        <div className="flex gap-2 mt-4">
+          <button className="flex-1 h-9 rounded-xl bg-primary/10 text-primary text-xs font-semibold active:scale-95 transition-all touch-manipulation">
+            Modifier
+          </button>
+          <button className="h-9 w-9 rounded-xl bg-card/60 border border-border/30 flex items-center justify-center active:scale-95 transition-all touch-manipulation">
+            <Share2 className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </div>
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-2">
         {[
-          { num: "12", label: "Œuvres" },
-          { num: "156", label: "Followers" },
-          { num: "89", label: "Suivis" },
+          { num: "12", label: "Œuvres", icon: Palette, color: "text-primary" },
+          { num: "156", label: "Followers", icon: Users, color: "text-cyan-400" },
+          { num: "89", label: "Suivis", icon: User, color: "text-green-400" },
+          { num: "1.2k", label: "Likes", icon: Heart, color: "text-red-400" },
         ].map((stat) => (
           <div key={stat.label} className="flex flex-col items-center justify-center py-3 rounded-2xl bg-card/60 border border-border/30">
-            <span className="text-xl font-bold text-foreground">{stat.num}</span>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-[0.1em] mt-1">{stat.label}</span>
+            <stat.icon className={`h-4 w-4 ${stat.color} mb-1`} />
+            <span className="text-lg font-bold text-foreground" style={{ fontFamily: "'Outfit', sans-serif" }}>{stat.num}</span>
+            <span className="text-[9px] text-muted-foreground uppercase tracking-[0.05em]">{stat.label}</span>
           </div>
         ))}
       </div>
 
+      {/* Tab Navigation */}
+      <div className="flex gap-1 bg-card/60 border border-border/30 rounded-xl p-1">
+        {[
+          { id: "gallery" as const, label: "Galerie", icon: Grid3X3 },
+          { id: "activity" as const, label: "Activité", icon: Clock },
+          { id: "stats" as const, label: "Stats", icon: TrendingUp },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+              activeTab === tab.id
+                ? "bg-primary/15 text-primary"
+                : "text-muted-foreground"
+            }`}
+          >
+            <tab.icon className="h-3.5 w-3.5" />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Gallery Tab */}
+      {activeTab === "gallery" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground/80" style={{ fontFamily: "'Outfit', sans-serif" }}>
+              Mes Créations
+            </h3>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setShowGallery("grid")}
+                className={`h-8 w-8 rounded-lg flex items-center justify-center ${showGallery === "grid" ? "bg-primary/15 text-primary" : "text-muted-foreground"}`}
+              >
+                <Grid3X3 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setShowGallery("list")}
+                className={`h-8 w-8 rounded-lg flex items-center justify-center ${showGallery === "list" ? "bg-primary/15 text-primary" : "text-muted-foreground"}`}
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {showGallery === "grid" ? (
+            <div className="grid grid-cols-2 gap-3">
+              {GALLERY_ITEMS.map((item) => (
+                <div key={item.id} className="rounded-2xl bg-card border border-border/30 overflow-hidden active:scale-[0.97] transition-transform duration-100 touch-manipulation">
+                  <div className={`h-32 bg-gradient-to-br ${item.gradient} flex items-center justify-center relative`}>
+                    <span className="text-4xl">{item.emoji}</span>
+                    <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/30 backdrop-blur-sm rounded-full px-2 py-0.5">
+                      <Eye className="h-3 w-3 text-white/80" />
+                      <span className="text-[10px] text-white/80">{item.views}</span>
+                    </div>
+                  </div>
+                  <div className="p-3">
+                    <h4 className="text-sm font-semibold text-foreground truncate">{item.title}</h4>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{item.category}</p>
+                    <div className="flex items-center gap-1 mt-2">
+                      <Heart className="h-3 w-3 text-red-400" />
+                      <span className="text-[10px] text-muted-foreground">{item.likes}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {GALLERY_ITEMS.map((item) => (
+                <div key={item.id} className="flex items-center gap-3 p-3 rounded-2xl bg-card border border-border/30 active:scale-[0.98] transition-transform duration-100 touch-manipulation">
+                  <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${item.gradient} flex items-center justify-center shrink-0`}>
+                    <span className="text-xl">{item.emoji}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-semibold text-foreground truncate">{item.title}</h4>
+                    <p className="text-[10px] text-muted-foreground">{item.category}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="flex items-center gap-1">
+                      <Heart className="h-3 w-3 text-red-400" />
+                      <span className="text-[10px] text-muted-foreground">{item.likes}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Eye className="h-3 w-3 text-muted-foreground/50" />
+                      <span className="text-[10px] text-muted-foreground/50">{item.views}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Activity Tab */}
+      {activeTab === "activity" && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground/80" style={{ fontFamily: "'Outfit', sans-serif" }}>
+            Activité Récente
+          </h3>
+          {ACTIVITY_ITEMS.map((item) => (
+            <div key={item.id} className="flex items-center gap-3 p-3 rounded-2xl bg-card border border-border/30">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <span className="text-lg">{item.emoji}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-foreground">
+                  <span className="font-semibold">{item.user}</span>{" "}
+                  <span className="text-muted-foreground">{item.content}</span>
+                </p>
+                <p className="text-[10px] text-muted-foreground/50 mt-0.5">{item.time}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Stats Tab */}
+      {activeTab === "stats" && (
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground/80" style={{ fontFamily: "'Outfit', sans-serif" }}>
+            Statistiques
+          </h3>
+          
+          {/* Performance card */}
+          <div className="rounded-2xl bg-gradient-to-br from-primary/10 to-accent/5 border border-border/30 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Trophy className="h-5 w-5 text-amber-400" />
+              <span className="text-sm font-semibold text-foreground" style={{ fontFamily: "'Outfit', sans-serif" }}>Performance</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="text-center p-3 rounded-xl bg-card/60">
+                <p className="text-2xl font-bold text-primary" style={{ fontFamily: "'Outfit', sans-serif" }}>1.2k</p>
+                <p className="text-[10px] text-muted-foreground uppercase">Vues totales</p>
+              </div>
+              <div className="text-center p-3 rounded-xl bg-card/60">
+                <p className="text-2xl font-bold text-cyan-400" style={{ fontFamily: "'Outfit', sans-serif" }}>89%</p>
+                <p className="text-[10px] text-muted-foreground uppercase">Engagement</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Top creations */}
+          <div className="rounded-2xl bg-card/60 border border-border/30 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Flame className="h-5 w-5 text-red-400" />
+              <span className="text-sm font-semibold text-foreground" style={{ fontFamily: "'Outfit', sans-serif" }}>Top Créations</span>
+            </div>
+            <div className="space-y-2">
+              {GALLERY_ITEMS.slice(0, 3).map((item, i) => (
+                <div key={item.id} className="flex items-center gap-3">
+                  <span className="text-lg font-bold text-muted-foreground/30" style={{ fontFamily: "'Outfit', sans-serif" }}>#{i + 1}</span>
+                  <div className={`h-8 w-8 rounded-lg bg-gradient-to-br ${item.gradient} flex items-center justify-center`}>
+                    <span className="text-sm">{item.emoji}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
+                    <p className="text-[10px] text-muted-foreground">{item.likes} likes · {item.views} vues</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Menu Items */}
       <div className="rounded-2xl bg-card/60 border border-border/30 overflow-hidden divide-y divide-border/20">
-        {MENU_ITEMS.map((item) => (
+        {[
+          { icon: Heart, label: "Favoris", color: "text-red-400", badge: 24 },
+          { icon: Bookmark, label: "Enregistrés", color: "text-amber-400", badge: 8 },
+          { icon: Bell, label: "Notifications", color: "text-cyan-400", badge: 3 },
+          { icon: Settings, label: "Paramètres", color: "text-muted-foreground", action: () => setShowSettings(true) },
+        ].map((item) => (
           <button
             key={item.label}
+            onClick={item.action}
             className="flex items-center gap-3 w-full p-3.5 active:bg-card/60 transition-colors duration-100 touch-manipulation"
           >
             <item.icon className={`h-5 w-5 shrink-0 ${item.color}`} />
             <span className="flex-1 text-left text-sm font-medium text-foreground">{item.label}</span>
+            {item.badge && (
+              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary px-1.5">
+                {item.badge}
+              </span>
+            )}
             <ChevronRight className="h-4 w-4 text-muted-foreground/30" />
           </button>
         ))}
