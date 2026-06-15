@@ -45,7 +45,7 @@ const DEFAULT_CHANNELS: ChatChannel[] = [
   { id: "manga", name: "Manga Club", type: "public", description: "Chapitres, reviews, fan arts", created_at: new Date().toISOString() },
 ];
 
-export function MobileCommunity() {
+export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (active: boolean) => void }) {
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [channels] = useState<ChatChannel[]>(DEFAULT_CHANNELS);
@@ -174,6 +174,11 @@ export function MobileCommunity() {
     setShowGifs(false);
   }
 
+  // Notify parent when chat state changes
+  useEffect(() => {
+    onChatStateChange?.(!!activeChat);
+  }, [activeChat]);
+
   // Voice recording mode
   if (isRecording && activeChat) {
     return (
@@ -192,11 +197,11 @@ export function MobileCommunity() {
     );
   }
 
-  // Chat view
+  // Chat view — expose activeChat to parent via callback
   if (activeChat) {
     const chat = channels.find(c => c.id === activeChat);
     return (
-      <div className="flex flex-col h-full bg-background">
+      <div className="flex flex-col h-full bg-background" data-chat-active="true">
         {/* Chat Header */}
         <header className="flex items-center gap-3 px-4 py-3 border-b border-border/30 bg-background/95 backdrop-blur-xl shrink-0">
           <button onClick={() => { setActiveChat(null); closeAllPickers(); }} className="flex items-center gap-1 text-primary text-sm font-medium touch-manipulation active:opacity-70">
@@ -272,13 +277,25 @@ export function MobileCommunity() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Pickers */}
-        {showEmoji && <EmojiPicker onSelect={(emoji) => { setMessage(prev => prev + emoji); }} onClose={() => setShowEmoji(false)} />}
-        {showStickers && <StickerPicker onSelect={handleSendSticker} onClose={() => setShowStickers(false)} />}
-        {showGifs && <GifPicker onSelect={handleSendGif} onClose={() => setShowGifs(false)} />}
-
-        {/* Input Bar */}
-        <div className="flex items-center gap-2 px-3 py-2 border-t border-border/30 bg-background/95 backdrop-blur-xl shrink-0">
+        {/* Input Bar with pickers */}
+        <div className="relative shrink-0 border-t border-border/30 bg-background/95 backdrop-blur-xl">
+          {/* Pickers — positioned above input bar */}
+          {showEmoji && (
+            <div className="absolute bottom-full left-0 right-0 z-50">
+              <EmojiPicker onSelect={(emoji) => { setMessage(prev => prev + emoji); }} onClose={() => setShowEmoji(false)} />
+            </div>
+          )}
+          {showStickers && (
+            <div className="absolute bottom-full left-0 right-0 z-50">
+              <StickerPicker onSelect={handleSendSticker} onClose={() => setShowStickers(false)} />
+            </div>
+          )}
+          {showGifs && (
+            <div className="absolute bottom-full left-0 right-0 z-50">
+              <GifPicker onSelect={handleSendGif} onClose={() => setShowGifs(false)} />
+            </div>
+          )}
+          <div className="flex items-center gap-2 px-3 py-2">
           <button
             onClick={() => { closeAllPickers(); setShowGifs(!showGifs); }}
             className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground active:bg-card/60 active:scale-90 transition-all touch-manipulation"
@@ -322,6 +339,7 @@ export function MobileCommunity() {
               <Mic className="h-4 w-4" />
             </button>
           )}
+          </div>
         </div>
       </div>
     );

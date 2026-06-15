@@ -42,6 +42,7 @@ export function MobileApp() {
   const [tabDirection, setTabDirection] = useState<"left" | "right">("right");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [notificationCount] = useState(3); // mock
+  const [isChatActive, setIsChatActive] = useState(false);
   const { data, source, isLoading: isDataLoading } = useCommunityData();
   const prevTabRef = useRef<Tab>("home");
 
@@ -76,7 +77,7 @@ export function MobileApp() {
       <div className={animClass}>
         {activeTab === "home" && <MobileHome data={data} source={source} />}
         {activeTab === "explore" && <MobileExplore data={data} onNavigate={switchTab} />}
-        {activeTab === "community" && <MobileCommunity />}
+        {activeTab === "community" && <MobileCommunity onChatStateChange={setIsChatActive} />}
         {activeTab === "profile" && <MobileProfile />}
       </div>
     );
@@ -153,16 +154,19 @@ export function MobileApp() {
         {renderTabContent()}
       </main>
 
-      {/* FAB — Floating Action Button */}
-      <button
-        onClick={() => { haptic(); switchTab("community"); }}
-        className="absolute bottom-20 right-4 z-20 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-xl shadow-primary/30 active:scale-90 transition-all duration-200 touch-manipulation animate-bounce-slow"
-        aria-label="Créer"
-      >
-        <Plus className="h-6 w-6" />
-      </button>
+      {/* FAB — Hidden when chat is active */}
+      {!isChatActive && (
+        <button
+          onClick={() => { haptic(); switchTab("community"); }}
+          className="absolute bottom-20 right-4 z-20 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-xl shadow-primary/30 active:scale-90 transition-all duration-200 touch-manipulation animate-bounce-slow"
+          aria-label="Créer"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      )}
 
-      {/* Bottom tab bar */}
+      {/* Bottom tab bar — Hidden when chat is active */}
+      {!isChatActive && (
       <nav className="bottom-nav flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom)] pt-1 bg-background/95 backdrop-blur-xl border-t border-border/30 shrink-0 relative z-10">
         {TABS.map((tab) => {
           const Icon = tab.icon;
@@ -197,6 +201,7 @@ export function MobileApp() {
           );
         })}
       </nav>
+      )}
     </div>
   );
 }

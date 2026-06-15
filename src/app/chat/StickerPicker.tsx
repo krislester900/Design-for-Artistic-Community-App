@@ -111,7 +111,7 @@ export function StickerPicker({ onSelect, onClose }: StickerPickerProps) {
   }, [activeCategory, search]);
 
   return (
-    <div className="absolute bottom-full left-0 mb-2 w-80 rounded-2xl border border-border bg-card shadow-2xl backdrop-blur-xl z-50 picker-enter picker-shadow">
+    <div className="w-full rounded-t-2xl border border-border bg-card shadow-2xl backdrop-blur-xl z-50">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <span className="text-xs font-semibold text-muted-foreground">Stickers</span>
@@ -151,7 +151,7 @@ export function StickerPicker({ onSelect, onClose }: StickerPickerProps) {
       </div>
 
       {/* Sticker grid */}
-      <div className="grid grid-cols-6 gap-2 px-3 py-2 max-h-56 overflow-y-auto">
+      <div className="grid grid-cols-6 gap-2 px-3 py-2 max-h-48 overflow-y-auto">
         {activeStickers.map((sticker) => (
           <button
             key={sticker.id}
