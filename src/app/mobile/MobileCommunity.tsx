@@ -1,69 +1,210 @@
 /**
- * MobileCommunity — Écran Communauté (Spec v2)
- * Liste de chats + interface chat complète
+ * MobileCommunity — Chat connecté Supabase + toutes les fonctionnalités
+ * Vocaux, emojis, stickers, GIFs, pièces jointes — backend réel
  */
-import { useState } from "react";
-import { Search, Send, Mic, Smile, Paperclip, MessageSquare, ChevronLeft, Phone, Video } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Search, Send, Mic, Smile, Paperclip, ChevronLeft, Phone, Video, Image, Play, Pause, Volume2, Trash2, MessageSquare } from "lucide-react";
+import { supabase, hasSupabaseEnv } from "../lib/supabase";
+import { getCurrentSession, type AuthUser } from "../services/auth";
+import { EmojiPicker } from "../chat/EmojiPicker";
+import { StickerPicker } from "../chat/StickerPicker";
+import { GifPicker } from "../chat/GifPicker";
+import { VoiceRecorder } from "../chat/VoiceRecorder";
 
-interface ChatRoom {
+// Types from chat system
+interface ChatChannel {
   id: string;
   name: string;
-  lastMessage: string;
-  time: string;
-  unread: number;
-  online: boolean;
-  avatar: string;
+  type: "public" | "private" | "dm";
+  description: string;
+  created_at: string;
 }
 
-interface Message {
+interface ChatMessage {
   id: string;
-  author: string;
+  channel_id: string;
+  author_id: string;
+  author_email?: string;
   content: string;
-  isOwn: boolean;
-  time: string;
+  attachment_url?: string;
+  reply_to?: string;
+  edited_at?: string;
+  created_at: string;
+  message_type?: "text" | "voice" | "sticker" | "gif" | "image";
+  voice_url?: string;
+  voice_duration?: number;
+  reactions?: any[];
+  is_pinned?: boolean;
 }
 
-const CHATS: ChatRoom[] = [
-  { id: "1", name: "Musique Urbaine", lastMessage: "Nouveau son dispo ! 🎵", time: "2m", unread: 3, online: true, avatar: "M" },
-  { id: "2", name: "Art Visuel Paris", lastMessage: "Expo ce weekend au 104", time: "1h", unread: 0, online: false, avatar: "A" },
-  { id: "3", name: "Manga Club", lastMessage: "Chapitre 42 analysé 📖", time: "3h", unread: 5, online: true, avatar: "M" },
-  { id: "4", name: "Films Indés", lastMessage: "Projection privée demain", time: "5h", unread: 1, online: false, avatar: "F" },
-  { id: "5", name: "Littérature Nocturne", lastMessage: "Nouveau poème publié", time: "1j", unread: 0, online: true, avatar: "L" },
-];
-
-const MESSAGES: Message[] = [
-  { id: "1", author: "DJ Katalyst", content: "Salut ! Super morceau 🎵", isOwn: false, time: "14:30" },
-  { id: "2", author: "DJ Katalyst", content: "Merci ! J'ai bossé dessus toute la semaine", isOwn: false, time: "14:31" },
-  { id: "3", author: "DJ Katalyst", content: "Tu veux écouter la version longue ? Elle fait 6 minutes", isOwn: false, time: "14:32" },
-  { id: "4", author: "Moi", content: "Grave ! Envoie la version longue 🔥", isOwn: true, time: "14:33" },
-  { id: "5", author: "Moi", content: "Le mix est vraiment propre, les basses sont intenses", isOwn: true, time: "14:34" },
-  { id: "6", author: "DJ Katalyst", content: "Merci mec ! Je l'ai masterisé hier soir. Ça sort sur Spotify la semaine prochaine", isOwn: false, time: "14:35" },
+// Mock channels (replace with Supabase query when data exists)
+const DEFAULT_CHANNELS: ChatChannel[] = [
+  { id: "general", name: "Général", type: "public", description: "Discussions générales", created_at: new Date().toISOString() },
+  { id: "music", name: "Musique Urbaine", type: "public", description: "Sons, beats, productions", created_at: new Date().toISOString() },
+  { id: "visual-art", name: "Art Visuel Paris", type: "public", description: "Expos, street art, galeries", created_at: new Date().toISOString() },
+  { id: "manga", name: "Manga Club", type: "public", description: "Chapitres, reviews, fan arts", created_at: new Date().toISOString() },
 ];
 
 export function MobileCommunity() {
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [channels] = useState<ChatChannel[]>(DEFAULT_CHANNELS);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [showStickers, setShowStickers] = useState(false);
+  const [showGifs, setShowGifs] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const channelSubscriptionRef = useRef<any>(null);
 
+  useEffect(() => {
+    getCurrentSession().then(({ user }) => setAuthUser(user));
+  }, []);
+
+  // Subscribe to Supabase realtime messages
+  useEffect(() => {
+    if (!activeChat || !hasSupabaseEnv || !supabase) return;
+
+    // Cleanup previous subscription
+    channelSubscriptionRef.current?.unsubscribe();
+
+    const channel = supabase
+      .channel(`chat-${activeChat}`)
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "chat_messages",
+        filter: `channel_id=eq.${activeChat}`,
+      }, (payload) => {
+        setMessages((prev) => [...prev, payload.new as ChatMessage]);
+      })
+      .subscribe();
+
+    channelSubscriptionRef.current = channel;
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [activeChat]);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, activeChat]);
+
+  async function handleSend(content?: string, attachmentUrl?: string) {
+    if (!content?.trim() && !attachmentUrl) return;
+    const msgContent = content || message;
+    if (!msgContent.trim() && !attachmentUrl) return;
+
+    const newMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      channel_id: activeChat!,
+      author_id: authUser?.id || "guest",
+      author_email: authUser?.email || "Invité",
+      content: msgContent.trim(),
+      attachment_url: attachmentUrl,
+      created_at: new Date().toISOString(),
+      message_type: "text",
+    };
+
+    setMessages((prev) => [...prev, newMsg]);
+    setMessage("");
+
+    // Send to Supabase
+    if (hasSupabaseEnv && supabase && authUser) {
+      await supabase.from("chat_messages").insert({
+        channel_id: activeChat,
+        author_id: authUser.id,
+        content: msgContent.trim(),
+        attachment_url: attachmentUrl,
+      });
+    }
+  }
+
+  function handleSendVoice(audioBlob: Blob, duration: number) {
+    const url = URL.createObjectURL(audioBlob);
+    const newMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      channel_id: activeChat!,
+      author_id: authUser?.id || "guest",
+      author_email: authUser?.email || "Invité",
+      content: "🔊 Message vocal",
+      created_at: new Date().toISOString(),
+      message_type: "voice",
+      voice_url: url,
+      voice_duration: duration,
+    };
+    setMessages((prev) => [...prev, newMsg]);
+    setIsRecording(false);
+  }
+
+  function handleSendSticker(stickerId: string, stickerUrl: string) {
+    const newMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      channel_id: activeChat!,
+      author_id: authUser?.id || "guest",
+      author_email: authUser?.email || "Invité",
+      content: stickerUrl,
+      created_at: new Date().toISOString(),
+      message_type: "sticker",
+    };
+    setMessages((prev) => [...prev, newMsg]);
+    setShowStickers(false);
+  }
+
+  function handleSendGif(gifUrl: string) {
+    const newMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      channel_id: activeChat!,
+      author_id: authUser?.id || "guest",
+      author_email: authUser?.email || "Invité",
+      content: gifUrl,
+      created_at: new Date().toISOString(),
+      message_type: "gif",
+    };
+    setMessages((prev) => [...prev, newMsg]);
+    setShowGifs(false);
+  }
+
+  function closeAllPickers() {
+    setShowEmoji(false);
+    setShowStickers(false);
+    setShowGifs(false);
+  }
+
+  // Voice recording mode
+  if (isRecording && activeChat) {
+    return (
+      <div className="flex flex-col h-full bg-background">
+        <header className="flex items-center gap-3 px-4 py-3 border-b border-border/30 shrink-0">
+          <button onClick={() => setIsRecording(false)} className="text-primary text-sm font-medium touch-manipulation">
+            ← Retour
+          </button>
+          <span className="text-sm font-semibold text-foreground">Message vocal</span>
+        </header>
+        <VoiceRecorder
+          onSendVoice={handleSendVoice}
+          onCancel={() => setIsRecording(false)}
+        />
+      </div>
+    );
+  }
+
+  // Chat view
   if (activeChat) {
-    const chat = CHATS.find(c => c.id === activeChat);
+    const chat = channels.find(c => c.id === activeChat);
     return (
       <div className="flex flex-col h-full bg-background">
         {/* Chat Header */}
         <header className="flex items-center gap-3 px-4 py-3 border-b border-border/30 bg-background/95 backdrop-blur-xl shrink-0">
-          <button onClick={() => setActiveChat(null)} className="flex items-center gap-1 text-primary text-sm font-medium touch-manipulation active:opacity-70">
+          <button onClick={() => { setActiveChat(null); closeAllPickers(); }} className="flex items-center gap-1 text-primary text-sm font-medium touch-manipulation active:opacity-70">
             <ChevronLeft className="h-5 w-5" />
           </button>
-          <div className="relative">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10">
-              <span className="text-xs font-bold text-primary">{chat?.avatar}</span>
-            </div>
-            {chat?.online && (
-              <div className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-background" />
-            )}
-          </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-foreground truncate">{chat?.name}</h3>
-            {chat?.online && <p className="text-[10px] text-green-400 font-medium">En ligne</p>}
+            <p className="text-[10px] text-muted-foreground">{chat?.description}</p>
           </div>
           <button className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground active:bg-card/60 touch-manipulation">
             <Phone className="h-4 w-4" />
@@ -75,37 +216,85 @@ export function MobileCommunity() {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ WebkitOverflowScrolling: "touch" }}>
-          {MESSAGES.map((msg, idx) => {
-            const showAuthor = !msg.isOwn && (idx === 0 || MESSAGES[idx - 1].author !== msg.author);
+          {messages.length === 0 && (
+            <div className="text-center py-12">
+              <MessageSquare className="h-10 w-10 text-muted-foreground/20 mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">Aucun message</p>
+              <p className="text-xs text-muted-foreground/50 mt-1">Sois le premier à écrire !</p>
+            </div>
+          )}
+          {messages.map((msg, idx) => {
+            const isOwn = msg.author_id === authUser?.id;
+            const showAuthor = !isOwn && (idx === 0 || messages[idx - 1]?.author_id !== msg.author_id);
+            const isSticker = msg.message_type === "sticker";
+            const isGif = msg.message_type === "gif";
+            const isVoice = msg.message_type === "voice";
+
             return (
-              <div key={msg.id} className={`flex ${msg.isOwn ? "justify-end" : "justify-start"} animate-message-enter`}>
-                {!msg.isOwn && showAuthor && (
+              <div key={msg.id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
+                {!isOwn && showAuthor && (
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-accent/20 mr-2 mt-1">
-                    <span className="text-[10px] font-bold text-primary">{msg.author.charAt(0)}</span>
+                    <span className="text-[10px] font-bold text-primary">{msg.author_email?.charAt(0) || "?"}</span>
                   </div>
                 )}
-                {!msg.isOwn && !showAuthor && <div className="w-9 shrink-0 mr-2" />}
-                <div className={`max-w-[78%] rounded-[18px] px-3.5 py-2.5 shadow-sm ${
-                  msg.isOwn
-                    ? "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-br-md"
-                    : "bg-card border border-border/30 text-foreground rounded-bl-md"
-                }`}>
-                  {showAuthor && !msg.isOwn && (
-                    <p className="text-[11px] font-semibold text-primary mb-0.5">{msg.author}</p>
-                  )}
-                  <p className="text-sm leading-relaxed">{msg.content}</p>
-                  <p className={`text-[10px] mt-1 text-right ${msg.isOwn ? "text-white/50" : "text-muted-foreground/40"}`}>
-                    {msg.time}
-                  </p>
-                </div>
+                {!isOwn && !showAuthor && <div className="w-9 shrink-0 mr-2" />}
+
+                {isVoice && msg.voice_url ? (
+                  <VoiceBubble msg={msg} isOwn={isOwn} />
+                ) : isSticker ? (
+                  <div className="py-1"><span className="text-5xl leading-none">{msg.content}</span></div>
+                ) : isGif ? (
+                  <div className="py-1 max-w-[70%]">
+                    <img src={msg.content} alt="GIF" className="rounded-2xl max-h-48 object-cover" />
+                  </div>
+                ) : (
+                  <div className={`max-w-[78%] rounded-[18px] px-3.5 py-2.5 shadow-sm ${
+                    isOwn
+                      ? "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-br-md"
+                      : "bg-card border border-border/30 text-foreground rounded-bl-md"
+                  }`}>
+                    {showAuthor && (
+                      <p className="text-[11px] font-semibold text-primary mb-0.5">{msg.author_email || "Inconnu"}</p>
+                    )}
+                    <p className="text-sm leading-relaxed">{msg.content}</p>
+                    {msg.attachment_url && (
+                      <img src={msg.attachment_url} alt="Pièce jointe" className="mt-2 rounded-xl max-h-48 object-cover" />
+                    )}
+                    <p className={`text-[10px] mt-1 text-right ${isOwn ? "text-white/50" : "text-muted-foreground/40"}`}>
+                      {new Date(msg.created_at).toLocaleTimeString("fr", { hour: "2-digit", minute: "2-digit" })}
+                      {msg.edited_at ? " (modifié)" : ""}
+                    </p>
+                  </div>
+                )}
               </div>
             );
           })}
+          <div ref={messagesEndRef} />
         </div>
+
+        {/* Pickers */}
+        {showEmoji && <EmojiPicker onSelect={(emoji) => { setMessage(prev => prev + emoji); }} onClose={() => setShowEmoji(false)} />}
+        {showStickers && <StickerPicker onSelect={handleSendSticker} onClose={() => setShowStickers(false)} />}
+        {showGifs && <GifPicker onSelect={handleSendGif} onClose={() => setShowGifs(false)} />}
 
         {/* Input Bar */}
         <div className="flex items-center gap-2 px-3 py-2 border-t border-border/30 bg-background/95 backdrop-blur-xl shrink-0">
-          <button className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground active:bg-card/60 active:scale-90 transition-all touch-manipulation">
+          <button
+            onClick={() => { closeAllPickers(); setShowGifs(!showGifs); }}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground active:bg-card/60 active:scale-90 transition-all touch-manipulation"
+          >
+            <Image className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => { closeAllPickers(); setShowStickers(!showStickers); }}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-lg active:bg-card/60 active:scale-90 transition-all touch-manipulation"
+          >
+            🎭
+          </button>
+          <button
+            onClick={() => { closeAllPickers(); setShowEmoji(!showEmoji); }}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground active:bg-card/60 active:scale-90 transition-all touch-manipulation"
+          >
             <Smile className="h-5 w-5" />
           </button>
           <button className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground active:bg-card/60 active:scale-90 transition-all touch-manipulation">
@@ -115,29 +304,39 @@ export function MobileCommunity() {
             className="flex-1 h-10 rounded-2xl border border-border/50 bg-card/60 px-4 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/5 transition-all placeholder:text-muted-foreground/30"
             placeholder="Écris un message..."
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(e) => { closeAllPickers(); setMessage(e.target.value); }}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
           />
-          <button className={`flex h-10 w-10 items-center justify-center rounded-2xl active:scale-90 transition-all touch-manipulation shadow-sm ${
-            message.trim()
-              ? "bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-primary/20"
-              : "bg-card border border-border/40 text-muted-foreground"
-          }`}>
-            {message.trim() ? <Send className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-          </button>
+          {message.trim() ? (
+            <button
+              onClick={() => handleSend()}
+              className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-lg shadow-primary/20 active:scale-90 transition-all touch-manipulation"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsRecording(true)}
+              className="flex h-10 w-10 items-center justify-center rounded-2xl bg-card border border-border/40 text-muted-foreground shadow-sm active:scale-90 transition-all touch-manipulation"
+            >
+              <Mic className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
     );
   }
 
+  // Channel list view
   return (
     <div className="px-4 py-6 space-y-5 pb-24">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-foreground mb-1">Communauté</h1>
-        <p className="text-xs text-muted-foreground">Discute avec d'autres créateurs</p>
+        <p className="text-xs text-muted-foreground">
+          {hasSupabaseEnv ? "Chat en temps réel" : "Mode hors-ligne"}
+        </p>
       </div>
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/40" />
         <input
@@ -146,39 +345,58 @@ export function MobileCommunity() {
         />
       </div>
 
-      {/* Chat List */}
       <div className="space-y-0.5">
-        {CHATS.map((chat) => (
+        {channels.map((channel) => (
           <button
-            key={chat.id}
-            onClick={() => setActiveChat(chat.id)}
+            key={channel.id}
+            onClick={() => setActiveChat(channel.id)}
             className="flex items-center gap-3 w-full p-3 rounded-2xl active:bg-card/60 transition-colors duration-100 touch-manipulation"
           >
-            <div className="relative shrink-0">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-card border border-border/30">
-                <span className="text-sm font-bold text-primary">{chat.avatar}</span>
-              </div>
-              {chat.online && (
-                <div className="absolute bottom-0.5 right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
-              )}
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10">
+              <span className="text-sm font-bold text-primary">#</span>
             </div>
             <div className="flex-1 min-w-0 text-left">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-foreground truncate">{chat.name}</h3>
-                <span className="text-[10px] text-muted-foreground/50 shrink-0">{chat.time}</span>
-              </div>
-              <div className="flex items-center justify-between gap-2 mt-0.5">
-                <p className="text-xs text-muted-foreground truncate">{chat.lastMessage}</p>
-                {chat.unread > 0 && (
-                  <span className="flex items-center justify-center h-5 min-w-[20px] rounded-full bg-primary text-[10px] font-bold text-primary-foreground px-1.5 shrink-0">
-                    {chat.unread}
-                  </span>
-                )}
-              </div>
+              <h3 className="text-sm font-semibold text-foreground">{channel.name}</h3>
+              <p className="text-xs text-muted-foreground truncate mt-0.5">{channel.description}</p>
             </div>
+            <ChevronLeft className="h-4 w-4 text-muted-foreground/30 rotate-180" />
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** Voice message bubble with animated waveform */
+function VoiceBubble({ msg, isOwn }: { msg: ChatMessage; isOwn: boolean }) {
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  function togglePlay() {
+    if (!audioRef.current) return;
+    if (playing) { audioRef.current.pause(); }
+    else { audioRef.current.play().catch(() => {}); }
+    setPlaying(!playing);
+  }
+
+  return (
+    <div className={`inline-flex items-center gap-3 rounded-2xl px-4 py-2.5 ${isOwn ? "bg-gradient-to-r from-primary/15 to-primary/5" : "bg-card border border-border/30"}`}>
+      <button onClick={togglePlay} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-md active:scale-95">
+        {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+      </button>
+      <Volume2 className={`h-3.5 w-3.5 ${playing ? "text-primary" : "text-muted-foreground"}`} />
+      <div className="flex items-end gap-[1.5px] h-6">
+        {Array.from({ length: 24 }).map((_, i) => (
+          <div key={i} className="w-[3px] rounded-full transition-all" style={{
+            height: `${4 + Math.sin(i * 0.6) * 10 + Math.cos(i * 0.3) * 6 + Math.random() * 6}px`,
+            backgroundColor: playing ? "var(--primary)" : "var(--muted-foreground)",
+            opacity: playing ? 0.6 + Math.random() * 0.4 : 0.3,
+            animation: playing ? `audio-wave ${0.4 + Math.random() * 0.6}s ease-in-out infinite ${i * 0.04}s` : "none",
+          }} />
+        ))}
+      </div>
+      <span className="text-[11px] tabular-nums text-muted-foreground">{msg.voice_duration ? `${Math.floor(msg.voice_duration / 60)}:${String(Math.floor(msg.voice_duration % 60)).padStart(2, "0")}` : "0:00"}</span>
+      <audio ref={audioRef} src={msg.voice_url} onEnded={() => setPlaying(false)} />
     </div>
   );
 }

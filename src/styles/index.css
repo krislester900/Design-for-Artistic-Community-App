@@ -1,3 +1,92 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+
+/* === Mobile App Animations === */
+
+/* Tab slide transitions */
+@keyframes tab-enter-right {
+  from { transform: translateX(30px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes tab-enter-left {
+  from { transform: translateX(-30px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.animate-tab-enter-right {
+  animation: tab-enter-right 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.animate-tab-enter-left {
+  animation: tab-enter-left 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Tab indicator line */
+@keyframes tab-indicator {
+  from { width: 0; opacity: 0; }
+  to { width: 16px; opacity: 1; }
+}
+.animate-tab-indicator {
+  animation: tab-indicator 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* FAB bounce */
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.05); }
+}
+.animate-bounce-slow {
+  animation: bounce-slow 2s ease-in-out infinite;
+}
+
+/* Pull to refresh spinner */
+@keyframes refresh-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Heart explosion for likes */
+@keyframes heart-explode {
+  0% { transform: scale(0.5); opacity: 1; }
+  50% { transform: scale(1.4); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-heart-explode {
+  animation: heart-explode 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Audio wave animation for voice messages */
+@keyframes audio-wave {
+  0%, 100% { height: 4px; }
+  50% { height: 20px; }
+}
+
+/* Float animation for background particles */
+@keyframes float-up {
+  0% { transform: translateY(100vh) scale(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+}
+.animate-float {
+  animation: float-up 8s linear infinite;
+}
+
+/* Notification badge pulse */
+@keyframes badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+.animate-badge-pulse {
+  animation: badge-pulse 2s ease-in-out infinite;
+}
