@@ -11,6 +11,7 @@ import {
   Sparkles,
   Plus,
   Bell,
+  Search,
 } from "lucide-react";
 import { ArtLoadingScreen } from "../components/ArtLoadingScreen";
 import { useCommunityData } from "../hooks/useCommunityData";
@@ -18,13 +19,16 @@ import { MobileHome } from "./MobileHome";
 import { MobileExplore } from "./MobileExplore";
 import { MobileCommunity } from "./MobileCommunity";
 import { MobileProfile } from "./MobileProfile";
+import { MobileSearch } from "./MobileSearch";
+import { MobileNotifications } from "./MobileNotifications";
 import { ThemeToggle } from "../components/ui/ThemeToggle";
 
-type Tab = "home" | "explore" | "community" | "profile";
+type Tab = "home" | "explore" | "community" | "profile" | "search" | "notifications";
 
 const TABS: { id: Tab; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Accueil", icon: Home },
   { id: "explore", label: "Univers", icon: Compass },
+  { id: "search", label: "Rechercher", icon: Search },
   { id: "community", label: "Communauté", icon: MessageCircle },
   { id: "profile", label: "Profil", icon: User },
 ];
@@ -77,6 +81,7 @@ export function MobileApp() {
       <div className={animClass}>
         {activeTab === "home" && <MobileHome data={data} source={source} />}
         {activeTab === "explore" && <MobileExplore data={data} onNavigate={switchTab} />}
+        {activeTab === "search" && <MobileSearch />}
         {activeTab === "community" && <MobileCommunity onChatStateChange={setIsChatActive} />}
         {activeTab === "profile" && <MobileProfile />}
       </div>
