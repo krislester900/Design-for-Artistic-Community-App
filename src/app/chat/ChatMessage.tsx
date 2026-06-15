@@ -294,41 +294,51 @@ export function ChatMessage({
             <span className="text-5xl leading-none">{message.content}</span>
           </div>
         ) : isVoice ? (
-          /* Voice message */
+          /* Voice message with waveform animation */
           <div className={`inline-flex items-center gap-3 rounded-2xl px-4 py-2.5 ${
             isOwn
-              ? "bg-primary/15 text-foreground"
+              ? "bg-gradient-to-r from-primary/15 to-primary/5 text-foreground"
               : "bg-card/80 text-foreground border border-border/50"
           }`}>
             <button
               onClick={toggleAudioPlayback}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-md transition-all hover:scale-105 active:scale-95"
             >
               {isPlaying ? (
-                <Pause className="h-3.5 w-3.5" />
+                <Pause className="h-4 w-4" />
               ) : (
-                <Play className="h-3.5 w-3.5 ml-0.5" />
+                <Play className="h-4 w-4 ml-0.5" />
               )}
             </button>
-            <div className="flex items-center gap-1">
-              <Volume2 className="h-3.5 w-3.5 text-muted-foreground" />
-              <div className="flex items-end gap-0.5 h-5">
-                {Array.from({ length: 20 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="w-0.5 rounded-full bg-primary/40"
-                    style={{ height: `${Math.max(3, Math.random() * 20)}px` }}
-                  />
-                ))}
+            <div className="flex items-center gap-2">
+              <Volume2 className={`h-3.5 w-3.5 ${isPlaying ? "text-primary" : "text-muted-foreground"}`} />
+              {/* Animated waveform */}
+              <div className="flex items-end gap-[1.5px] h-6">
+                {Array.from({ length: 24 }).map((_, i) => {
+                  const barHeight = 4 + Math.sin(i * 0.6) * 10 + Math.cos(i * 0.3) * 6 + Math.random() * 6;
+                  return (
+                    <div
+                      key={i}
+                      className="w-[3px] rounded-full transition-all"
+                      style={{
+                        height: `${Math.max(3, barHeight)}px`,
+                        backgroundColor: isPlaying ? "var(--primary)" : "var(--muted-foreground)",
+                        opacity: isPlaying ? 0.6 + Math.random() * 0.4 : 0.4,
+                        animation: isPlaying ? `audio-wave ${0.4 + Math.random() * 0.6}s ease-in-out infinite ${i * 0.04}s` : "none",
+                      }}
+                    />
+                  );
+                })}
               </div>
             </div>
-            <span className="text-[11px] font-mono text-muted-foreground">
+            <span className="text-[11px] font-mono tabular-nums text-muted-foreground">
               {message.voice_duration ? formatVoiceDuration(message.voice_duration) : "0:00"}
             </span>
             <audio
               ref={audioRef}
               src={message.voice_url || ""}
               onEnded={() => setIsPlaying(false)}
+              onTimeUpdate={() => {}}
               className="hidden"
             />
           </div>
