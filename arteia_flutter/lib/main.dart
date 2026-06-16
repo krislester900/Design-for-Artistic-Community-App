@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'theme/app_theme.dart';
+import 'screens/loading_screen.dart';
 import 'pages/home_page.dart';
 import 'pages/explore_page.dart';
 import 'pages/search_page.dart';
@@ -8,8 +10,14 @@ import 'pages/profile_page.dart';
 import 'pages/universe_page.dart';
 import 'pages/notifications_page.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    systemNavigationBarColor: AppTheme.bgDark,
+    systemNavigationBarIconBrightness: Brightness.light,
+  ));
   runApp(const ArteiaApp());
 }
 
@@ -22,8 +30,31 @@ class ArteiaApp extends StatelessWidget {
       title: 'Artéïa',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.arteiaTheme,
-      home: const MainScreen(),
+      home: const LoadingScreenWrapper(),
     );
+  }
+}
+
+class LoadingScreenWrapper extends StatefulWidget {
+  const LoadingScreenWrapper({super.key});
+
+  @override
+  State<LoadingScreenWrapper> createState() => _LoadingScreenWrapperState();
+}
+
+class _LoadingScreenWrapperState extends State<LoadingScreenWrapper> {
+  bool _isLoading = true;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return LoadingScreen(
+        onComplete: () {
+          setState(() => _isLoading = false);
+        },
+      );
+    }
+    return const MainScreen();
   }
 }
 
