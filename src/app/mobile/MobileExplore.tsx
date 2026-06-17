@@ -67,10 +67,11 @@ export function MobileExplore({ data }: Props) {
   }
 
   return (
-    <div className="px-4 py-6 space-y-8 pb-24">
+    <div className="app-page space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground mb-1">Explorer</h1>
+      <div className="app-hero-surface py-5">
+        <span className="app-kicker mb-4">Exploration créative</span>
+        <h1 className="text-3xl font-bold text-foreground mb-1 tracking-tight">Explorer</h1>
         <p className="text-xs text-muted-foreground">{data.categories.length} univers · {data.artists.length} artistes · {data.artworks.length} œuvres</p>
       </div>
 
@@ -78,7 +79,7 @@ export function MobileExplore({ data }: Props) {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/40" />
         <input
-          className="w-full h-11 pl-10 pr-4 rounded-xl border border-border/50 bg-card/60 text-sm text-foreground outline-none placeholder:text-muted-foreground/30 focus:border-primary/50 focus:ring-2 focus:ring-primary/5 transition-all"
+          className="app-input w-full pl-10 pr-4 placeholder:text-muted-foreground/30"
           placeholder="Rechercher un artiste, une œuvre..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -87,7 +88,7 @@ export function MobileExplore({ data }: Props) {
 
       {/* Categories Grid */}
       <div>
-        <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground/80 mb-4">
+        <h2 className="app-heading mb-4">
           Catégories
         </h2>
         <div className="grid grid-cols-3 gap-3">
@@ -98,7 +99,7 @@ export function MobileExplore({ data }: Props) {
               <button
                 key={cat.slug}
                 onClick={() => setActiveUniverse(cat.slug)}
-                className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-card border border-border/30 active:scale-95 active:border-primary/30 transition-all duration-100 touch-manipulation"
+                className="app-surface-soft flex flex-col items-center justify-center gap-2 p-4 active:scale-95 active:border-primary/30 transition-all duration-100 touch-manipulation"
               >
                 <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${CATEGORY_GRADIENTS[cat.slug] || "from-primary/20 to-accent/15"} ${CATEGORY_COLORS[cat.slug]?.split(" ")[1] || "text-primary"}`}>
                   <Icon className="h-6 w-6" />
@@ -119,8 +120,8 @@ export function MobileExplore({ data }: Props) {
             onClick={() => setActiveFilter(filter)}
             className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-150 active:scale-95 touch-manipulation ${
               activeFilter === filter
-                ? "bg-primary/15 border border-primary/30 text-primary"
-                : "bg-card border border-border/40 text-muted-foreground hover:border-border/60"
+                ? "bg-gradient-to-r from-primary/20 to-secondary/15 border border-primary/30 text-primary shadow-[0_10px_24px_rgba(156,107,255,0.15)]"
+                : "bg-card/60 border border-border/40 text-muted-foreground hover:border-border/60"
             }`}
           >
             {filter}
@@ -130,7 +131,7 @@ export function MobileExplore({ data }: Props) {
 
       {/* Artists Grid */}
       <div>
-        <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground/80 mb-4">
+        <h2 className="app-heading mb-4">
           Artistes ({filteredArtists.length})
         </h2>
         {filteredArtists.length > 0 ? (
@@ -138,11 +139,12 @@ export function MobileExplore({ data }: Props) {
             {filteredArtists.map((artist) => (
               <div
                 key={artist.name}
-                className="rounded-2xl bg-card border border-border/30 overflow-hidden active:scale-[0.97] transition-transform duration-100 touch-manipulation shadow-card"
+                className="app-surface overflow-hidden active:scale-[0.97] transition-transform duration-100 touch-manipulation"
               >
                 <div className={`h-36 bg-gradient-to-br ${ARTIST_GRADIENTS[artist.category] || "from-primary/20 to-accent/10"} flex items-center justify-center relative`}>
-                  <div className="absolute inset-0 bg-gradient-to-t from-card/90 to-transparent" />
-                  <Palette className="h-10 w-10 text-foreground/5" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-card/30 to-transparent" />
+                  <div className="absolute -right-4 top-3 h-16 w-16 rounded-full bg-white/10 blur-2xl" />
+                  <Palette className="h-10 w-10 text-white/45" />
                 </div>
                 <div className="p-3">
                   <h3 className="text-sm font-semibold text-foreground truncate">{artist.name}</h3>

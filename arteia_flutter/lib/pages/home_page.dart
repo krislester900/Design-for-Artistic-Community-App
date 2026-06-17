@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import 'universe_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -70,6 +71,13 @@ class _HomePageState extends State<HomePage> {
         });
       }
     }
+  }
+
+  void _openUniverse(String slug) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => UniversePage(slug: slug)),
+    );
   }
 
   @override
@@ -190,20 +198,23 @@ class _HomePageState extends State<HomePage> {
                   itemBuilder: (context, index) {
                     final cat = _categories[index];
                     final color = Color(int.parse((cat['color'] ?? '#7C5CFC').replaceFirst('#', '0xFF')));
-                    return Container(
-                      width: 100,
-                      margin: const EdgeInsets.only(right: 10),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(colors: [color, color.withOpacity(0.3)]),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(cat['short_label'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
-                          const SizedBox(height: 4),
-                          Text(cat['title'] ?? '', style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.8)), textAlign: TextAlign.center),
-                        ],
+                    return GestureDetector(
+                      onTap: () => _openUniverse(cat['slug'] ?? ''),
+                      child: Container(
+                        width: 100,
+                        margin: const EdgeInsets.only(right: 10),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: [color, color.withOpacity(0.3)]),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(cat['short_label'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                            const SizedBox(height: 4),
+                            Text(cat['title'] ?? '', style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.8)), textAlign: TextAlign.center),
+                          ],
+                        ),
                       ),
                     );
                   },

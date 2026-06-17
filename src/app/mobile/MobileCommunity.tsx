@@ -302,7 +302,7 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
   if (isRecording && activeChat) {
     return (
       <div className="flex flex-col h-full bg-background">
-        <header className="flex items-center gap-3 px-4 py-3 border-b border-border/30 shrink-0">
+        <header className="flex items-center gap-3 px-4 py-3 border-b border-border/30 bg-card/45 backdrop-blur-xl shrink-0">
           <button onClick={() => setIsRecording(false)} className="text-primary text-sm font-medium touch-manipulation">
             ← Retour
           </button>
@@ -322,7 +322,7 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
     return (
       <div className="flex flex-col h-full bg-background" data-chat-active="true">
         {/* Chat Header */}
-        <header className="flex items-center gap-3 px-4 py-3 border-b border-border/30 bg-background/95 backdrop-blur-xl shrink-0">
+        <header className="flex items-center gap-3 px-4 py-3 border-b border-border/30 bg-card/55 backdrop-blur-xl shrink-0">
           <button onClick={() => { setActiveChat(null); closeAllPickers(); }} className="flex items-center gap-1 text-primary text-sm font-medium touch-manipulation active:opacity-70">
             <ChevronLeft className="h-5 w-5" />
           </button>
@@ -339,7 +339,7 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
         </header>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ WebkitOverflowScrolling: "touch" }}>
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-[radial-gradient(circle_at_top,rgba(156,107,255,0.08),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(38,224,192,0.06),transparent_28%)]" style={{ WebkitOverflowScrolling: "touch" }}>
           {messages.length === 0 && (
             <div className="text-center py-12">
               <MessageSquare className="h-10 w-10 text-muted-foreground/20 mx-auto mb-3" />
@@ -374,8 +374,8 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
                 ) : (
                   <div className={`max-w-[78%] rounded-[18px] px-3.5 py-2.5 shadow-sm ${
                     isOwn
-                      ? "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-br-md"
-                      : "bg-card border border-border/30 text-foreground rounded-bl-md"
+                      ? "bg-gradient-to-br from-primary via-secondary to-primary text-primary-foreground rounded-br-md shadow-[0_16px_32px_rgba(156,107,255,0.22)]"
+                      : "bg-card/88 border border-border/30 text-foreground rounded-bl-md backdrop-blur-xl"
                   }`}>
                     {showAuthor && (
                       <p className="text-[11px] font-semibold text-primary mb-0.5">{msg.author_email || "Inconnu"}</p>
@@ -397,7 +397,7 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
         </div>
 
         {/* Input Bar with pickers */}
-        <div className="relative shrink-0 border-t border-border/30 bg-background/95 backdrop-blur-xl">
+        <div className="relative shrink-0 border-t border-border/30 bg-card/55 backdrop-blur-xl">
           {/* Pickers — positioned above input bar */}
           {showEmoji && (
             <div className="absolute bottom-full left-0 right-0 z-50">
@@ -437,7 +437,7 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
             <Paperclip className="h-5 w-5" />
           </button>
           <input
-            className="flex-1 h-10 rounded-2xl border border-border/50 bg-card/60 px-4 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/5 transition-all placeholder:text-muted-foreground/30"
+            className="app-input flex-1 h-10 px-4 placeholder:text-muted-foreground/30"
             placeholder="Écris un message..."
             value={message}
             onChange={(e) => { closeAllPickers(); setMessage(e.target.value); }}
@@ -466,9 +466,10 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
 
   // Channel list view
   return (
-    <div className="px-4 py-6 space-y-5 pb-24">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground mb-1">Communauté</h1>
+    <div className="app-page space-y-5">
+      <div className="app-hero-surface py-5">
+        <span className="app-kicker mb-4">Studio social</span>
+        <h1 className="text-3xl font-bold text-foreground mb-1 tracking-tight">Communauté</h1>
         <p className="text-xs text-muted-foreground">
           {hasSupabaseEnv ? "Chat en temps réel" : "Mode hors-ligne"}
         </p>
@@ -477,7 +478,7 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/40" />
         <input
-          className="w-full h-11 pl-10 pr-4 rounded-xl border border-border/50 bg-card/60 text-sm text-foreground outline-none placeholder:text-muted-foreground/30 focus:border-primary/50 transition-all"
+          className="app-input w-full pl-10 pr-4 placeholder:text-muted-foreground/30"
           placeholder="Rechercher une discussion..."
         />
       </div>
@@ -487,9 +488,9 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
           <button
             key={channel.id}
             onClick={() => setActiveChat(channel.id)}
-            className="flex items-center gap-3 w-full p-3 rounded-2xl active:bg-card/60 transition-colors duration-100 touch-manipulation"
+            className="app-surface-soft flex items-center gap-3 w-full p-3 active:bg-card/60 transition-colors duration-100 touch-manipulation"
           >
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 via-secondary/20 to-accent/15 border border-primary/15 shadow-[0_12px_30px_rgba(156,107,255,0.16)]">
               <span className="text-sm font-bold text-primary">#</span>
             </div>
             <div className="flex-1 min-w-0 text-left">

@@ -29,10 +29,11 @@ const CATEGORY_GRADIENT: Record<string, string> = {
 
 function ArtworkCard({ item }: { item: Artwork }) {
   return (
-    <div className="flex-shrink-0 w-40 rounded-2xl bg-card border border-border/30 overflow-hidden shadow-card active:scale-[0.97] transition-transform duration-100 touch-manipulation">
+    <div className="app-surface flex-shrink-0 w-40 overflow-hidden active:scale-[0.97] transition-transform duration-100 touch-manipulation">
       <div className={`h-28 bg-gradient-to-br ${CATEGORY_GRADIENT[item.category] || "from-primary/30 to-accent/20"} flex items-center justify-center relative overflow-hidden`}>
-        <div className="absolute inset-0 bg-gradient-to-t from-card/80 to-transparent" />
-        <Sparkles className="h-8 w-8 text-primary/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-card/30 to-transparent" />
+        <div className="absolute -right-4 -top-4 h-14 w-14 rounded-full bg-white/10 blur-xl" />
+        <Sparkles className="h-8 w-8 text-white/60" />
       </div>
       <div className="p-3">
         <h3 className="text-sm font-semibold text-foreground truncate">{item.title}</h3>
@@ -52,7 +53,7 @@ function ArtworkCard({ item }: { item: Artwork }) {
 function DiscussionRow({ item }: { item: Discussion }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 active:bg-card/50 transition-colors duration-100 touch-manipulation rounded-xl">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent shadow-md shadow-primary/10">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary via-secondary to-accent shadow-md shadow-primary/20">
         <span className="text-xs font-bold text-primary-foreground">{item.author.charAt(0)}</span>
       </div>
       <div className="flex-1 min-w-0">
@@ -81,25 +82,31 @@ export function MobileHome({ data, source }: Props) {
   const discussions = data.discussions.slice(0, 5);
 
   return (
-    <div className="px-4 py-6 space-y-8 pb-24">
+    <div className="app-page space-y-8">
       {/* Hero Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/10 via-background to-accent/5 border border-border/30 p-6 shadow-card">
-        <div className="absolute -top-6 -right-6 h-20 w-20 rounded-full bg-primary/10 blur-xl" />
-        <div className="absolute -bottom-4 -left-4 h-16 w-16 rounded-full bg-accent/10 blur-xl" />
-        <span className="relative inline-block rounded-full bg-primary px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary-foreground mb-4">
+      <div className="app-hero-surface">
+        <div className="absolute -top-10 -right-10 h-28 w-28 rounded-full bg-primary/20 blur-3xl" />
+        <div className="absolute -bottom-6 -left-6 h-24 w-24 rounded-full bg-secondary/20 blur-3xl" />
+        <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:28px_28px] [mask-image:radial-gradient(circle_at_center,black,transparent_75%)]" />
+        <span className="app-kicker relative mb-4">
           {source === "supabase" ? "Données Supabase" : "Bienvenue sur Artéïa"}
         </span>
-        <h1 className="relative text-2xl font-bold text-foreground mb-2 tracking-tight">
+        <h1 className="relative text-3xl font-bold text-foreground mb-2 tracking-tight leading-tight">
           Ta créativité,<br />ton univers
         </h1>
         <p className="relative text-sm text-muted-foreground leading-relaxed">
           {data.categories.length} univers · {data.artists.length} artistes · {data.artworks.length} œuvres
         </p>
+        <div className="relative mt-5 flex flex-wrap gap-2">
+          <span className="app-pill text-primary">Galerie vivante</span>
+          <span className="app-pill text-secondary">Couleurs vibrantes</span>
+          <span className="app-pill text-accent">Communauté créative</span>
+        </div>
       </div>
 
       {/* Quick Actions */}
       <div>
-        <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground/80 mb-4">
+        <h2 className="app-heading mb-4">
           Univers
         </h2>
         <div className="grid grid-cols-4 gap-3">
@@ -108,7 +115,7 @@ export function MobileHome({ data, source }: Props) {
             return (
               <button
                 key={cat.slug}
-                className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-card border border-border/50 active:scale-95 active:bg-surface transition-all duration-100 touch-manipulation"
+                className="app-surface-soft flex flex-col items-center gap-2 p-3 active:scale-95 transition-all duration-100 touch-manipulation"
               >
                 <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${cat.color} shadow-md`}>
                   <cat.icon className="h-5 w-5 text-white" />
@@ -132,7 +139,7 @@ export function MobileHome({ data, source }: Props) {
         <div>
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground/80">
+            <h2 className="app-heading">
               À la une
             </h2>
           </div>
@@ -147,10 +154,10 @@ export function MobileHome({ data, source }: Props) {
       {/* Activité récente — Discussions */}
       {discussions.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-foreground/80 mb-3">
+          <h2 className="app-heading mb-3">
             Discussions récentes
           </h2>
-          <div className="rounded-2xl bg-card/60 border border-border/30 divide-y divide-border/20 overflow-hidden">
+          <div className="app-surface-soft divide-y divide-border/20 overflow-hidden">
             {discussions.map((item) => (
               <DiscussionRow key={item.title} item={item} />
             ))}
