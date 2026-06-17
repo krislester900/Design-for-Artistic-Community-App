@@ -31,7 +31,9 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
 
     _mainController.forward();
     _blinkController.repeat();
-    _meltController.delay(const Duration(milliseconds: 3000));
+    Future.delayed(const Duration(milliseconds: 3000), () {
+      if (mounted) _meltController.forward();
+    });
 
     _mainController.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
@@ -173,7 +175,7 @@ class _AlienPainter extends CustomPainter {
     canvas.translate(centerX - 28, centerY);
     canvas.scale(1, leftLidScale);
     paint.color = Colors.white;
-    canvas.drawOval(const Rect.fromCenter(center: Offset(0, 0), width: 48, height: 60), paint);
+    canvas.drawOval(Rect.fromCenter(center: const Offset(0, 0), width: 48, height: 60), paint);
     canvas.restore();
 
     // Right eye lid
@@ -181,7 +183,7 @@ class _AlienPainter extends CustomPainter {
     canvas.translate(centerX + 28, centerY);
     canvas.scale(1, rightLidScale);
     paint.color = Colors.white;
-    canvas.drawOval(const Rect.fromCenter(center: Offset(0, 0), width: 48, height: 60), paint);
+    canvas.drawOval(Rect.fromCenter(center: const Offset(0, 0), width: 48, height: 60), paint);
     canvas.restore();
 
     // Pupils

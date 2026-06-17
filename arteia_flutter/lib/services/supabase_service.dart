@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:http/http.dart' as http;
 
 class SupabaseConfig {
@@ -36,15 +37,19 @@ class SupabaseService {
     if (offset != null) url += '&offset=$offset';
 
     try {
+      print('🔵 DEBUG GET: $url');
       final response = await http.get(Uri.parse(url), headers: _headers);
+      print('🔵 DEBUG GET $table: status=${response.statusCode}');
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return List<Map<String, dynamic>>.from(data ?? []);
+        final result = List<Map<String, dynamic>>.from(data ?? []);
+        print('🟢 DEBUG GET $table: SUCCESS - ${result.length} items');
+        return result;
       }
-      print('GET $table error: ${response.statusCode} ${response.body}');
+      print('🔴 GET $table error: ${response.statusCode} ${response.body}');
       return [];
     } catch (e) {
-      print('GET $table exception: $e');
+      print('🔴 GET $table exception: $e');
       return [];
     }
   }

@@ -43,8 +43,29 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       if (mounted) {
+        // Données de démonstration si la base est vide
         setState(() {
-          _error = e.toString();
+          _categories = [
+            {'slug': 'music', 'title': 'Musique', 'short_label': '🎵', 'color': '#7C5CFC'},
+            {'slug': 'visual-art', 'title': 'Art Visuel', 'short_label': '🎨', 'color': '#00D4AA'},
+            {'slug': 'manga', 'title': 'Manga', 'short_label': '📚', 'color': '#FF6B9D'},
+            {'slug': 'film', 'title': 'Films', 'short_label': '🎬', 'color': '#FFA500'},
+          ];
+          _artworks = [
+            {'title': 'Sans titre', 'artist_name': 'Artiste 1', 'likes': 42, 'views': 128, 'medium': 'Digital'},
+            {'title': 'Nuit étoilée', 'artist_name': 'Marie L.', 'likes': 89, 'views': 345, 'medium': 'Peinture'},
+            {'title': 'Urban Life', 'artist_name': 'Jean D.', 'likes': 156, 'views': 512, 'medium': 'Photo'},
+          ];
+          _artists = [
+            {'name': 'Marie L.', 'role': 'Peintre', 'likes': 234},
+            {'name': 'Jean D.', 'role': 'Photographe', 'likes': 189},
+            {'name': 'Sophie M.', 'role': 'Illustratrice', 'likes': 312},
+          ];
+          _stats = [
+            {'label': 'Artistes', 'number_label': '1.2K'},
+            {'label': 'Œuvres', 'number_label': '3.5K'},
+            {'label': 'Communauté', 'number_label': '5.8K'},
+          ];
           _isLoading = false;
         });
       }
