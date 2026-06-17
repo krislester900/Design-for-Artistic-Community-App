@@ -52,10 +52,11 @@ export function MobileNotifications() {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <div className="px-4 py-6 space-y-5 pb-24">
+    <div className="app-page space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="app-hero-surface py-5 flex items-center justify-between">
         <div>
+          <span className="app-kicker mb-4">Signal créatif</span>
           <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "'Outfit', sans-serif" }}>Notifications</h1>
           <p className="text-xs text-muted-foreground mt-0.5">{unreadCount} non lues</p>
         </div>
@@ -76,8 +77,8 @@ export function MobileNotifications() {
             onClick={() => setActiveFilter(filter)}
             className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-150 active:scale-95 touch-manipulation ${
               activeFilter === filter
-                ? "bg-primary/15 border border-primary/30 text-primary"
-                : "bg-card border border-border/40 text-muted-foreground"
+                ? "bg-gradient-to-r from-primary/20 to-secondary/15 border border-primary/30 text-primary shadow-[0_10px_24px_rgba(156,107,255,0.15)]"
+                : "bg-card/60 border border-border/40 text-muted-foreground"
             }`}
           >
             {filter}
@@ -93,8 +94,8 @@ export function MobileNotifications() {
             onClick={() => markRead(notif.id)}
             className={`flex items-start gap-3 p-3 rounded-2xl border transition-all duration-100 active:scale-[0.98] touch-manipulation ${
               notif.read
-                ? "bg-card/40 border-border/20"
-                : "bg-card border-primary/20 shadow-sm"
+                ? "bg-card/50 border-border/20 backdrop-blur-lg"
+                : "bg-card/75 border-primary/20 shadow-[0_16px_36px_rgba(156,107,255,0.12)] backdrop-blur-xl"
             }`}
           >
             <div className={`h-10 w-10 rounded-full bg-gradient-to-br ${notif.gradient} flex items-center justify-center shrink-0`}>

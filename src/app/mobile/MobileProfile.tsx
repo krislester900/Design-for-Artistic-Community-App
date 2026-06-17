@@ -109,7 +109,7 @@ export function MobileProfile() {
   // Settings view
   if (showSettings) {
     return (
-      <div className="px-4 py-6 space-y-6 pb-24">
+      <div className="app-page">
         <div className="flex items-center gap-3">
           <button onClick={() => setShowSettings(false)} className="text-primary text-sm font-medium touch-manipulation">
             ← Retour
@@ -118,7 +118,7 @@ export function MobileProfile() {
         </div>
 
         {/* Theme */}
-        <div className="rounded-2xl bg-card/60 border border-border/30 overflow-hidden divide-y divide-border/20">
+        <div className="app-surface overflow-hidden divide-y divide-border/20">
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center gap-3">
               {darkMode ? <Moon className="h-5 w-5 text-primary" /> : <Sun className="h-5 w-5 text-amber-400" />}
@@ -158,7 +158,7 @@ export function MobileProfile() {
         </div>
 
         {/* Account */}
-        <div className="rounded-2xl bg-card/60 border border-border/30 overflow-hidden divide-y divide-border/20">
+        <div className="app-surface overflow-hidden divide-y divide-border/20">
           <button className="flex items-center justify-between p-4 w-full active:bg-card/60 transition-colors">
             <div className="flex items-center gap-3">
               <Shield className="h-5 w-5 text-primary" />
@@ -184,7 +184,7 @@ export function MobileProfile() {
           </button>
         </div>
 
-        <div className="p-3 rounded-xl bg-card/40 border border-border/30 text-center">
+        <div className="app-surface-soft p-3 text-center">
           <p className="text-[10px] text-muted-foreground/50 uppercase tracking-[0.2em]">Artéïa v1.0.0</p>
         </div>
       </div>
@@ -194,7 +194,7 @@ export function MobileProfile() {
   // Auth form view
   if (showAuth && !authUser) {
     return (
-      <div className="px-4 py-6 pb-24">
+      <div className="app-page">
         <button onClick={() => setShowAuth(false)} className="text-primary text-sm font-medium mb-6 touch-manipulation">
           ← Retour au profil
         </button>
@@ -231,12 +231,12 @@ export function MobileProfile() {
 
         <form onSubmit={handleSignIn} className="space-y-3">
           <input
-            className="w-full h-11 rounded-xl border border-border/50 bg-card/60 px-3 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/5 placeholder:text-muted-foreground/30"
+            className="app-input w-full px-3 placeholder:text-muted-foreground/30"
             type="email" placeholder="Email" value={email}
             onChange={(e) => setEmail(e.target.value)} required
           />
           <input
-            className="w-full h-11 rounded-xl border border-border/50 bg-card/60 px-3 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/5 placeholder:text-muted-foreground/30"
+            className="app-input w-full px-3 placeholder:text-muted-foreground/30"
             type="password" placeholder="Mot de passe" value={password}
             onChange={(e) => setPassword(e.target.value)} required minLength={6}
           />
@@ -258,8 +258,8 @@ export function MobileProfile() {
   // Logged-out profile view
   if (!authUser) {
     return (
-      <div className="px-4 py-6 space-y-6 pb-24">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/10 via-background to-accent/5 border border-border/30 p-6 text-center">
+      <div className="app-page">
+        <div className="app-hero-surface text-center">
           <div className="relative mx-auto mb-4 h-20 w-20 flex items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent shadow-xl shadow-primary/20">
             <User className="h-9 w-9 text-primary-foreground" />
           </div>
@@ -273,7 +273,7 @@ export function MobileProfile() {
           </button>
         </div>
 
-        <div className="p-3 rounded-xl bg-card/40 border border-border/30 text-center">
+        <div className="app-surface-soft p-3 text-center">
           <p className="text-[10px] text-muted-foreground/50 uppercase tracking-[0.2em]">Artéïa v1.0.0</p>
         </div>
       </div>
@@ -282,9 +282,9 @@ export function MobileProfile() {
 
   // Logged-in profile view
   return (
-    <div className="px-4 py-6 space-y-6 pb-24">
+    <div className="app-page">
       {/* Profile Header Card */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/10 via-background to-accent/5 border border-border/30 p-6">
+      <div className="app-hero-surface">
         <div className="absolute -top-10 -right-10 h-24 w-24 rounded-full bg-primary/15 blur-2xl" />
         <div className="absolute -bottom-8 -left-8 h-20 w-20 rounded-full bg-accent/10 blur-2xl" />
 
@@ -335,7 +335,7 @@ export function MobileProfile() {
           { num: "89", label: "Suivis", icon: User, color: "text-green-400" },
           { num: "1.2k", label: "Likes", icon: Heart, color: "text-red-400" },
         ].map((stat) => (
-          <div key={stat.label} className="flex flex-col items-center justify-center py-3 rounded-2xl bg-card/60 border border-border/30">
+          <div key={stat.label} className="app-surface-soft flex flex-col items-center justify-center py-3">
             <stat.icon className={`h-4 w-4 ${stat.color} mb-1`} />
             <span className="text-lg font-bold text-foreground" style={{ fontFamily: "'Outfit', sans-serif" }}>{stat.num}</span>
             <span className="text-[9px] text-muted-foreground uppercase tracking-[0.05em]">{stat.label}</span>
@@ -344,7 +344,7 @@ export function MobileProfile() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-1 bg-card/60 border border-border/30 rounded-xl p-1">
+      <div className="app-surface-soft flex gap-1 rounded-xl p-1">
         {[
           { id: "gallery" as const, label: "Galerie", icon: Grid3X3 },
           { id: "activity" as const, label: "Activité", icon: Clock },
@@ -391,7 +391,7 @@ export function MobileProfile() {
           {showGallery === "grid" ? (
             <div className="grid grid-cols-2 gap-3">
               {GALLERY_ITEMS.map((item) => (
-                <div key={item.id} className="rounded-2xl bg-card border border-border/30 overflow-hidden active:scale-[0.97] transition-transform duration-100 touch-manipulation">
+                <div key={item.id} className="app-surface overflow-hidden active:scale-[0.97] transition-transform duration-100 touch-manipulation">
                   <div className={`h-32 bg-gradient-to-br ${item.gradient} flex items-center justify-center relative`}>
                     <span className="text-4xl">{item.emoji}</span>
                     <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/30 backdrop-blur-sm rounded-full px-2 py-0.5">
@@ -413,7 +413,7 @@ export function MobileProfile() {
           ) : (
             <div className="space-y-2">
               {GALLERY_ITEMS.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 p-3 rounded-2xl bg-card border border-border/30 active:scale-[0.98] transition-transform duration-100 touch-manipulation">
+                <div key={item.id} className="app-surface flex items-center gap-3 p-3 active:scale-[0.98] transition-transform duration-100 touch-manipulation">
                   <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${item.gradient} flex items-center justify-center shrink-0`}>
                     <span className="text-xl">{item.emoji}</span>
                   </div>
@@ -445,7 +445,7 @@ export function MobileProfile() {
             Activité Récente
           </h3>
           {ACTIVITY_ITEMS.map((item) => (
-            <div key={item.id} className="flex items-center gap-3 p-3 rounded-2xl bg-card border border-border/30">
+            <div key={item.id} className="app-surface flex items-center gap-3 p-3">
               <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                 <span className="text-lg">{item.emoji}</span>
               </div>
@@ -469,7 +469,7 @@ export function MobileProfile() {
           </h3>
           
           {/* Performance card */}
-          <div className="rounded-2xl bg-gradient-to-br from-primary/10 to-accent/5 border border-border/30 p-4">
+          <div className="app-hero-surface rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-3">
               <Trophy className="h-5 w-5 text-amber-400" />
               <span className="text-sm font-semibold text-foreground" style={{ fontFamily: "'Outfit', sans-serif" }}>Performance</span>
@@ -487,7 +487,7 @@ export function MobileProfile() {
           </div>
 
           {/* Top creations */}
-          <div className="rounded-2xl bg-card/60 border border-border/30 p-4">
+          <div className="app-surface p-4">
             <div className="flex items-center gap-2 mb-3">
               <Flame className="h-5 w-5 text-red-400" />
               <span className="text-sm font-semibold text-foreground" style={{ fontFamily: "'Outfit', sans-serif" }}>Top Créations</span>
@@ -511,7 +511,7 @@ export function MobileProfile() {
       )}
 
       {/* Menu Items */}
-      <div className="rounded-2xl bg-card/60 border border-border/30 overflow-hidden divide-y divide-border/20">
+      <div className="app-surface overflow-hidden divide-y divide-border/20">
         {[
           { icon: Heart, label: "Favoris", color: "text-red-400", badge: 24 },
           { icon: Bookmark, label: "Enregistrés", color: "text-amber-400", badge: 8 },

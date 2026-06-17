@@ -109,25 +109,25 @@ export function MobileApp() {
 
       {/* Pull to refresh indicator */}
       {isRefreshing && (
-        <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-center py-3 bg-background/95 backdrop-blur-xl border-b border-border/30">
+        <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-center py-3 bg-card/70 backdrop-blur-xl border-b border-border/30">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
           <span className="ml-2 text-xs text-primary font-medium">Rafraîchissement...</span>
         </div>
       )}
 
-      <div className="h-[env(safe-area-inset-top)] bg-background shrink-0 relative z-10" />
+      <div className="h-[env(safe-area-inset-top)] bg-background/80 shrink-0 relative z-10" />
 
       {/* Header */}
-      <header className="flex items-center justify-between px-5 py-3 bg-background/95 backdrop-blur-xl border-b border-border/30 shrink-0 relative z-10">
+      <header className="flex items-center justify-between px-5 py-3 bg-card/60 backdrop-blur-xl border-b border-border/30 shrink-0 relative z-10 shadow-[0_16px_36px_rgba(5,4,12,0.14)]">
         <div className="flex items-center gap-2">
-          <button onClick={() => setIsDrawerOpen(true)} className="flex h-8 w-8 items-center justify-center rounded-xl bg-card/60 border border-border/30 active:scale-90 transition-all">
+          <button onClick={() => setIsDrawerOpen(true)} className="flex h-8 w-8 items-center justify-center rounded-xl bg-background/35 border border-border/30 active:scale-90 transition-all">
             <svg className="h-4 w-4 text-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="3" y1="12" x2="21" y2="12"></line>
               <line x1="3" y1="6" x2="21" y2="6"></line>
               <line x1="3" y1="18" x2="21" y2="18"></line>
             </svg>
           </button>
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-lg shadow-primary/20">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary via-secondary to-accent shadow-lg shadow-primary/20">
             <Sparkles className="h-4 w-4 text-primary-foreground" />
           </div>
           <span className="text-lg font-bold tracking-wider text-foreground" style={{ fontFamily: "'Alien Block', cursive" }}>
@@ -188,7 +188,7 @@ export function MobileApp() {
 
       {/* Bottom tab bar — Hidden when chat is active */}
       {!isChatActive && (
-      <nav className="bottom-nav flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom)] pt-1 bg-background/95 backdrop-blur-xl border-t border-border/30 shrink-0 relative z-10">
+      <nav className="bottom-nav flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom)] pt-1 bg-card/60 backdrop-blur-xl border-t border-border/30 shrink-0 relative z-10 shadow-[0_-16px_36px_rgba(5,4,12,0.14)]">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -198,7 +198,7 @@ export function MobileApp() {
               onClick={() => switchTab(tab.id)}
               className={`relative flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all duration-200 min-w-[64px] touch-manipulation ${
                 isActive
-                  ? "text-primary scale-105"
+                  ? "text-primary scale-105 bg-primary/10"
                   : "text-muted-foreground/50 hover:text-muted-foreground"
               }`}
               aria-label={tab.label}

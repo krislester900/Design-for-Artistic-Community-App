@@ -380,7 +380,7 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
                     {showAuthor && (
                       <p className="text-[11px] font-semibold text-primary mb-0.5">{msg.author_email || "Inconnu"}</p>
                     )}
-                    <p className="text-sm leading-relaxed">{msg.content}</p>
+                    <p className="font-message text-sm leading-relaxed">{msg.content}</p>
                     {msg.attachment_url && (
                       <img src={msg.attachment_url} alt="Pièce jointe" className="mt-2 rounded-xl max-h-48 object-cover" />
                     )}
@@ -437,7 +437,7 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
             <Paperclip className="h-5 w-5" />
           </button>
           <input
-            className="app-input flex-1 h-10 px-4 placeholder:text-muted-foreground/30"
+            className="app-input font-message flex-1 h-10 px-4 placeholder:text-muted-foreground/30"
             placeholder="Écris un message..."
             value={message}
             onChange={(e) => { closeAllPickers(); setMessage(e.target.value); }}
@@ -533,7 +533,7 @@ function VoiceBubble({ msg, isOwn }: { msg: ChatMessage; isOwn: boolean }) {
           }} />
         ))}
       </div>
-      <span className="text-[11px] tabular-nums text-muted-foreground">{msg.voice_duration ? `${Math.floor(msg.voice_duration / 60)}:${String(Math.floor(msg.voice_duration % 60)).padStart(2, "0")}` : "0:00"}</span>
+      <span className="font-message text-[11px] tabular-nums text-muted-foreground">{msg.voice_duration ? `${Math.floor(msg.voice_duration / 60)}:${String(Math.floor(msg.voice_duration % 60)).padStart(2, "0")}` : "0:00"}</span>
       <audio ref={audioRef} src={msg.voice_url} onEnded={() => setPlaying(false)} />
     </div>
   );
