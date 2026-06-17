@@ -1,13 +1,14 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { X } from "lucide-react";
 
 type CreateChannelDialogProps = {
   open: boolean;
   onClose: () => void;
   onCreate: (name: string, description: string, type: "public" | "private", categorySlug: string | null) => void;
+  categories?: { slug: string; label: string }[];
 };
 
-export function CreateChannelDialog({ open, onClose, onCreate }: CreateChannelDialogProps) {
+export function CreateChannelDialog({ open, onClose, onCreate, categories = [] }: CreateChannelDialogProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState<"public" | "private">("public");
@@ -15,7 +16,7 @@ export function CreateChannelDialog({ open, onClose, onCreate }: CreateChannelDi
 
   if (!open) return null;
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!name.trim()) return;
     onCreate(name.trim(), description.trim(), type, categorySlug);
@@ -56,6 +57,21 @@ export function CreateChannelDialog({ open, onClose, onCreate }: CreateChannelDi
               placeholder="Description du salon..."
             />
           </div>
+          {categories.length > 0 && (
+            <div>
+              <label className="mb-1 block text-xs uppercase tracking-[0.15em] text-muted-foreground">Catégorie</label>
+              <select
+                value={categorySlug ?? ""}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCategorySlug(e.target.value || null)}
+                className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:border-primary"
+              >
+                <option value="">Aucune</option>
+                {categories.map((c) => (
+                  <option key={c.slug} value={c.slug}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-xs uppercase tracking-[0.15em] text-muted-foreground">Type</label>
             <div className="flex gap-3">
