@@ -47,11 +47,22 @@ class _LoadingScreenWrapperState extends State<LoadingScreenWrapper> {
   bool _isLoading = true;
 
   @override
+  void initState() {
+    super.initState();
+    // Timeout de sécurité : 5 secondes max
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted && _isLoading) {
+        setState(() => _isLoading = false);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return LoadingScreen(
         onComplete: () {
-          setState(() => _isLoading = false);
+          if (mounted) setState(() => _isLoading = false);
         },
       );
     }

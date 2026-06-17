@@ -12,32 +12,28 @@ class LoadingScreen extends StatefulWidget {
 
 class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateMixin {
   late AnimationController _mainController;
-  late AnimationController _particleController;
-  late AnimationController _logoController;
-  late AnimationController _progressController;
+  late AnimationController _blinkController;
+  late AnimationController _meltController;
   late Animation<double> _fadeAnim;
   late Animation<double> _scaleAnim;
-  late Animation<double> _logoGlow;
-  late Animation<double> _progress;
+  late Animation<double> _meltAnim;
 
   @override
   void initState() {
     super.initState();
-    _mainController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500));
-    _particleController = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat();
-    _logoController = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000));
-    _progressController = AnimationController(vsync: this, duration: const Duration(milliseconds: 2500));
+    _mainController = AnimationController(vsync: this, duration: const Duration(milliseconds: 3800));
+    _blinkController = AnimationController(vsync: this, duration: const Duration(milliseconds: 4000));
+    _meltController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200));
 
-    _fadeAnim = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _mainController, curve: Curves.easeOut));
-    _scaleAnim = Tween<double>(begin: 0.5, end: 1).animate(CurvedAnimation(parent: _logoController, curve: Curves.elasticOut));
-    _logoGlow = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _logoController, curve: Curves.easeInOut));
-    _progress = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _progressController, curve: Curves.easeOutCubic));
+    _fadeAnim = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _mainController, curve: const Interval(0.0, 0.2, curve: Curves.easeOut)));
+    _scaleAnim = Tween<double>(begin: 0.8, end: 1.03).animate(CurvedAnimation(parent: _mainController, curve: const Interval(0.2, 0.6, curve: Curves.easeOut)));
+    _meltAnim = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _meltController, curve: Curves.easeIn));
 
     _mainController.forward();
-    _logoController.forward();
-    _progressController.forward();
+    _blinkController.repeat();
+    _meltController.delay(const Duration(milliseconds: 3000));
 
-    _progressController.addStatusListener((status) {
+    _mainController.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         widget.onComplete();
       }
@@ -47,165 +43,87 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
   @override
   void dispose() {
     _mainController.dispose();
-    _particleController.dispose();
-    _logoController.dispose();
-    _progressController.dispose();
+    _blinkController.dispose();
+    _meltController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.bgDark,
+      backgroundColor: const Color(0xFF0a0a0a),
       body: Stack(
         children: [
-          // Animated background gradient
-          AnimatedBuilder(
-            animation: _particleController,
-            builder: (context, child) {
-              return CustomPaint(
-                painter: _BackgroundPainter(
-                  progress: _particleController.value,
-                  glow: _logoGlow.value,
-                ),
-                size: Size.infinite,
-              );
-            },
-          ),
-          // Glassmorphism overlay
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppTheme.primaryViolet.withOpacity(0.1),
-                  Colors.transparent,
-                  AppTheme.primaryPink.withOpacity(0.05),
-                ],
-              ),
-            ),
-          ),
-          // Content
+          // Alien SVG
           Center(
             child: AnimatedBuilder(
               animation: _fadeAnim,
               builder: (context, child) {
                 return Opacity(
                   opacity: _fadeAnim.value,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Logo
-                      AnimatedBuilder(
-                        animation: _scaleAnim,
-                        builder: (context, child) {
-                          return Transform.scale(
-                            scale: _scaleAnim.value,
-                            child: Container(
-                              width: 120,
-                              height: 120,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [AppTheme.primaryViolet, AppTheme.primaryTeal],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(30),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppTheme.primaryViolet.withOpacity(0.4 * _logoGlow.value),
-                                    blurRadius: 40 * _logoGlow.value,
-                                    spreadRadius: 5,
-                                  ),
-                                  BoxShadow(
-                                    color: AppTheme.primaryTeal.withOpacity(0.2 * _logoGlow.value),
-                                    blurRadius: 60 * _logoGlow.value,
-                                    spreadRadius: 10,
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.auto_awesome,
-                                color: Colors.white,
-                                size: 48,
-                              ),
+                  child: Transform.scale(
+                    scale: _scaleAnim.value,
+                    child: Transform.translate(
+                      offset: Offset(0, _meltAnim.value * 80),
+                      child: Transform.scale(
+                        scale: 1.0 + _meltAnim.value * 0.8,
+                        child: SizedBox(
+                          width: 180,
+                          height: 240,
+                          child: CustomPaint(
+                            painter: _AlienPainter(
+                              blinkValue: _blinkController.value,
+                              meltValue: _meltAnim.value,
                             ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 32),
-                      // Title with glow effect
-                      ShaderMask(
-                        shaderCallback: (bounds) => const LinearGradient(
-                          colors: [AppTheme.primaryViolet, AppTheme.primaryPink, AppTheme.primaryTeal],
-                        ).createShader(bounds),
-                        child: const Text(
-                          'Artéïa',
-                          style: TextStyle(
-                            fontSize: 42,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 4,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Communauté Artistique',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppTheme.textMuted.withOpacity(_fadeAnim.value),
-                          letterSpacing: 6,
-                        ),
-                      ),
-                      const SizedBox(height: 48),
-                      // Progress bar
-                      AnimatedBuilder(
-                        animation: _progress,
-                        builder: (context, child) {
-                          return Column(
-                            children: [
-                              Container(
-                                width: 200,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.cardDark,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                                child: FractionallySizedBox(
-                                  alignment: Alignment.centerLeft,
-                                  widthFactor: _progress.value,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      gradient: const LinearGradient(
-                                        colors: [AppTheme.primaryViolet, AppTheme.primaryTeal],
-                                      ),
-                                      borderRadius: BorderRadius.circular(2),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: AppTheme.primaryViolet.withOpacity(0.5),
-                                          blurRadius: 8,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                '${(_progress.value * 100).toInt()}%',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppTheme.textMuted.withOpacity(0.6),
-                                  letterSpacing: 2,
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          // Puddle
+          Positioned(
+            bottom: 0.42,
+            left: 0,
+            right: 0,
+            child: AnimatedBuilder(
+              animation: _mainController,
+              builder: (context, child) {
+                final puddleOpacity = _mainController.value > 0.85 ? (_mainController.value - 0.85) * 6.67 : 0.0;
+                return Opacity(
+                  opacity: puddleOpacity.clamp(0.0, 1.0),
+                  child: CustomPaint(
+                    size: const Size(160, 40),
+                    painter: _PuddlePainter(),
+                  ),
+                );
+              },
+            ),
+          ),
+          // Text
+          Positioned(
+            bottom: 0.15,
+            left: 0,
+            right: 0,
+            child: AnimatedBuilder(
+              animation: _mainController,
+              builder: (context, child) {
+                final textOpacity = _mainController.value > 0.6 ? 1.0 - (_mainController.value - 0.6) * 2.5 : 1.0;
+                return Opacity(
+                  opacity: textOpacity.clamp(0.0, 1.0),
+                  child: const Text(
+                    'ARTÉÏA',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'Alien Block',
+                      fontSize: 22,
+                      fontWeight: FontWeight.w300,
+                      letterSpacing: 0.35,
+                      color: Colors.white70,
+                    ),
                   ),
                 );
               },
@@ -217,51 +135,106 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
   }
 }
 
-class _BackgroundPainter extends CustomPainter {
-  final double progress;
-  final double glow;
+class _AlienPainter extends CustomPainter {
+  final double blinkValue;
+  final double meltValue;
 
-  _BackgroundPainter({required this.progress, required this.glow});
+  _AlienPainter({required this.blinkValue, required this.meltValue});
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..style = PaintingStyle.fill;
+    final strokePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
 
-    // Floating particles
-    final random = Random(42);
-    for (int i = 0; i < 30; i++) {
-      final x = (random.nextDouble() * size.width);
-      final y = (random.nextDouble() * size.height);
-      final radius = random.nextDouble() * 3 + 1;
-      final opacity = (sin(progress * 2 * pi + i) * 0.5 + 0.5) * 0.3;
+    final centerX = size.width / 2;
+    final centerY = size.height / 2;
 
-      paint.color = [
-        AppTheme.primaryViolet,
-        AppTheme.primaryTeal,
-        AppTheme.primaryPink,
-      ][i % 3].withOpacity(opacity);
+    // Head
+    paint.color = Colors.white;
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(centerX, centerY + 10), width: 144, height: 180),
+      paint,
+    );
 
-      canvas.drawCircle(Offset(x, y - progress * 50 % size.height), radius, paint);
-    }
+    // Eyes background
+    paint.color = const Color(0xFF0a0a0a);
+    canvas.drawOval(Rect.fromCenter(center: Offset(centerX - 28, centerY), width: 48, height: 60), paint);
+    canvas.drawOval(Rect.fromCenter(center: Offset(centerX + 28, centerY), width: 48, height: 60), paint);
 
-    // Glow orbs
-    paint.shader = RadialGradient(
-      colors: [
-        AppTheme.primaryViolet.withOpacity(0.15 * glow),
-        Colors.transparent,
-      ],
-    ).createShader(Rect.fromCircle(center: Offset(size.width * 0.3, size.height * 0.4), radius: 200));
-    canvas.drawCircle(Offset(size.width * 0.3, size.height * 0.4), 200, paint);
+    // Blink effect
+    final leftLidScale = blinkValue < 0.42 || blinkValue > 0.46 ? 1.0 : 0.05;
+    final rightLidScale = blinkValue < 0.55 || blinkValue > 0.59 ? 1.0 : 0.05;
 
-    paint.shader = RadialGradient(
-      colors: [
-        AppTheme.primaryTeal.withOpacity(0.1 * glow),
-        Colors.transparent,
-      ],
-    ).createShader(Rect.fromCircle(center: Offset(size.width * 0.7, size.height * 0.6), radius: 180));
-    canvas.drawCircle(Offset(size.width * 0.7, size.height * 0.6), 180, paint);
+    // Left eye lid
+    canvas.save();
+    canvas.translate(centerX - 28, centerY);
+    canvas.scale(1, leftLidScale);
+    paint.color = Colors.white;
+    canvas.drawOval(const Rect.fromCenter(center: Offset(0, 0), width: 48, height: 60), paint);
+    canvas.restore();
+
+    // Right eye lid
+    canvas.save();
+    canvas.translate(centerX + 28, centerY);
+    canvas.scale(1, rightLidScale);
+    paint.color = Colors.white;
+    canvas.drawOval(const Rect.fromCenter(center: Offset(0, 0), width: 48, height: 60), paint);
+    canvas.restore();
+
+    // Pupils
+    paint.color = Colors.white;
+    canvas.drawOval(Rect.fromCenter(center: Offset(centerX - 28, centerY + 2), width: 28, height: 36), paint);
+    canvas.drawOval(Rect.fromCenter(center: Offset(centerX + 28, centerY + 2), width: 28, height: 36), paint);
+
+    // Eye shine
+    paint.color = const Color(0xFF0a0a0a);
+    paint.style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(centerX - 32, centerY - 4), 5, paint);
+    canvas.drawCircle(Offset(centerX + 24, centerY - 4), 5, paint);
+
+    // Nose
+    strokePaint.color = const Color(0xFF333333);
+    canvas.drawLine(Offset(centerX - 4, centerY + 30), Offset(centerX, centerY + 38), strokePaint);
+    canvas.drawLine(Offset(centerX + 4, centerY + 30), Offset(centerX, centerY + 38), strokePaint);
+
+    // Mouth
+    final path = Path();
+    path.moveTo(centerX - 18, centerY + 55);
+    path.quadraticBezierTo(centerX, centerY + 65, centerX + 18, centerY + 55);
+    strokePaint.color = const Color(0xFF444444);
+    canvas.drawPath(path, strokePaint);
+
+    // Antennas
+    strokePaint.color = Colors.white.withOpacity(0.6);
+    strokePaint.strokeWidth = 2;
+    canvas.drawLine(Offset(centerX - 40, centerY - 85), Offset(centerX - 25, centerY - 55), strokePaint);
+    canvas.drawCircle(Offset(centerX - 43, centerY - 88), 5, paint..color = Colors.white.withOpacity(0.8));
+    canvas.drawLine(Offset(centerX + 40, centerY - 85), Offset(centerX + 25, centerY - 55), strokePaint);
+    canvas.drawCircle(Offset(centerX + 43, centerY - 88), 5, paint..color = Colors.white.withOpacity(0.8));
   }
 
   @override
-  bool shouldRepaint(covariant _BackgroundPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _AlienPainter oldDelegate) => true;
+}
+
+class _PuddlePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..shader = RadialGradient(
+        colors: [Colors.white.withOpacity(0.15), Colors.transparent],
+        stops: const [0.0, 1.0],
+      ).createShader(Rect.fromCenter(center: Offset(size.width / 2, size.height / 2), width: size.width, height: size.height));
+
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(size.width / 2, size.height / 2), width: size.width, height: size.height * 0.4),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
