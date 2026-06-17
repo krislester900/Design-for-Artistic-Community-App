@@ -9,6 +9,7 @@ import 'pages/community_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/universe_page.dart';
 import 'pages/notifications_page.dart';
+import 'pages/music_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -277,7 +278,7 @@ class MainScreenState extends State<MainScreen> {
                 _drawerItem(Icons.bookmark_border, 'Enregistrés', () {}, badge: 8),
                 _drawerItem(Icons.trending_up, 'Tendances', () {}),
                 const Divider(),
-                _drawerItem(Icons.music_note, 'Musique', () { openUniverse('music'); setState(() => _isDrawerOpen = false); }),
+                _drawerItem(Icons.music_note, 'Musique', () { Navigator.push(context, MaterialPageRoute(builder: (_) => const MusicPage())); setState(() => _isDrawerOpen = false); }),
                 _drawerItem(Icons.palette_outlined, 'Art Visuel', () { openUniverse('visual-art'); setState(() => _isDrawerOpen = false); }),
                 _drawerItem(Icons.menu_book, 'Manga', () { openUniverse('manga'); setState(() => _isDrawerOpen = false); }),
                 _drawerItem(Icons.movie_outlined, 'Films', () { openUniverse('film'); setState(() => _isDrawerOpen = false); }),

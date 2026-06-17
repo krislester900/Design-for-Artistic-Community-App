@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import 'chat_room_page.dart';
 
 class CommunityPage extends StatefulWidget {
   const CommunityPage({super.key});
@@ -69,7 +70,20 @@ class _CommunityPageState extends State<CommunityPage> {
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final channel = _channels[index];
-                  return _channelCard(channel);
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChatRoomPage(
+                            channelId: channel['id'] ?? '',
+                            channelName: channel['name'] ?? 'Chat',
+                          ),
+                        ),
+                      );
+                    },
+                    child: _channelCard(channel),
+                  );
                 },
                 childCount: _channels.length,
               ),
