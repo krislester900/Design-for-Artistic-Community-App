@@ -18,7 +18,6 @@ dependencies:
   flutter_native_splash: ^2.4.4
   http: ^1.6.0
   path_provider: ^2.1.5
-  supabase: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -28,7 +27,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/animations/
+    - assets/images/
     - assets/icons/
     - assets/fonts/
-    - assets/images/
-    - assets/animations/

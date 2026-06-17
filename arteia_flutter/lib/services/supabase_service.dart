@@ -1,4 +1,5 @@
-import 'package:supabase/supabase.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class SupabaseConfig {
   static const String supabaseUrl = 'https://wzewlweghntnqyfvhgan.supabase.co';
@@ -8,129 +9,162 @@ class SupabaseConfig {
 class SupabaseService {
   static final SupabaseService _instance = SupabaseService._internal();
   factory SupabaseService() => _instance;
-  SupabaseService._internal() {
-    _client = SupabaseClient(SupabaseConfig.supabaseUrl, SupabaseConfig.supabaseAnonKey);
+  SupabaseService._internal();
+
+  String get _baseUrl => SupabaseConfig.supabaseUrl;
+  String get _apiKey => SupabaseConfig.supabaseAnonKey;
+
+  Map<String, String> get _headers => {
+    'apikey': _apiKey,
+    'Authorization': 'Bearer $_apiKey',
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation',
+  };
+
+  // Generic GET request
+  Future<List<Map<String, dynamic>>> _get(String table, {
+    String? filter,
+    String? order,
+    bool ascending = true,
+    int? limit,
+    int? offset,
+  }) async {
+    var url = '$_baseUrl/rest/v1/$table?select=*';
+    if (filter != null) url += '&$filter';
+    if (order != null) url += '&order=$order.${ascending ? 'asc' : 'desc'}';
+    if (limit != null) url += '&limit=$limit';
+    if (offset != null) url += '&offset=$offset';
+
+    try {
+      final response = await http.get(Uri.parse(url), headers: _headers);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return List<Map<String, dynamic>>.from(data ?? []);
+      }
+      print('GET $table error: ${response.statusCode} ${response.body}');
+      return [];
+    } catch (e) {
+      print('GET $table exception: $e');
+      return [];
+    }
   }
 
-  late final SupabaseClient _client;
-  SupabaseClient get client => _client;
-
-  // Auth methods
-  User? get currentUser => _client.auth.currentUser;
-  Session? get currentSession => _client.auth.currentSession;
-  bool get isAuthenticated => currentUser != null;
-
-  // Sign in with email
-  Future<AuthResponse> signInWithEmail(String email, String password) async {
-    return await _client.auth.signInWithPassword(email: email, password: password);
+  // Generic POST request (public - accessible from other services)
+  Future<Map<String, dynamic>?> post(String table, Map<String, dynamic> body) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/rest/v1/$table'),
+        headers: _headers,
+        body: json.encode(body),
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = json.decode(response.body);
+        if (data is List && data.isNotEmpty) return data.first;
+        if (data is Map) return Map<String, dynamic>.from(data);
+      }
+      print('POST $table error: ${response.statusCode} ${response.body}');
+      return null;
+    } catch (e) {
+      print('POST $table exception: $e');
+      return null;
+    }
   }
 
-  // Sign up with email
-  Future<AuthResponse> signUpWithEmail(String email, String password) async {
-    return await _client.auth.signUp(email: email, password: password);
+  // Generic PATCH request
+  Future<bool> _patch(String table, String id, Map<String, dynamic> body) async {
+    try {
+      final response = await http.patch(
+        Uri.parse('$_baseUrl/rest/v1/$table?id=eq.$id'),
+        headers: _headers,
+        body: json.encode(body),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('PATCH $table exception: $e');
+      return false;
+    }
   }
 
-  // Sign out
-  Future<void> signOut() async {
-    await _client.auth.signOut();
-  }
-
-  // Listen to auth state changes
-  Stream<AuthState> get authStateChanges => _client.auth.onAuthStateChange;
-
-  // Profile methods
-  Future<Map<String, dynamic>?> getProfile(String userId) async {
-    final response = await _client.from('profiles').select().eq('id', userId).maybeSingle();
-    return response;
+  // Generic DELETE request
+  Future<bool> _delete(String table, String id) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/rest/v1/$table?id=eq.$id'),
+        headers: _headers,
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('DELETE $table exception: $e');
+      return false;
+    }
   }
 
   // Categories
   Future<List<Map<String, dynamic>>> getCategories() async {
-    final response = await _client.from('categories').select().order('sort_order');
-    return List<Map<String, dynamic>>.from(response);
+    return await _get('categories', order: 'sort_order');
   }
 
   // Artists
   Future<List<Map<String, dynamic>>> getArtists({String? categorySlug, int limit = 20, int offset = 0}) async {
-    var query = _client.from('artists').select();
-    if (categorySlug != null) {
-      query = query.eq('category_slug', categorySlug);
-    }
-    final response = await query.order('created_at', ascending: false).range(offset, offset + limit - 1);
-    return List<Map<String, dynamic>>.from(response);
+    String? filter;
+    if (categorySlug != null) filter = 'category_slug=eq.$categorySlug';
+    return await _get('artists', filter: filter, order: 'created_at', limit: limit, offset: offset);
   }
 
   // Artworks
   Future<List<Map<String, dynamic>>> getArtworks({String? categorySlug, int limit = 20, int offset = 0}) async {
-    var query = _client.from('artworks').select();
-    if (categorySlug != null) {
-      query = query.eq('category_slug', categorySlug);
-    }
-    final response = await query.order('created_at', ascending: false).range(offset, offset + limit - 1);
-    return List<Map<String, dynamic>>.from(response);
+    String? filter;
+    if (categorySlug != null) filter = 'category_slug=eq.$categorySlug';
+    return await _get('artworks', filter: filter, order: 'created_at', limit: limit, offset: offset);
   }
 
   // Forum discussions
   Future<List<Map<String, dynamic>>> getForumDiscussions({String? categorySlug, int limit = 20, int offset = 0}) async {
-    var query = _client.from('forum_discussions').select();
-    if (categorySlug != null) {
-      query = query.eq('category_slug', categorySlug);
-    }
-    final response = await query.order('created_at', ascending: false).range(offset, offset + limit - 1);
-    return List<Map<String, dynamic>>.from(response);
-  }
-
-  // Trend tags
-  Future<List<Map<String, dynamic>>> getTrendTags({String? categorySlug}) async {
-    var query = _client.from('trend_tags').select();
-    if (categorySlug != null) {
-      query = query.eq('category_slug', categorySlug);
-    }
-    final response = await query.order('sort_order');
-    return List<Map<String, dynamic>>.from(response);
-  }
-
-  // Community events
-  Future<List<Map<String, dynamic>>> getCommunityEvents({String? categorySlug}) async {
-    var query = _client.from('community_events').select();
-    if (categorySlug != null) {
-      query = query.eq('category_slug', categorySlug);
-    }
-    final response = await query.order('sort_order');
-    return List<Map<String, dynamic>>.from(response);
+    String? filter;
+    if (categorySlug != null) filter = 'category_slug=eq.$categorySlug';
+    return await _get('forum_discussions', filter: filter, order: 'created_at', limit: limit, offset: offset);
   }
 
   // Community stats
   Future<List<Map<String, dynamic>>> getCommunityStats() async {
-    final response = await _client.from('community_stats').select().order('sort_order');
-    return List<Map<String, dynamic>>.from(response);
+    return await _get('community_stats', order: 'sort_order');
+  }
+
+  // Trend tags
+  Future<List<Map<String, dynamic>>> getTrendTags({String? categorySlug}) async {
+    String? filter;
+    if (categorySlug != null) filter = 'category_slug=eq.$categorySlug';
+    return await _get('trend_tags', filter: filter, order: 'sort_order');
   }
 
   // Chat channels
   Future<List<Map<String, dynamic>>> getChatChannels() async {
-    final response = await _client.from('chat_channels').select().order('sort_order');
-    return List<Map<String, dynamic>>.from(response);
+    return await _get('chat_channels', order: 'sort_order');
   }
 
-  // Chat messages for a channel
+  // Chat messages
   Future<List<Map<String, dynamic>>> getChatMessages(String channelId, {int limit = 50}) async {
-    final response = await _client
-        .from('chat_messages')
-        .select('*, profiles!author_id(email)')
-        .eq('channel_id', channelId)
-        .order('created_at', ascending: true)
-        .limit(limit);
-    return List<Map<String, dynamic>>.from(response);
+    return await _get('chat_messages', filter: 'channel_id=eq.$channelId', order: 'created_at', limit: limit);
   }
 
-  // Send a chat message
+  // Send chat message
   Future<void> sendChatMessage(String channelId, String content) async {
-    final userId = currentUser?.id;
-    if (userId == null) return;
-    await _client.from('chat_messages').insert({
+    await post('chat_messages', {
       'channel_id': channelId,
-      'author_id': userId,
       'content': content,
     });
   }
+
+  // Profile
+  Future<Map<String, dynamic>?> getProfile(String userId) async {
+    final results = await _get('profiles', filter: 'id=eq.$userId', limit: 1);
+    return results.isNotEmpty ? results.first : null;
+  }
+
+  // Auth (simplified - no Supabase Auth SDK needed for public data)
+  bool get isAuthenticated => false;
+  dynamic get currentUser => null;
+  dynamic get currentSession => null;
+
+  Future<void> signOut() async {}
 }
