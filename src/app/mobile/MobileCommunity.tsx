@@ -45,6 +45,75 @@ const DEFAULT_CHANNELS: ChatChannel[] = [
   { id: "manga", name: "Manga Club", type: "public", description: "Chapitres, reviews, fan arts", created_at: new Date().toISOString() },
 ];
 
+const DEFAULT_MESSAGES: Record<string, ChatMessage[]> = {
+  general: [
+    {
+      id: "general-1",
+      channel_id: "general",
+      author_id: "system",
+      author_email: "Artéïa",
+      content: "Bienvenue dans le salon général. Présente ton univers et ce sur quoi tu bosses.",
+      created_at: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
+      message_type: "text",
+    },
+    {
+      id: "general-2",
+      channel_id: "general",
+      author_id: "mila-chrom",
+      author_email: "mila@arteia.app",
+      content: "Je cherche des retours sur une série d'illustrations urbaines.",
+      created_at: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
+      message_type: "text",
+    },
+  ],
+  music: [
+    {
+      id: "music-1",
+      channel_id: "music",
+      author_id: "naya-pulse",
+      author_email: "naya@arteia.app",
+      content: "Qui veut tester un pack de drums afro-trap ce soir ?",
+      created_at: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
+      message_type: "text",
+    },
+  ],
+  "visual-art": [
+    {
+      id: "visual-art-1",
+      channel_id: "visual-art",
+      author_id: "urban-art",
+      author_email: "urban@arteia.app",
+      content: "Je poste demain une fresque terminée, vos avis sur la palette néon ?",
+      created_at: new Date(Date.now() - 1000 * 60 * 22).toISOString(),
+      message_type: "text",
+    },
+  ],
+  manga: [
+    {
+      id: "manga-1",
+      channel_id: "manga",
+      author_id: "kiro-ink",
+      author_email: "kiro@arteia.app",
+      content: "Je finalise un pilote de 12 pages. Vous préférez lecture verticale ou planches classiques ?",
+      created_at: new Date(Date.now() - 1000 * 60 * 42).toISOString(),
+      message_type: "text",
+    },
+  ],
+};
+
+function mergeMessages(messages: ChatMessage[]) {
+  const uniqueMessages = new Map<string, ChatMessage>();
+
+  messages.forEach((item) => {
+    uniqueMessages.set(item.id, item);
+  });
+
+  return Array.from(uniqueMessages.values()).sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
+}
+
 export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (active: boolean) => void }) {
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -62,6 +131,46 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
     getCurrentSession().then(({ user }) => setAuthUser(user));
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!activeChat) {
+      setMessages([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const fallbackMessages = DEFAULT_MESSAGES[activeChat] ?? [];
+    setMessages(fallbackMessages);
+
+    if (!hasSupabaseEnv || !supabase) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    supabase
+      .from("chat_messages")
+      .select(
+        "id, channel_id, author_id, author_email, content, attachment_url, reply_to, edited_at, created_at, message_type, voice_url, voice_duration, is_pinned",
+      )
+      .eq("channel_id", activeChat)
+      .order("created_at", { ascending: true })
+      .then(({ data, error }) => {
+        if (cancelled || error) {
+          return;
+        }
+
+        const loadedMessages = (data ?? []) as ChatMessage[];
+        setMessages(mergeMessages([...fallbackMessages, ...loadedMessages]));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeChat]);
+
   // Subscribe to Supabase realtime messages
   useEffect(() => {
     if (!activeChat || !hasSupabaseEnv || !supabase) return;
@@ -77,7 +186,7 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
         table: "chat_messages",
         filter: `channel_id=eq.${activeChat}`,
       }, (payload) => {
-        setMessages((prev) => [...prev, payload.new as ChatMessage]);
+        setMessages((prev) => mergeMessages([...prev, payload.new as ChatMessage]));
       })
       .subscribe();
 
@@ -94,33 +203,43 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
   }, [messages, activeChat]);
 
   async function handleSend(content?: string, attachmentUrl?: string) {
-    if (!content?.trim() && !attachmentUrl) return;
-    const msgContent = content || message;
-    if (!msgContent.trim() && !attachmentUrl) return;
+    if (!activeChat) return;
+
+    const msgContent = content ?? message;
+    const trimmedContent = msgContent.trim();
+    if (!trimmedContent && !attachmentUrl) return;
 
     const newMsg: ChatMessage = {
       id: crypto.randomUUID(),
-      channel_id: activeChat!,
+      channel_id: activeChat,
       author_id: authUser?.id || "guest",
       author_email: authUser?.email || "Invité",
-      content: msgContent.trim(),
+      content: trimmedContent,
       attachment_url: attachmentUrl,
       created_at: new Date().toISOString(),
-      message_type: "text",
+      message_type: attachmentUrl ? "image" : "text",
     };
 
-    setMessages((prev) => [...prev, newMsg]);
     setMessage("");
+    closeAllPickers();
 
     // Send to Supabase
     if (hasSupabaseEnv && supabase && authUser) {
-      await supabase.from("chat_messages").insert({
+      const { error } = await supabase.from("chat_messages").insert({
         channel_id: activeChat,
         author_id: authUser.id,
-        content: msgContent.trim(),
+        author_email: authUser.email,
+        content: trimmedContent,
         attachment_url: attachmentUrl,
+        message_type: attachmentUrl ? "image" : "text",
       });
+
+      if (!error) {
+        return;
+      }
     }
+
+    setMessages((prev) => mergeMessages([...prev, newMsg]));
   }
 
   function handleSendVoice(audioBlob: Blob, duration: number) {
@@ -136,7 +255,7 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
       voice_url: url,
       voice_duration: duration,
     };
-    setMessages((prev) => [...prev, newMsg]);
+    setMessages((prev) => mergeMessages([...prev, newMsg]));
     setIsRecording(false);
   }
 
@@ -150,7 +269,7 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
       created_at: new Date().toISOString(),
       message_type: "sticker",
     };
-    setMessages((prev) => [...prev, newMsg]);
+    setMessages((prev) => mergeMessages([...prev, newMsg]));
     setShowStickers(false);
   }
 
@@ -164,7 +283,7 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
       created_at: new Date().toISOString(),
       message_type: "gif",
     };
-    setMessages((prev) => [...prev, newMsg]);
+    setMessages((prev) => mergeMessages([...prev, newMsg]));
     setShowGifs(false);
   }
 
@@ -177,7 +296,7 @@ export function MobileCommunity({ onChatStateChange }: { onChatStateChange?: (ac
   // Notify parent when chat state changes
   useEffect(() => {
     onChatStateChange?.(!!activeChat);
-  }, [activeChat]);
+  }, [activeChat, onChatStateChange]);
 
   // Voice recording mode
   if (isRecording && activeChat) {

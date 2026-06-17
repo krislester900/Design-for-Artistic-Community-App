@@ -49,7 +49,7 @@ export function MobileApp() {
   const [notificationCount] = useState(3); // mock
   const [isChatActive, setIsChatActive] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const { data, source, isLoading: isDataLoading } = useCommunityData();
+  const { data, source, isLoading: isDataLoading, refetch } = useCommunityData();
   const prevTabRef = useRef<Tab>("home");
 
   useEffect(() => {
@@ -69,8 +69,7 @@ export function MobileApp() {
   async function handleRefresh() {
     setIsRefreshing(true);
     haptic();
-    // Reload data by forcing re-render
-    await new Promise(r => setTimeout(r, 800));
+    await refetch();
     setIsRefreshing(false);
   }
 
@@ -82,7 +81,7 @@ export function MobileApp() {
     return (
       <div className={animClass}>
         {activeTab === "home" && <MobileHome data={data} source={source} />}
-        {activeTab === "explore" && <MobileExplore data={data} onNavigate={switchTab} />}
+        {activeTab === "explore" && <MobileExplore data={data} />}
         {activeTab === "search" && <MobileSearch />}
         {activeTab === "community" && <MobileCommunity onChatStateChange={setIsChatActive} />}
         {activeTab === "profile" && <MobileProfile />}
@@ -91,7 +90,7 @@ export function MobileApp() {
   }, [activeTab, data, source, isDataLoading, tabDirection]);
 
   if (isLoading) {
-    return <ArtLoadingScreen onComplete={() => {}} onFinished={() => setIsLoading(false)} />;
+    return <ArtLoadingScreen onComplete={() => setIsLoading(false)} />;
   }
 
   return (

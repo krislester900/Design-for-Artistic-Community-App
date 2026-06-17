@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   type CommunityData,
   type CommunityDataSource,
@@ -10,6 +10,7 @@ interface CommunityDataState {
   data: CommunityData;
   source: CommunityDataSource;
   isLoading: boolean;
+  refetch: () => Promise<void>;
 }
 
 export function useCommunityData(): CommunityDataState {
@@ -17,7 +18,32 @@ export function useCommunityData(): CommunityDataState {
     data: mockCommunityData,
     source: 'mock',
     isLoading: true,
+    refetch: async () => {},
   });
+
+  const loadCommunityData = useCallback(async () => {
+    setState((current) => ({
+      ...current,
+      isLoading: true,
+    }));
+
+    try {
+      const result = await getCommunityData();
+      setState((current) => ({
+        ...current,
+        data: result.data,
+        source: result.source,
+        isLoading: false,
+      }));
+    } catch {
+      setState((current) => ({
+        ...current,
+        data: mockCommunityData,
+        source: 'mock',
+        isLoading: false,
+      }));
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -27,11 +53,23 @@ export function useCommunityData(): CommunityDataState {
         return;
       }
 
-      setState({
+      setState((current) => ({
+        ...current,
         data: result.data,
         source: result.source,
         isLoading: false,
-      });
+      }));
+    }).catch(() => {
+      if (!isMounted) {
+        return;
+      }
+
+      setState((current) => ({
+        ...current,
+        data: mockCommunityData,
+        source: 'mock',
+        isLoading: false,
+      }));
     });
 
     return () => {
@@ -39,5 +77,8 @@ export function useCommunityData(): CommunityDataState {
     };
   }, []);
 
-  return state;
+  return {
+    ...state,
+    refetch: loadCommunityData,
+  };
 }

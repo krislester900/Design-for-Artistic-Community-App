@@ -9,7 +9,6 @@ import { MobileUniverse } from "./MobileUniverse";
 
 interface Props {
   data: CommunityData;
-  onNavigate: (tab: "home" | "explore" | "community" | "profile") => void;
 }
 
 const CATEGORY_ICONS: Record<string, typeof Music4> = {

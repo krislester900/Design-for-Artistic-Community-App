@@ -209,21 +209,182 @@ export const categories: Category[] = [
   },
 ];
 
-export const artists: Artist[] = [];
+export const artists: Artist[] = [
+  {
+    name: "Naya Pulse",
+    category: "music",
+    role: "Beatmaker & performeuse",
+    image: "",
+    featuredWork: "Pulse Nocturne",
+    likes: 1280,
+  },
+  {
+    name: "Kiro Ink",
+    category: "manga",
+    role: "Mangaka indépendant",
+    image: "",
+    featuredWork: "Fragments de Néon",
+    likes: 980,
+  },
+  {
+    name: "Mila Chrom",
+    category: "visual-art",
+    role: "Illustratrice digitale",
+    image: "",
+    featuredWork: "Portraits Urbains",
+    likes: 1540,
+  },
+  {
+    name: "Ari Vox",
+    category: "literature",
+    role: "Poète spoken word",
+    image: "",
+    featuredWork: "Minuit sur Béton",
+    likes: 860,
+  },
+  {
+    name: "Soren Frame",
+    category: "film",
+    role: "Réalisateur de courts-métrages",
+    image: "",
+    featuredWork: "Dernière Station",
+    likes: 1110,
+  },
+  {
+    name: "Luma Motion",
+    category: "animation",
+    role: "Motion designer 2D/3D",
+    image: "",
+    featuredWork: "Echo Loops",
+    likes: 1205,
+  },
+];
 
-export const artworks: Artwork[] = [];
+export const artworks: Artwork[] = [
+  {
+    image: "",
+    title: "Pulse Nocturne",
+    artist: "Naya Pulse",
+    category: "music",
+    medium: "EP",
+    likes: 420,
+    views: 5400,
+    height: "medium",
+  },
+  {
+    image: "",
+    title: "Portraits Urbains",
+    artist: "Mila Chrom",
+    category: "visual-art",
+    medium: "Illustration",
+    likes: 610,
+    views: 7200,
+    height: "large",
+  },
+  {
+    image: "",
+    title: "Fragments de Néon",
+    artist: "Kiro Ink",
+    category: "manga",
+    medium: "Chapitre pilote",
+    likes: 390,
+    views: 4600,
+    height: "medium",
+  },
+  {
+    image: "",
+    title: "Dernière Station",
+    artist: "Soren Frame",
+    category: "film",
+    medium: "Court-métrage",
+    likes: 515,
+    views: 6800,
+    height: "large",
+  },
+  {
+    image: "",
+    title: "Minuit sur Béton",
+    artist: "Ari Vox",
+    category: "literature",
+    medium: "Poème visuel",
+    likes: 275,
+    views: 3100,
+    height: "small",
+  },
+  {
+    image: "",
+    title: "Echo Loops",
+    artist: "Luma Motion",
+    category: "animation",
+    medium: "Motion design",
+    likes: 440,
+    views: 5900,
+    height: "medium",
+  },
+];
 
-export const discussions: Discussion[] = [];
+export const discussions: Discussion[] = [
+  {
+    title: "Vos références visuelles du moment ?",
+    author: "Mila Chrom",
+    category: "visual-art",
+    replies: 24,
+    time: "Il y a 2 h",
+    trending: true,
+  },
+  {
+    title: "Comment publier un premier chapitre efficacement ?",
+    author: "Kiro Ink",
+    category: "manga",
+    replies: 18,
+    time: "Il y a 4 h",
+    trending: true,
+  },
+  {
+    title: "Plugins audio préférés pour des textures lo-fi",
+    author: "Naya Pulse",
+    category: "music",
+    replies: 31,
+    time: "Aujourd'hui",
+    trending: false,
+  },
+  {
+    title: "Workflow rapide pour teaser un court-métrage",
+    author: "Soren Frame",
+    category: "film",
+    replies: 12,
+    time: "Hier",
+    trending: false,
+  },
+  {
+    title: "Texte court ou texte long sur mobile ?",
+    author: "Ari Vox",
+    category: "literature",
+    replies: 16,
+    time: "Hier",
+    trending: false,
+  },
+];
 
-export const trends: Trend[] = [];
+export const trends: Trend[] = [
+  { tag: "#neonportrait", count: "2.1k posts", category: "visual-art" },
+  { tag: "#beatmaking", count: "1.6k posts", category: "music" },
+  { tag: "#mangapanel", count: "980 posts", category: "manga" },
+  { tag: "#microfiction", count: "640 posts", category: "literature" },
+];
 
-export const events: EventItem[] = [];
+export const events: EventItem[] = [
+  { title: "Session live croquis & critique", date: "18 juin", category: "visual-art" },
+  { title: "Écoute collective des prods", date: "20 juin", category: "music" },
+  { title: "Lecture ouverte spoken word", date: "22 juin", category: "literature" },
+  { title: "Projection courts indépendants", date: "28 juin", category: "film" },
+];
 
 export const communityStats: CommunityStat[] = [
-  { number: "0", label: "Artistes actifs" },
-  { number: "0", label: "Œuvres publiées" },
-  { number: "0", label: "Discussions" },
-  { number: "0", label: "Satisfaction" },
+  { number: "2.4k", label: "Artistes actifs" },
+  { number: "8.9k", label: "Œuvres publiées" },
+  { number: "1.2k", label: "Discussions" },
+  { number: "96%", label: "Satisfaction" },
 ];
 
 export const mockCommunityData: CommunityData = {

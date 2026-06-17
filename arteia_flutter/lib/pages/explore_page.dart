@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import 'universe_page.dart';
 
 class ExplorePage extends StatefulWidget {
   const ExplorePage({super.key});
@@ -13,6 +14,13 @@ class _ExplorePageState extends State<ExplorePage> {
   final SupabaseService _supabase = SupabaseService();
   List<Map<String, dynamic>> _categories = [];
   bool _isLoading = true;
+
+  void _openUniverse(String slug, String title) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => UniversePage(slug: slug)),
+    );
+  }
 
   @override
   void initState() {
@@ -66,7 +74,7 @@ class _ExplorePageState extends State<ExplorePage> {
                 final cat = _categories[index];
                 final color = Color(int.parse((cat['color'] ?? '#7C5CFC').replaceFirst('#', '0xFF')));
                 return GestureDetector(
-                  onTap: () {},
+                  onTap: () => _openUniverse(cat['slug'] ?? '', cat['title'] ?? ''),
                   child: Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
