@@ -25,7 +25,20 @@ class _ExplorePageState extends State<ExplorePage> {
       final categories = await _supabase.getCategories();
       if (mounted) setState(() { _categories = categories; _isLoading = false; });
     } catch (e) {
-      if (mounted) setState(() { _isLoading = false; });
+      if (mounted) {
+        // Données de démonstration
+        setState(() {
+          _categories = [
+            {'slug': 'music', 'title': 'Musique', 'description': 'Artistes et albums', 'color': '#7C5CFC'},
+            {'slug': 'visual-art', 'title': 'Art Visuel', 'description': 'Peinture, sculpture, photo', 'color': '#00D4AA'},
+            {'slug': 'manga', 'title': 'Manga', 'description': 'BD japonaise et illustrations', 'color': '#FF6B9D'},
+            {'slug': 'film', 'title': 'Films', 'description': 'Cinéma et séries', 'color': '#FFA500'},
+            {'slug': 'literature', 'title': 'Littérature', 'description': 'Romans et poésie', 'color': '#4ECDC4'},
+            {'slug': 'animation', 'title': 'Animation', 'description': 'Court-métrages et GIFs', 'color': '#FF6B6B'},
+          ];
+          _isLoading = false;
+        });
+      }
     }
   }
 
