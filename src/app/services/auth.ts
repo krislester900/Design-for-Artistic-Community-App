@@ -1,146 +1,147 @@
-/**
- * AuthService — Service d'authentification public pour Artéïa.
- * Gère inscription, connexion, déconnexion et OAuth Google.
- */
+import { createClient } from '@supabase/supabase-js';
 
-import { hasSupabaseEnv, supabase } from "../lib/supabase";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export interface AuthUser {
+export const hasSupabaseEnv = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+
+const supabase = hasSupabaseEnv 
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
+  : null;
+
+export type AuthUser = {
   id: string;
   email: string;
-  avatar_url?: string;
-  display_name?: string;
-}
+  display_name: string;
+  avatar_url: string;
+};
 
-/**
- * Vérifie si l'utilisateur est connecté et retourne sa session
- */
 export async function getCurrentSession() {
   if (!hasSupabaseEnv || !supabase) {
-    return { user: null, error: "Supabase n'est pas configuré." };
+    return { user: null, error: new Error('Configuration Supabase manquante') };
   }
-  const { data, error } = await supabase.auth.getSession();
-  if (error) throw error;
-  const sessionUser = data.session?.user;
-  const user: AuthUser | null = sessionUser
-    ? {
-        id: sessionUser.id,
-        email: sessionUser.email ?? "",
-        avatar_url: sessionUser.user_metadata?.avatar_url,
-        display_name: sessionUser.user_metadata?.full_name ?? sessionUser.user_metadata?.name,
-      }
-    : null;
+
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) return { user: null, error };
+    if (!session) return { user: null, error: null };
+
+    const user = {
+      id: session.user.id,
+      email: session.user.email || '',
+      display_name: session.user.user_metadata?.display_name || session.user.email || 'Utilisateur',
+      avatar_url: session.user.user_metadata?.avatar_url || '',
+    };
+
+    return { user, error: null };
+  } catch (error) {
+    return { user: null, error: error instanceof Error ? error : new Error('Erreur inconnue lors de la récupération de la session') };
+  }
+}
+
+export async function signIn(email, password) {
+  if (!hasSupabaseEnv || !supabase) {
+    return { user: null, error: new Error('Configuration Supabase manquante') };
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return { user: null, error };
+
+  const user = {
+    id: data.user.id,
+    email: data.user.email || '',
+    display_name: data.user.user_metadata?.display_name || data.user.email || 'Utilisateur',
+    avatar_url: data.user.user_metadata?.avatar_url || '',
+  };
+
   return { user, error: null };
 }
 
-/**
- * Inscription d'un nouvel utilisateur
- */
-export async function signUp(email: string, password: string) {
+export async function signUp(email, password, displayName) {
   if (!hasSupabaseEnv || !supabase) {
-    return { user: null, error: "Supabase n'est pas configuré. Configure le fichier .env." };
+    return { user: null, error: new Error('Configuration Supabase manquante') };
   }
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: window.location.origin + "/connexion.html",
+      data: { display_name: displayName },
     },
   });
-  if (error) return { user: null, error: error.message };
-  return { user: data.user, error: null };
+
+  if (error) return { user: null, error };
+
+  const user = {
+    id: data.user.id,
+    email: data.user.email || '',
+    display_name: displayName || data.user.// metadata?.display_name || data.user.email || 'Utilisateur',
+    avatar_url: data.user.user_metadata?.avatar_url || '',
+  };
+
+  return { user, error: null };
 }
 
-/**
- * Connexion email/mot de passe
- */
-export async function signIn(email: string, password: string) {
+export async function doSignOut() {
   if (!hasSupabaseEnv || !supabase) {
-    return { user: null, error: "Supabase n'est pas configuré. Configure le fichier .env." };
+    return { error: new Error('Configuration Supabase manquante') };
   }
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return { user: null, error: error.message };
-  return { user: data.user, error: null };
+
+  const { error } = await supabase.auth.signOut();
+  return { error };
 }
 
-/**
- * Connexion avec Google OAuth
- */
 export async function signInWithGoogle() {
   if (!hasSupabaseEnv || !supabase) {
-    return { error: "Supabase n'est pas configuré. Configure le fichier .env." };
+    return { data: null, error: new Error('Configuration Supabase manquante') };
   }
+
   const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: window.location.origin + "/index.html",
-      queryParams: {
-        access_type: "offline",
-        prompt: "consent",
-      },
-    },
+    provider: 'google',
   });
-  if (error) return { error: error.message };
-  return { data, error: null };
+
+  return { data, error };
 }
 
-/**
- * Connexion avec Google (popup pour Capacitor mobile)
- */
 export async function signInWithGoogleMobile() {
   if (!hasSupabaseEnv || !supabase) {
-    return { error: "Supabase n'est pas configuré." };
+    return { data: null, error: new Error('Configuration Supabase manquante') };
   }
+
   const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
+    provider: 'google',
     options: {
-      skipBrowserRedirect: true,
-      redirectTo: "arteia://auth/callback",
+      redirectTo: window.location.origin,
     },
   });
-  if (error) return { error: error.message };
-  // Open the OAuth URL in system browser
-  if (data?.url) {
-    window.open(data.url, "_blank");
-  }
-  return { data, error: null };
+
+  return { data, error };
 }
 
-/**
- * Déconnexion
- */
-export async function signOut() {
-  if (!hasSupabaseEnv || !supabase) return;
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
-}
-
-/**
- * S'abonne aux changements d'état d'authentification
- */
-export function onAuthChange(callback: (user: AuthUser | null) => void) {
+export function onAuthChange(callback) {
   if (!hasSupabaseEnv || !supabase) {
-    return { unsubscribe: () => {} };
+    return { subscription: null };
   }
-  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-    if (session?.user) {
+
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    if (session) {
       callback({
-        id: session.user.id,
-        email: session.user.email ?? "",
-        avatar_url: session.user.user_metadata?.avatar_url,
-        display_name: session.user.user_metadata?.full_name ?? session.user.user_metadata?.name,
+        user: {
+          id: session.user.id,
+          email: session.user.email || '',
+          display_name: session.user.user_metadata?.display_name || session.user.email || 'Utilisateur',
+          avatar_url: session.user.user_metadata?.avatar_url || '',
+        },
+        event,
       });
     } else {
-      callback(null);
+      callback({ user: null, event });
     }
   });
-  return data.subscription;
+
+  return { subscription };
 }
 
-/**
- * Récupère l'URL de l'avatar (fallback initials)
- */
-export function getAvatarUrl(user: AuthUser | null): string {
-  if (user?.avatar_url) return user.avatar_url;
-  return "";
+export function getAvatarUrl(user) {
+  return user?.avatar_url || '';
 }
