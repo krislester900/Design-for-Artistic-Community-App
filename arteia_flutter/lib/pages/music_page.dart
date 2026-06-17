@@ -38,7 +38,30 @@ class _MusicPageState extends State<MusicPage> {
         _isLoading = false;
       });
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        // Données de démonstration
+        setState(() {
+          _artworks = [
+            {'title': 'Nuit Étoilée', 'artist_name': 'Luna', 'medium': 'Électro'},
+            {'title': 'Urban Beat', 'artist_name': 'DJ Metro', 'medium': 'Hip-Hop'},
+            {'title': 'Jazz Café', 'artist_name': 'Trio Blue', 'medium': 'Jazz'},
+            {'title': 'Rock Anthem', 'artist_name': 'The Wild', 'medium': 'Rock'},
+            {'title': 'Pop Dreams', 'artist_name': 'Star Light', 'medium': 'Pop'},
+            {'title': 'Classical Mood', 'artist_name': 'Orchestra', 'medium': 'Classique'},
+          ];
+          _trendTags = [
+            {'tag': 'Électro'},
+            {'tag': 'Hip-Hop'},
+            {'tag': 'Jazz'},
+            {'tag': 'Rock'},
+            {'tag': 'Pop'},
+            {'tag': 'Classique'},
+            {'tag': 'R&B'},
+            {'tag': 'Reggae'},
+          ];
+          _isLoading = false;
+        });
+      }
     }
   }
 
