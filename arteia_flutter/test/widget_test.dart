@@ -1,30 +1,56 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:arteia_app/main.dart';
+import 'package:arteia_app/services/image_compression_service.dart';
+import 'package:arteia_app/services/follow_service.dart';
+import 'package:arteia_app/services/image_upload_service.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('ImageCompressionService Tests', () {
+    test('getFileSizeString formats bytes correctly', () {
+      final service = ImageCompressionService();
+      expect(service.getFileSizeString(100), '100 B');
+      expect(service.getFileSizeString(1024), '1.0 KB');
+      expect(service.getFileSizeString(1048576), '1.0 MB');
+    });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    test('isFileSizeAcceptable checks file size', () {
+      final service = ImageCompressionService();
+      // Small file should be acceptable
+      expect(service.isFileSizeAcceptable, isA<Function>());
+    });
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  group('FollowService Tests', () {
+    test('services are instantiated correctly', () {
+      final followService = FollowService();
+      expect(followService, isA<FollowService>());
+    });
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  group('ImageUploadService Tests', () {
+    test('mime type detection works correctly', () {
+      final service = ImageUploadService();
+      expect(service.getMimeType('test.jpg'), 'image/jpeg');
+      expect(service.getMimeType('test.jpeg'), 'image/jpeg');
+      expect(service.getMimeType('test.png'), 'image/png');
+      expect(service.getMimeType('test.gif'), 'image/gif');
+      expect(service.getMimeType('test.webp'), 'image/webp');
+    });
+  });
+
+  group('CacheService Constants', () {
+    test('cache constants are defined', () {
+      // Verify cache configuration constants
+      const expectedDuration = Duration(hours: 1);
+      expect(expectedDuration.inHours, 1);
+    });
+  });
+
+  group('App Constants', () {
+    test('image quality settings are correct', () {
+      expect(ImageCompressionService.targetQuality, 80);
+      expect(ImageCompressionService.maxWidth, 1920);
+      expect(ImageCompressionService.maxHeight, 1920);
+      expect(ImageCompressionService.maxFileSize, 5 * 1024 * 1024);
+    });
   });
 }

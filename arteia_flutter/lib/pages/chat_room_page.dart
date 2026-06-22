@@ -133,7 +133,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
             ),
             decoration: BoxDecoration(
               color: AppTheme.cardDark,
-              border: Border(top: BorderSide(color: AppTheme.divider.withOpacity(0.5))),
+              border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.5))),
             ),
             child: Row(
               children: [
@@ -147,7 +147,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                     decoration: BoxDecoration(
                       color: AppTheme.cardDarkLight,
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: AppTheme.divider.withOpacity(0.3)),
+                      border: Border.all(color: Colors.grey.withOpacity(0.3)),
                     ),
                     child: TextField(
                       controller: _messageController,

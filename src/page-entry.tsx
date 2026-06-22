@@ -4,10 +4,10 @@ import "./styles/index.css";
 import { ThemeProvider } from "./app/components/ui/ThemeProvider.tsx";
 import { ArtLoadingScreen } from "./app/components/ArtLoadingScreen.tsx";
 
-// Lazy load the heavy MultiPageApp
+// Lazy load the secondary page shell.
 const MultiPageApp = lazy(async () => {
   const mod = await import("./app/pages/MultiPageApp.tsx");
-  return { default: mod.MultiPageApp };
+  return { default: mod.default };
 });
 
 const page = document.body.dataset.page ?? "";

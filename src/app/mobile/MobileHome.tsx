@@ -1,10 +1,27 @@
-// ... (code existant)
+import { useEffect, useState } from "react";
+import { WelcomeBird } from "./WelcomeBird";
 
-useEffect(() => {
-  const timer = setTimeout(() => setIsDataLoading(false), 1500); // Mise à jour isDataLoading
-  return () => clearTimeout(timer);
-}, []);
+export function MobileHome() {
+  const [isDataLoading, setIsDataLoading] = useState(true);
 
-<WelcomeBird zIndex="50" /> // Ajout de zIndex dans MobileHome
+  useEffect(() => {
+    const timer = setTimeout(() => setIsDataLoading(false), 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
-// ... (rest of the file)
+  return (
+    <div className="mobile-home relative w-full h-full">
+      <WelcomeBird />
+      <div className="mobile-home-content p-4">
+        {isDataLoading ? (
+          <div className="loading-spinner">Chargement...</div>
+        ) : (
+          <div className="home-grid">
+            <h2 className="text-lg font-semibold">Accueil</h2>
+            <p className="text-sm text-muted-foreground">Bienvenue sur Artéïa</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

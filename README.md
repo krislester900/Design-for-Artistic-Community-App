@@ -53,7 +53,7 @@ npm run dev
 ```
 
 ## Administration
-Une interface d’administration est disponible ici :
+Une interface d'administration est disponible ici :
 - `http://localhost:5173/admin.html`
 
 Elle permet de :

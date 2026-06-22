@@ -1,9 +1,17 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/supabase_service.dart';
+import '../services/image_upload_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/follow_button.dart';
+import 'favorites_page.dart';
+import 'artwork_upload_page.dart';
+import 'thought_bubble_upload_page.dart';
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  final String? userId;
+  const ProfilePage({super.key, this.userId});
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -11,8 +19,12 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   final SupabaseService _supabase = SupabaseService();
+  final ImageUploadService _imageUploadService = ImageUploadService();
+  final ImagePicker _picker = ImagePicker();
   Map<String, dynamic>? _profile;
   bool _isLoading = true;
+  bool _isCurrentUser = false;
+  bool _isUploadingAvatar = false;
 
   @override
   void initState() {
@@ -22,148 +34,289 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _loadProfile() async {
     try {
-      final user = _supabase.currentUser;
-      if (user != null) {
-        final profile = await _supabase.getProfile(user.id);
-        if (mounted) setState(() { _profile = profile; _isLoading = false; });
-      } else {
-        if (mounted) setState(() { _isLoading = false; });
+      final currentUser = _supabase.currentUser;
+      final targetUserId = widget.userId ?? currentUser?.id;
+      
+      if (targetUserId == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      _isCurrentUser = currentUser?.id == targetUserId;
+
+      final profile = await _supabase.getProfile(targetUserId);
+      if (mounted) {
+        setState(() {
+          _profile = profile;
+          _isLoading = false;
+        });
       }
     } catch (e) {
-      if (mounted) setState(() { _isLoading = false; });
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.primaryViolet));
-    }
-
-    final user = _supabase.currentUser;
-
-    if (user == null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [AppTheme.primaryViolet, AppTheme.primaryTeal]),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(Icons.person, color: Colors.white, size: 40),
+    return Scaffold(
+      backgroundColor: AppTheme.bgDark,
+      appBar: AppBar(
+        backgroundColor: AppTheme.cardDark,
+        elevation: 0,
+        title: Text(
+          _profile?['username'] ?? 'Profil',
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 20),
+        ),
+        actions: [
+          if (_isCurrentUser) ...[
+            IconButton(
+              icon: const Icon(Icons.favorite_border, color: Colors.white),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoritesPage())),
+              tooltip: 'Favoris',
             ),
-            const SizedBox(height: 16),
-            const Text('Non connecté', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text('Connectez-vous pour accéder à votre profil', style: TextStyle(color: AppTheme.textMuted), textAlign: TextAlign.center),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryViolet, foregroundColor: Colors.white),
-              child: const Text('Se connecter'),
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline, color: Colors.white),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ArtworkUploadPage())),
+              tooltip: 'Publier',
             ),
           ],
-        ),
-      );
-    }
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryViolet))
+          : _supabase.currentUser == null && widget.userId == null
+              ? _buildLoginPrompt()
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      _buildProfileHeader(),
+                      const SizedBox(height: 24),
+                      if (_isCurrentUser) _buildMyPostsSection(),
+                    ],
+                  ),
+                ),
+    );
+  }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+  Widget _buildLoginPrompt() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80, height: 80,
+              decoration: BoxDecoration(
+                color: AppTheme.cardDarkLight,
+                borderRadius: BorderRadius.circular(40),
+              ),
+              child: const Icon(Icons.person, size: 40, color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            const Text('Profil', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(height: 8),
+            Text('Connectez-vous pour voir votre profil', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 400,
+        maxHeight: 400,
+        imageQuality: 80,
+      );
+      if (image == null) return;
+
+      setState(() => _isUploadingAvatar = true);
+
+      final result = await _imageUploadService.uploadArtworkImage(File(image.path));
+      final avatarUrl = result['image_url'];
+
+      // Update profile in Supabase
+      final user = _supabase.currentUser;
+      if (user != null && avatarUrl.isNotEmpty) {
+        await _supabase.client
+            .from('profiles')
+            .update({'avatar_url': avatarUrl})
+            .eq('id', user.id);
+
+        setState(() {
+          _profile?['avatar_url'] = avatarUrl;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Photo de profil mise à jour!'), backgroundColor: Colors.green),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingAvatar = false);
+    }
+  }
+
+  Widget _buildProfileHeader() {
+    final profile = _profile;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.cardDark,
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Column(
         children: [
-          const SizedBox(height: 16),
-          // Avatar
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [AppTheme.primaryViolet, AppTheme.primaryTeal]),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [BoxShadow(color: AppTheme.primaryViolet.withOpacity(0.3), blurRadius: 20)],
+          GestureDetector(
+            onTap: _isCurrentUser ? _pickAndUploadAvatar : null,
+            child: Container(
+              width: 80, height: 80,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [AppTheme.primaryViolet, AppTheme.primaryTeal]),
+                borderRadius: BorderRadius.circular(40),
+              ),
+              child: Stack(
+                children: [
+                  Center(
+                    child: Text(profile?['avatar_url'] ?? '👤', style: const TextStyle(fontSize: 40)),
+                  ),
+                  if (_isUploadingAvatar)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(40),
+                      ),
+                      child: const Center(
+                        child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                      ),
+                    ),
+                  if (_isCurrentUser && !_isUploadingAvatar)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryViolet,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppTheme.cardDark, width: 2),
+                        ),
+                        child: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
+                      ),
+                    ),
+                ],
+              ),
             ),
-            child: const Icon(Icons.person, color: Colors.white, size: 40),
           ),
-          const SizedBox(height: 16),
-          Text(user.email ?? 'Utilisateur', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          Text(
+            profile?['username'] ?? profile?['display_name'] ?? 'Utilisateur',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
           const SizedBox(height: 4),
-          Text(_profile?['role'] ?? 'user', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
-          const SizedBox(height: 24),
-          // Stats
+          Text(
+            profile?['role'] ?? 'Artiste',
+            style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+          ),
+          if (profile?['bio'] != null && (profile!['bio'] as String).isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              profile['bio'] as String,
+              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+              textAlign: TextAlign.center,
+            ),
+          ],
+          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _statItem('0', 'Œuvres'),
-              _statItem('0', 'Abonnés'),
-              _statItem('0', 'Abonnements'),
+              _StatItem(label: 'Publications', value: '${profile?['posts_count'] ?? 0}'),
+              _StatItem(label: 'Abonnés', value: '${profile?['followers_count'] ?? 0}'),
+              _StatItem(label: 'Abonnements', value: '${profile?['following_count'] ?? 0}'),
             ],
           ),
-          const SizedBox(height: 24),
-          // Menu items
-          _menuItem(Icons.upload, 'Mes œuvres', '0 œuvres'),
-          _menuItem(Icons.favorite, 'Mes favoris', '0 favoris'),
-          _menuItem(Icons.bookmark, 'Enregistrés', '0 enregistrés'),
-          _menuItem(Icons.settings, 'Paramètres', ''),
-          _menuItem(Icons.help, 'Aide', ''),
-          const SizedBox(height: 24),
-          // Logout button
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () async {
-                await _supabase.signOut();
-                if (mounted) setState(() {});
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppTheme.primaryPink,
-                side: const BorderSide(color: AppTheme.primaryPink),
-              ),
-              child: const Text('Se déconnecter'),
-            ),
-          ),
+          const SizedBox(height: 16),
+          if (!_isCurrentUser && widget.userId != null)
+            FollowButton(userId: widget.userId!, onChanged: _loadProfile),
         ],
       ),
     );
   }
 
-  Widget _statItem(String count, String label) {
+  Widget _buildMyPostsSection() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(count, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.primaryViolet)),
-        const SizedBox(height: 4),
-        Text(label, style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+        const Text('Mes publications', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: AppTheme.cardDarkLight,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              Icon(Icons.photo_library_outlined, size: 48, color: Colors.grey[600]),
+              const SizedBox(height: 12),
+              const Text('Vos œuvres apparaîtront ici', style: TextStyle(color: Colors.grey, fontSize: 14)),
+              const SizedBox(height: 8),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ArtworkUploadPage())),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Publier une œuvre'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryViolet,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ThoughtBubbleUploadPage())),
+                icon: const Icon(Icons.psychology, size: 18),
+                label: const Text('Nouvelle bulle de pensée'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryPink,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
+}
 
-  Widget _menuItem(IconData icon, String title, String subtitle) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: AppTheme.primaryViolet),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                if (subtitle.isNotEmpty) Text(subtitle, style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-              ],
-            ),
-          ),
-          Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
-        ],
-      ),
+class _StatItem extends StatelessWidget {
+  final String label;
+  final String value;
+  const _StatItem({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+        const SizedBox(height: 4),
+        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+      ],
     );
   }
 }

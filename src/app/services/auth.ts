@@ -1,13 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
+import type { AuthChangeEvent, User } from "@supabase/supabase-js";
+import { hasSupabaseEnv, supabase } from "../lib/supabase";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-export const hasSupabaseEnv = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
-
-const supabase = hasSupabaseEnv 
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
-  : null;
+export { hasSupabaseEnv };
 
 export type AuthUser = {
   id: string;
@@ -16,50 +10,74 @@ export type AuthUser = {
   avatar_url: string;
 };
 
-export async function getCurrentSession() {
+type AuthResult = {
+  user: AuthUser | null;
+  error: Error | null;
+};
+
+type AuthChangePayload = {
+  user: AuthUser | null;
+  event: AuthChangeEvent | "NO_SUPABASE";
+};
+
+function missingConfigError() {
+  return new Error("Configuration Supabase manquante");
+}
+
+function toAuthUser(user: User): AuthUser {
+  return {
+    id: user.id,
+    email: user.email || "",
+    display_name: user.user_metadata?.display_name || user.email || "Utilisateur",
+    avatar_url: user.user_metadata?.avatar_url || "",
+  };
+}
+
+export async function getCurrentSession(): Promise<AuthResult> {
   if (!hasSupabaseEnv || !supabase) {
-    return { user: null, error: new Error('Configuration Supabase manquante') };
+    return { user: null, error: missingConfigError() };
   }
 
   try {
-    const { data: { session }, error } = await supabase.auth.getSession();
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+
     if (error) return { user: null, error };
     if (!session) return { user: null, error: null };
 
-    const user = {
-      id: session.user.id,
-      email: session.user.email || '',
-      display_name: session.user.user_metadata?.display_name || session.user.email || 'Utilisateur',
-      avatar_url: session.user.user_metadata?.avatar_url || '',
-    };
-
-    return { user, error: null };
+    return { user: toAuthUser(session.user), error: null };
   } catch (error) {
-    return { user: null, error: error instanceof Error ? error : new Error('Erreur inconnue lors de la récupération de la session') };
+    return {
+      user: null,
+      error:
+        error instanceof Error
+          ? error
+          : new Error("Erreur inconnue lors de la récupération de la session"),
+    };
   }
 }
 
-export async function signIn(email, password) {
+export async function signIn(email: string, password: string): Promise<AuthResult> {
   if (!hasSupabaseEnv || !supabase) {
-    return { user: null, error: new Error('Configuration Supabase manquante') };
+    return { user: null, error: missingConfigError() };
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { user: null, error };
+  if (!data.user) return { user: null, error: new Error("Utilisateur introuvable") };
 
-  const user = {
-    id: data.user.id,
-    email: data.user.email || '',
-    display_name: data.user.user_metadata?.display_name || data.user.email || 'Utilisateur',
-    avatar_url: data.user.user_metadata?.avatar_url || '',
-  };
-
-  return { user, error: null };
+  return { user: toAuthUser(data.user), error: null };
 }
 
-export async function signUp(email, password, displayName) {
+export async function signUp(
+  email: string,
+  password: string,
+  displayName: string,
+): Promise<AuthResult> {
   if (!hasSupabaseEnv || !supabase) {
-    return { user: null, error: new Error('Configuration Supabase manquante') };
+    return { user: null, error: missingConfigError() };
   }
 
   const { data, error } = await supabase.auth.signUp({
@@ -71,20 +89,15 @@ export async function signUp(email, password, displayName) {
   });
 
   if (error) return { user: null, error };
+  if (!data.user) return { user: null, error: new Error("Utilisateur introuvable") };
 
-  const user = {
-    id: data.user.id,
-    email: data.user.email || '',
-    display_name: displayName || data.user.// metadata?.display_name || data.user.email || 'Utilisateur',
-    avatar_url: data.user.user_metadata?.avatar_url || '',
-  };
-
-  return { user, error: null };
+  const user = toAuthUser(data.user);
+  return { user: { ...user, display_name: displayName || user.display_name }, error: null };
 }
 
 export async function doSignOut() {
   if (!hasSupabaseEnv || !supabase) {
-    return { error: new Error('Configuration Supabase manquante') };
+    return { error: missingConfigError() };
   }
 
   const { error } = await supabase.auth.signOut();
@@ -93,55 +106,44 @@ export async function doSignOut() {
 
 export async function signInWithGoogle() {
   if (!hasSupabaseEnv || !supabase) {
-    return { data: null, error: new Error('Configuration Supabase manquante') };
+    return { data: null, error: missingConfigError() };
   }
 
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
+  return supabase.auth.signInWithOAuth({
+    provider: "google",
   });
-
-  return { data, error };
 }
 
 export async function signInWithGoogleMobile() {
   if (!hasSupabaseEnv || !supabase) {
-    return { data: null, error: new Error('Configuration Supabase manquante') };
+    return { data: null, error: missingConfigError() };
   }
 
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
+  return supabase.auth.signInWithOAuth({
+    provider: "google",
     options: {
       redirectTo: window.location.origin,
     },
   });
-
-  return { data, error };
 }
 
-export function onAuthChange(callback) {
+export function onAuthChange(callback: (payload: AuthChangePayload) => void) {
   if (!hasSupabaseEnv || !supabase) {
     return { subscription: null };
   }
 
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-    if (session) {
-      callback({
-        user: {
-          id: session.user.id,
-          email: session.user.email || '',
-          display_name: session.user.user_metadata?.display_name || session.user.email || 'Utilisateur',
-          avatar_url: session.user.user_metadata?.avatar_url || '',
-        },
-        event,
-      });
-    } else {
-      callback({ user: null, event });
-    }
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((event, session) => {
+    callback({
+      user: session ? toAuthUser(session.user) : null,
+      event,
+    });
   });
 
   return { subscription };
 }
 
-export function getAvatarUrl(user) {
-  return user?.avatar_url || '';
+export function getAvatarUrl(user?: AuthUser | null) {
+  return user?.avatar_url || "";
 }

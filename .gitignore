@@ -33,3 +33,4 @@ ios/App/build/
 # Capacitor generated
 android/
 ios/
+.aider*

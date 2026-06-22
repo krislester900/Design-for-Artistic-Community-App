@@ -1,18 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'services/supabase_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/loading_screen.dart';
 import 'pages/home_page.dart';
 import 'pages/explore_page.dart';
 import 'pages/search_page.dart';
-import 'pages/community_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/universe_page.dart';
-import 'pages/notifications_page.dart';
+import 'pages/notifications_page_enhanced.dart';
 import 'pages/music_page.dart';
+import 'pages/auth_page.dart';
+import 'pages/chat_page.dart';
+import 'pages/inbox_page.dart';
+import 'pages/favorites_page.dart';
+import 'pages/artwork_upload_page.dart';
+import 'pages/music_upload_page.dart';
+import 'pages/writing_page.dart';
+import 'pages/comics_upload_page.dart';
+import 'pages/quests_page.dart';
+import 'pages/thought_bubble_upload_page.dart';
+import 'widgets/page_transition.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Hive for local cache
+  await Hive.initFlutter();
+  await Hive.openBox('arteia_cache');
+  
+  await Supabase.initialize(
+    url: SupabaseConfig.supabaseUrl,
+    anonKey: SupabaseConfig.supabaseAnonKey,
+  );
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
@@ -49,7 +71,6 @@ class _LoadingScreenWrapperState extends State<LoadingScreenWrapper> {
   @override
   void initState() {
     super.initState();
-    // Timeout de sécurité : 5 secondes max
     Future.delayed(const Duration(seconds: 5), () {
       if (mounted && _isLoading) {
         setState(() => _isLoading = false);
@@ -85,7 +106,7 @@ class MainScreenState extends State<MainScreen> {
     const HomePage(),
     const ExplorePage(),
     const SearchPage(),
-    const CommunityPage(),
+    const ChatPage(),
     const ProfilePage(),
   ];
 
@@ -94,16 +115,131 @@ class MainScreenState extends State<MainScreen> {
   }
 
   void openUniverse(String slug) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => UniversePage(slug: slug)),
-    );
+    final animationAsset = PageTransitionConfig.getAnimationFor(slug);
+    if (animationAsset != null) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => PageTransitionOverlay(
+          riveAsset: animationAsset,
+          onComplete: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const UniversePage()),
+            );
+          },
+          durationInSeconds: 1.8,
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const UniversePage()),
+      );
+    }
   }
 
   void openNotifications() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const NotificationsPage()),
+      MaterialPageRoute(builder: (_) => const NotificationsPageEnhanced()),
+    );
+  }
+
+  void openFavorites() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const FavoritesPage()),
+    );
+  }
+
+  void openQuests() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const QuestsPage()),
+    );
+  }
+
+  void openUpload() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.cardDark,
+        title: const Text('Nouvelle publication', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryViolet.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.image, color: AppTheme.primaryViolet),
+              ),
+              title: const Text('Œuvre visuelle', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ArtworkUploadPage()));
+              },
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryTeal.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.music_note, color: AppTheme.primaryTeal),
+              ),
+              title: const Text('Musique', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const MusicUploadPage()));
+              },
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryPink.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.edit, color: AppTheme.primaryPink),
+              ),
+              title: const Text('Écriture', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const WritingPage()));
+              },
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.photo_library, color: Colors.orange),
+              ),
+              title: const Text('BD / Manga', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ComicsUploadPage()));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void openAuth() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AuthPage()),
     );
   }
 
@@ -163,14 +299,15 @@ class MainScreenState extends State<MainScreen> {
                     Text('Artéïa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color)),
                     const Spacer(),
                     IconButton(
-                      icon: const Icon(Icons.dark_mode, size: 18),
-                      onPressed: () {},
+                      icon: const Icon(Icons.add_circle_outline, size: 20),
+                      onPressed: openUpload,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
+                      tooltip: 'Publier une œuvre',
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      ['Accueil', 'Univers', 'Rechercher', 'Communauté', 'Profil'][_currentIndex],
+                      ['Accueil', 'Univers', 'Rechercher', 'Discussions', 'Profil'][_currentIndex],
                       style: TextStyle(
                         fontSize: 10,
                         letterSpacing: 3,
@@ -283,16 +420,21 @@ class MainScreenState extends State<MainScreen> {
                 _drawerItem(Icons.search, 'Rechercher', () { switchTab(2); setState(() => _isDrawerOpen = false); }),
                 _drawerItem(Icons.message_outlined, 'Communauté', () { switchTab(3); setState(() => _isDrawerOpen = false); }, badge: 3),
                 _drawerItem(Icons.person_outline, 'Profil', () { switchTab(4); setState(() => _isDrawerOpen = false); }),
+                _drawerItem(Icons.inbox, 'Messages', () { Navigator.push(context, MaterialPageRoute(builder: (_) => const InboxPage())); setState(() => _isDrawerOpen = false); }, badge: 2),
+                _drawerItem(Icons.add_circle_outline, 'Publier', () { openUpload(); setState(() => _isDrawerOpen = false); }),
                 const Divider(),
                 _drawerItem(Icons.notifications_outlined, 'Notifications', () { setState(() => _isDrawerOpen = false); openNotifications(); }, badge: 5),
-                _drawerItem(Icons.favorite_border, 'Favoris', () {}, badge: 24),
-                _drawerItem(Icons.bookmark_border, 'Enregistrés', () {}, badge: 8),
+                 _drawerItem(Icons.favorite_border, 'Favoris', () { openFavorites(); setState(() => _isDrawerOpen = false); }, badge: 24),
+                 _drawerItem(Icons.bookmark_border, 'Enregistrés', () { openFavorites(); setState(() => _isDrawerOpen = false); }, badge: 8),
+                 _drawerItem(Icons.emoji_events, 'Quêtes', () { openQuests(); setState(() => _isDrawerOpen = false); }),
                 _drawerItem(Icons.trending_up, 'Tendances', () {}),
                 const Divider(),
                 _drawerItem(Icons.music_note, 'Musique', () { Navigator.push(context, MaterialPageRoute(builder: (_) => const MusicPage())); setState(() => _isDrawerOpen = false); }),
                 _drawerItem(Icons.palette_outlined, 'Art Visuel', () { openUniverse('visual-art'); setState(() => _isDrawerOpen = false); }),
                 _drawerItem(Icons.menu_book, 'Manga', () { openUniverse('manga'); setState(() => _isDrawerOpen = false); }),
                 _drawerItem(Icons.movie_outlined, 'Films', () { openUniverse('film'); setState(() => _isDrawerOpen = false); }),
+                const Divider(),
+                _drawerItem(Icons.login, 'Connexion / Inscription', () { openAuth(); setState(() => _isDrawerOpen = false); }),
               ],
             ),
           ),

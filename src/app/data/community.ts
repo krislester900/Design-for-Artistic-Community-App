@@ -200,8 +200,7 @@ export const categories: Category[] = [
     slug: "animation",
     title: "Animation",
     shortLabel: "Animation",
-    description:
-      "Motion design, animation 2D/3D et expérimentations visuelles.",
+    description: "Motion design, animation 2D/3D et expérimentations visuelles.",
     image:
       "https://images.unsplash.com/photo-1779864535439-292f58c6c6a4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHw1fHxzdHJlZXQlMjBhcnQlMjBncmFmZml0aSUyMHZpY3RvcmlhbiUyMGFyY2hpdGVjdHVyZXxlbnwxfHx8fDE3ODA5OTYzMTB8MA&ixlib=rb-4.1.0&q=80&w=1080",
     color: "from-primary/20 to-secondary/5",

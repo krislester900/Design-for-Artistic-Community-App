@@ -9,7 +9,7 @@ import {
   Moon, Sun, Globe, Shield, HelpCircle, MessageCircle, Users,
   ChevronDown, ExternalLink, Copy, Check, Plus, Eye
 } from "lucide-react";
-import { signIn, signUp, signInWithGoogle, signOut as doSignOut, getCurrentSession, onAuthChange, type AuthUser } from "../services/auth";
+import { signIn, signUp, signInWithGoogle, doSignOut, getCurrentSession, onAuthChange, type AuthUser } from "../services/auth";
 import { hasSupabaseEnv } from "../lib/supabase";
 
 interface MenuItem {
@@ -72,8 +72,8 @@ export function MobileProfile() {
 
   useEffect(() => {
     getCurrentSession().then(({ user }) => { if (user) setAuthUser(user); });
-    const sub = onAuthChange((u) => setAuthUser(u));
-    return () => sub.unsubscribe();
+    const { subscription } = onAuthChange((u: any) => setAuthUser(u));
+    return () => subscription?.unsubscribe();
   }, []);
 
   async function handleSignIn(e: React.FormEvent) {
@@ -81,7 +81,7 @@ export function MobileProfile() {
     setIsSubmitting(true);
     setMessage("");
     const { error } = await signIn(email, password);
-    if (error) setMessage(error);
+    if (error) setMessage(error.message || "Erreur de connexion");
     setIsSubmitting(false);
   }
 
@@ -89,8 +89,8 @@ export function MobileProfile() {
     e.preventDefault();
     setIsSubmitting(true);
     setMessage("");
-    const { error } = await signUp(email, password);
-    if (error) setMessage(error);
+    const { error } = await signUp(email, password, "");
+    if (error) setMessage(error.message || "Erreur d'inscription");
     else setMessage("Compte créé ! Vérifie tes emails.");
     setIsSubmitting(false);
   }
@@ -98,7 +98,7 @@ export function MobileProfile() {
   async function handleGoogleSignIn() {
     setMessage("");
     const { error } = await signInWithGoogle();
-    if (error) setMessage(error);
+    if (error) setMessage(error.message || "Erreur Google Sign-In");
   }
 
   async function handleLogout() {
