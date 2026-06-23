@@ -21,7 +21,7 @@ import 'pages/music_upload_page.dart';
 import 'pages/writing_page.dart';
 import 'pages/comics_upload_page.dart';
 import 'pages/quests_page.dart';
-import 'pages/thought_bubble_upload_page.dart';
+import 'pages/theme_customizer_page.dart';
 import 'widgets/page_transition.dart';
 
 void main() async {
@@ -426,7 +426,8 @@ class MainScreenState extends State<MainScreen> {
                 _drawerItem(Icons.notifications_outlined, 'Notifications', () { setState(() => _isDrawerOpen = false); openNotifications(); }, badge: 5),
                  _drawerItem(Icons.favorite_border, 'Favoris', () { openFavorites(); setState(() => _isDrawerOpen = false); }, badge: 24),
                  _drawerItem(Icons.bookmark_border, 'Enregistrés', () { openFavorites(); setState(() => _isDrawerOpen = false); }, badge: 8),
-                 _drawerItem(Icons.emoji_events, 'Quêtes', () { openQuests(); setState(() => _isDrawerOpen = false); }),
+                _drawerItem(Icons.emoji_events, 'Quêtes', () { openQuests(); setState(() => _isDrawerOpen = false); }),
+                _drawerItem(Icons.palette_outlined, 'Personnalisation', () { Navigator.push(context, MaterialPageRoute(builder: (_) => const ThemeCustomizerPage())); setState(() => _isDrawerOpen = false); }),
                 _drawerItem(Icons.trending_up, 'Tendances', () {}),
                 const Divider(),
                 _drawerItem(Icons.music_note, 'Musique', () { Navigator.push(context, MaterialPageRoute(builder: (_) => const MusicPage())); setState(() => _isDrawerOpen = false); }),

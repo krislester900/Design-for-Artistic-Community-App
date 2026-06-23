@@ -1,0 +1,119 @@
+Analyzing arteia_flutter...                                     
+
+   info - 'anonKey' is deprecated and shouldn't be used. Use publishableKey instead. anonKey will be removed in a future major version - lib\main.dart:35:5 - deprecated_member_use
+   info - Use 'const' with the constructor to improve performance - lib\main.dart:403:17 - prefer_const_constructors
+   info - Use 'const' literals as arguments to constructors of '@immutable' classes - lib\main.dart:405:29 - prefer_const_literals_to_create_immutables
+   info - Use 'const' with the constructor to improve performance - lib\main.dart:407:21 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\main.dart:407:58 - prefer_const_constructors
+   info - Don't use 'BuildContext's across async gaps - lib\pages\artwork_upload_page.dart:197:28 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\pages\artwork_upload_page.dart:208:30 - use_build_context_synchronously
+   info - Use 'const' with the constructor to improve performance - lib\pages\auth_page.dart:131:26 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\pages\auth_page.dart:145:35 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\pages\auth_page.dart:170:33 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\pages\auth_page.dart:194:33 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\pages\auth_page.dart:249:28 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\pages\chat_page.dart:310:25 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\pages\chat_room_page.dart:78:22 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\pages\chat_room_page.dart:85:17 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\pages\chat_room_page.dart:85:41 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\pages\chat_room_page.dart:108:25 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\pages\chat_room_page.dart:108:54 - prefer_const_constructors
+   info - Use 'const' for final variables initialized to a constant value - lib\pages\chat_room_page.dart:119:23 - prefer_const_declarations
+   info - Use 'const' with the constructor to improve performance - lib\pages\chat_room_page.dart:218:19 - prefer_const_constructors
+   info - Use 'const' literals as arguments to constructors of '@immutable' classes - lib\pages\chat_room_page.dart:218:42 - prefer_const_literals_to_create_immutables
+   info - The private field _ephemeralDuration could be 'final' - lib\pages\chat_room_page_enhanced.dart:27:12 - prefer_final_fields
+   info - The private field _isUploading could be 'final' - lib\pages\comics_upload_page.dart:26:8 - prefer_final_fields
+warning - The value of the field '_isUploading' isn't used - lib\pages\comics_upload_page.dart:26:8 - unused_field
+   info - Use 'const' with the constructor to improve performance - lib\pages\favorites_page.dart:321:32 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\pages\home_page.dart:136:17 - prefer_const_constructors
+   info - The variable name '_PostCard' isn't a lowerCamelCase identifier - lib\pages\home_page.dart:150:10 - non_constant_identifier_names
+   info - Use 'const' with the constructor to improve performance - lib\pages\inbox_page.dart:537:25 - prefer_const_constructors
+warning - The value of the field '_isUploading' isn't used - lib\pages\music_upload_page.dart:28:8 - unused_field
+   info - Don't use 'BuildContext's across async gaps - lib\pages\music_upload_page.dart:118:28 - use_build_context_synchronously
+   info - Use 'const' for final variables initialized to a constant value - lib\pages\notifications_page.dart:24:5 - prefer_const_declarations
+   info - Don't invoke 'print' in production code - lib\pages\post_detail_page.dart:73:7 - avoid_print
+   info - Use 'const' with the constructor to improve performance - lib\pages\quests_page.dart:59:19 - prefer_const_constructors
+   info - Use 'const' literals as arguments to constructors of '@immutable' classes - lib\pages\quests_page.dart:60:19 - prefer_const_literals_to_create_immutables
+warning - The value of the field '_categoryTheme' isn't used - lib\pages\reading_mode_page.dart:28:22 - unused_field
+   info - The declaration '_getThemeForCategory' isn't referenced - lib\pages\reading_mode_page.dart:39:17 - unused_element
+   info - Use interpolation to compose strings and values - lib\pages\reading_mode_page.dart:65:12 - prefer_interpolation_to_compose_strings
+   info - Use interpolation to compose strings and values - lib\pages\reading_mode_page.dart:69:24 - prefer_interpolation_to_compose_strings
+   info - Unnecessary cast - lib\pages\reading_mode_page.dart:261:29 - unnecessary_cast
+warning - Unused import: 'package:path_provider/path_provider.dart' - lib\pages\thought_bubble_upload_page.dart:5:8 - unused_import
+warning - The value of the field '_imageUrl' isn't used - lib\pages\thought_bubble_upload_page.dart:28:11 - unused_field
+   info - The private field _isUploading could be 'final' - lib\pages\thought_bubble_upload_page.dart:31:8 - prefer_final_fields
+warning - The value of the field '_isUploading' isn't used - lib\pages\thought_bubble_upload_page.dart:31:8 - unused_field
+warning - The value of the field '_categories' isn't used - lib\pages\universe_page.dart:21:30 - unused_field
+   info - Unnecessary braces in a string interpolation - lib\pages\writing_fullscreen_page.dart:250:22 - unnecessary_brace_in_string_interps
+   info - The import of 'package:flutter/services.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' - lib\screens\loading_screen.dart:2:8 - unnecessary_import
+warning - Unused import: '../theme/app_theme.dart' - lib\screens\loading_screen.dart:3:8 - unused_import
+   info - Don't invoke 'print' in production code - lib\services\api_service.dart:16:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\api_service.dart:31:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\api_service.dart:47:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\api_service.dart:63:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\api_service.dart:79:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\api_service.dart:89:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\api_service.dart:102:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\api_service.dart:116:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\api_service.dart:133:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\api_service.dart:149:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\api_service.dart:162:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\chat_service_enhanced.dart:14:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\chat_service_enhanced.dart:37:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\chat_service_enhanced.dart:53:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\chat_service_enhanced.dart:79:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\chat_service_enhanced.dart:89:7 - avoid_print
+   info - Statements in an if should be enclosed in a block - lib\services\color_analysis_service.dart:70:37 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\color_analysis_service.dart:71:28 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\color_analysis_service.dart:72:28 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\color_analysis_service.dart:73:29 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\color_analysis_service.dart:74:29 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\color_analysis_service.dart:75:29 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\color_analysis_service.dart:76:29 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\color_analysis_service.dart:77:14 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\color_analysis_service.dart:81:28 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\color_analysis_service.dart:82:33 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\color_analysis_service.dart:85:29 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\color_analysis_service.dart:86:34 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\color_analysis_service.dart:113:31 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\color_analysis_service.dart:114:36 - curly_braces_in_flow_control_structures
+   info - The imported package 'supabase' isn't a dependency of the importing package - lib\services\favorites_service.dart:1:8 - depend_on_referenced_packages
+   info - Don't invoke 'print' in production code - lib\services\follow_service.dart:21:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\follow_service.dart:39:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\follow_service.dart:58:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\follow_service.dart:73:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\follow_service.dart:88:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\follow_service.dart:111:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\follow_service.dart:134:7 - avoid_print
+   info - The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/services.dart' - lib\services\image_compression_service.dart:2:8 - unnecessary_import
+   info - Don't invoke 'print' in production code - lib\services\image_compression_service.dart:47:7 - avoid_print
+   info - Use 'const' with the constructor to improve performance - lib\services\image_compression_service.dart:62:28 - prefer_const_constructors
+   info - Don't invoke 'print' in production code - lib\services\image_compression_service.dart:74:7 - avoid_print
+   info - The imported package 'path' isn't a dependency of the importing package - lib\services\image_upload_service.dart:3:8 - depend_on_referenced_packages
+   info - Don't invoke 'print' in production code - lib\services\image_upload_service.dart:66:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\image_upload_service.dart:113:7 - avoid_print
+   info - The imported package 'supabase' isn't a dependency of the importing package - lib\services\notifications_service.dart:1:8 - depend_on_referenced_packages
+   info - Unnecessary cast - lib\services\realtime_notifications_service.dart:44:37 - unnecessary_cast
+   info - Unnecessary cast - lib\services\realtime_notifications_service.dart:65:31 - unnecessary_cast
+   info - Unnecessary cast - lib\services\realtime_notifications_service.dart:87:29 - unnecessary_cast
+   info - Don't invoke 'print' in production code - lib\services\realtime_notifications_service.dart:138:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\realtime_notifications_service.dart:156:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\realtime_notifications_service.dart:170:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\realtime_notifications_service.dart:188:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\supabase_service.dart:34:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\supabase_service.dart:96:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\supabase_service.dart:241:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\supabase_service.dart:252:7 - avoid_print
+   info - 'background' is deprecated and shouldn't be used. Use surface instead. This feature was deprecated after v3.18.0-0.1.pre - lib\theme\app_theme.dart:41:7 - deprecated_member_use
+   info - 'background' is deprecated and shouldn't be used. Use surface instead. This feature was deprecated after v3.18.0-0.1.pre - lib\theme\category_themes.dart:94:9 - deprecated_member_use
+   info - Statements in an if should be enclosed in a block - lib\widgets\follow_button.dart:39:18 - curly_braces_in_flow_control_structures
+warning - The value of the field '_isLoading' isn't used - lib\widgets\music_player_widget.dart:26:8 - unused_field
+   info - Use 'const' with the constructor to improve performance - lib\widgets\music_player_widget.dart:169:31 - prefer_const_constructors
+   info - The imported package 'rive' isn't a dependency of the importing package - lib\widgets\page_transition.dart:2:8 - depend_on_referenced_packages
+   info - The imported package 'rive' isn't a dependency of the importing package - lib\widgets\rive_loading.dart:2:8 - depend_on_referenced_packages
+   info - The private field _isLoading could be 'final' - lib\widgets\thought_bubble_audio.dart:34:8 - prefer_final_fields
+warning - The value of the field '_currentPosition' isn't used - lib\widgets\thought_bubble_audio.dart:287:10 - unused_field
+   info - The declaration '_formatDuration' isn't referenced - lib\widgets\thought_bubble_audio.dart:324:10 - unused_element
+warning - Unused import: 'package:arteia_app/services/cache_service.dart' - test\services_test.dart:3:8 - unused_import
+
+115 issues found. (ran in 14.5s)
