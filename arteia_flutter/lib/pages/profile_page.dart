@@ -5,6 +5,7 @@ import '../services/supabase_service.dart';
 import '../services/image_upload_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/follow_button.dart';
+import '../widgets/profile_bird_animation.dart';
 import 'favorites_page.dart';
 import 'artwork_upload_page.dart';
 import 'thought_bubble_upload_page.dart';
@@ -179,6 +180,15 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
       child: Column(
         children: [
+          // Profile Bird Animation
+          if (_isCurrentUser)
+            ProfileBirdAnimation(
+              autoPlay: true,
+              onAnimationComplete: () {
+                // Animation completed
+              },
+            ),
+          const SizedBox(height: 12),
           GestureDetector(
             onTap: _isCurrentUser ? _pickAndUploadAvatar : null,
             child: Container(

@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'utils/app_constants.dart';
 import 'services/supabase_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/loading_screen.dart';
+import 'widgets/app_drawer.dart';
+import 'widgets/error_boundary.dart';
 import 'pages/home_page.dart';
 import 'pages/explore_page.dart';
 import 'pages/search_page.dart';
@@ -53,7 +56,9 @@ class ArteiaApp extends StatelessWidget {
       title: 'Artéïa',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.arteiaTheme,
-      home: const LoadingScreenWrapper(),
+      home: const ErrorBoundary(
+        child: LoadingScreenWrapper(),
+      ),
     );
   }
 }
@@ -71,11 +76,29 @@ class _LoadingScreenWrapperState extends State<LoadingScreenWrapper> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted && _isLoading) {
+    _checkInitialization();
+  }
+
+  Future<void> _checkInitialization() async {
+    // Wait minimum duration for smooth UX
+    await Future.delayed(AppConstants.loadingScreenMinDuration);
+    
+    if (!mounted) return;
+    
+    // Check if Supabase is ready
+    try {
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session != null || !_isLoading) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
+    } catch (e) {
+      // If error, still proceed after delay
+      if (mounted) {
         setState(() => _isLoading = false);
       }
-    });
+    }
   }
 
   @override
@@ -333,7 +356,10 @@ class MainScreenState extends State<MainScreen> {
           if (_isDrawerOpen)
             Positioned(
               left: 0, top: 0, bottom: 0,
-              child: _buildDrawer(context),
+              child: AppDrawer(
+                onTabSelected: switchTab,
+                onClose: () => setState(() => _isDrawerOpen = false),
+              ),
             ),
         ],
       ),
@@ -371,94 +397,4 @@ class MainScreenState extends State<MainScreen> {
     );
   }
 
-  Widget _buildDrawer(BuildContext context) {
-    return Container(
-      width: 300,
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(
-          right: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.3)),
-        ),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.2)),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFF7C5CFC), Color(0xFF00D4AA)]),
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [BoxShadow(color: const Color(0xFF7C5CFC).withOpacity(0.3), blurRadius: 12)],
-                  ),
-                  child: const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Artéïa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text('Communauté artistique', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                _drawerItem(Icons.home, 'Accueil', () { switchTab(0); setState(() => _isDrawerOpen = false); }),
-                _drawerItem(Icons.compass_calibration_outlined, 'Explorer', () { switchTab(1); setState(() => _isDrawerOpen = false); }),
-                _drawerItem(Icons.search, 'Rechercher', () { switchTab(2); setState(() => _isDrawerOpen = false); }),
-                _drawerItem(Icons.message_outlined, 'Communauté', () { switchTab(3); setState(() => _isDrawerOpen = false); }, badge: 3),
-                _drawerItem(Icons.person_outline, 'Profil', () { switchTab(4); setState(() => _isDrawerOpen = false); }),
-                _drawerItem(Icons.inbox, 'Messages', () { Navigator.push(context, MaterialPageRoute(builder: (_) => const InboxPage())); setState(() => _isDrawerOpen = false); }, badge: 2),
-                _drawerItem(Icons.add_circle_outline, 'Publier', () { openUpload(); setState(() => _isDrawerOpen = false); }),
-                const Divider(),
-                _drawerItem(Icons.notifications_outlined, 'Notifications', () { setState(() => _isDrawerOpen = false); openNotifications(); }, badge: 5),
-                 _drawerItem(Icons.favorite_border, 'Favoris', () { openFavorites(); setState(() => _isDrawerOpen = false); }, badge: 24),
-                 _drawerItem(Icons.bookmark_border, 'Enregistrés', () { openFavorites(); setState(() => _isDrawerOpen = false); }, badge: 8),
-                _drawerItem(Icons.emoji_events, 'Quêtes', () { openQuests(); setState(() => _isDrawerOpen = false); }),
-                _drawerItem(Icons.palette_outlined, 'Personnalisation', () { Navigator.push(context, MaterialPageRoute(builder: (_) => const ThemeCustomizerPage())); setState(() => _isDrawerOpen = false); }),
-                _drawerItem(Icons.trending_up, 'Tendances', () {}),
-                const Divider(),
-                _drawerItem(Icons.music_note, 'Musique', () { Navigator.push(context, MaterialPageRoute(builder: (_) => const MusicPage())); setState(() => _isDrawerOpen = false); }),
-                _drawerItem(Icons.palette_outlined, 'Art Visuel', () { openUniverse('visual-art'); setState(() => _isDrawerOpen = false); }),
-                _drawerItem(Icons.menu_book, 'Manga', () { openUniverse('manga'); setState(() => _isDrawerOpen = false); }),
-                _drawerItem(Icons.movie_outlined, 'Films', () { openUniverse('film'); setState(() => _isDrawerOpen = false); }),
-                const Divider(),
-                _drawerItem(Icons.login, 'Connexion / Inscription', () { openAuth(); setState(() => _isDrawerOpen = false); }),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _drawerItem(IconData icon, String label, VoidCallback onTap, {int? badge}) {
-    return ListTile(
-      leading: Icon(icon, size: 20, color: Colors.grey[400]),
-      title: Text(label, style: const TextStyle(fontSize: 14)),
-      trailing: badge != null
-          ? Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFF7C5CFC).withOpacity(0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text('$badge', style: const TextStyle(fontSize: 10, color: Color(0xFF7C5CFC), fontWeight: FontWeight.bold)),
-            )
-          : const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
-      onTap: onTap,
-    );
-  }
 }

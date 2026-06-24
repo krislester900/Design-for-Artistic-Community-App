@@ -209,7 +209,7 @@ class ThemeCustomizerPage extends StatelessWidget {
                           children: [
                             Text(
                               'Bouton principal',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textColor),
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
                             ),
                             Text(
                               'Couleur: ${themeService.currentPalette.name}',

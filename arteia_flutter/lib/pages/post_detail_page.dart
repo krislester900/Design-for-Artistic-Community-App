@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
 import '../services/supabase_service.dart';
 import '../services/api_service.dart';
 import '../services/quests_service.dart';
+import '../services/local_image_cache_service.dart';
 import '../theme/app_theme.dart';
 import 'universe_page.dart';
 import 'reading_mode_page.dart';
@@ -18,6 +20,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
   final ApiService _api = ApiService();
   final SupabaseService _supabase = SupabaseService();
   final QuestsService _questsService = QuestsService();
+  LocalImageCacheService? _imageCache;
   final TextEditingController _commentController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -30,8 +33,13 @@ class _PostDetailPageState extends State<PostDetailPage> {
   @override
   void initState() {
     super.initState();
+    _initServices();
     _likesCount = widget.post['likes_count'] ?? widget.post['likes'] ?? 0;
     _loadInitialData();
+  }
+
+  Future<void> _initServices() async {
+    _imageCache = await LocalImageCacheService.getInstance();
   }
 
   Future<void> _loadInitialData() async {
@@ -287,30 +295,47 @@ class _PostDetailPageState extends State<PostDetailPage> {
               style: TextStyle(fontSize: 14, color: Colors.grey[300], height: 1.6),
             ),
           ],
-          if (imageUrl != null && (imageUrl as String).isNotEmpty) ...[
+          if (imageUrl != null && (imageUrl as String).isNotEmpty && _imageCache != null) ...[
             const SizedBox(height: 16),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                imageUrl,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    height: 200,
-                    color: AppTheme.cardDarkLight,
-                    child: const Center(child: CircularProgressIndicator()),
+            FutureBuilder<Uint8List?>(
+              future: _imageCache!.getImage(imageUrl),
+              builder: (context, snapshot) {
+                if (snapshot.hasData && snapshot.data != null) {
+                  // Display cached image
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.memory(
+                      snapshot.data!,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
                   );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 200,
-                    color: AppTheme.cardDarkLight,
-                    child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
-                  );
-                },
-              ),
+                }
+                // Fallback to network image
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    imageUrl,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        height: 200,
+                        color: AppTheme.cardDarkLight,
+                        child: const Center(child: CircularProgressIndicator()),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        height: 200,
+                        color: AppTheme.cardDarkLight,
+                        child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                      );
+                    },
+                  ),
+                );
+              },
             ),
           ],
         ],
