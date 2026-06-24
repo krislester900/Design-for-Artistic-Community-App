@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/app_state.dart';
 import '../pages/inbox_page.dart';
+import '../pages/settings_page.dart';
 import '../pages/notifications_page_enhanced.dart';
 import '../pages/favorites_page.dart';
 import '../pages/quests_page.dart';
@@ -111,9 +112,9 @@ class AppDrawer extends StatelessWidget {
           onClose();
           Navigator.push(context, MaterialPageRoute(builder: (_) => const QuestsPage()));
         }),
-        _drawerItem(Icons.palette_outlined, 'Personnalisation', () {
+        _drawerItem(Icons.settings, 'Paramètres', () {
           onClose();
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const ThemeCustomizerPage()));
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage()));
         }),
         _drawerItem(Icons.trending_up, 'Tendances', () {
           onClose();

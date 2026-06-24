@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'utils/app_constants.dart';
 import 'services/supabase_service.dart';
+import 'services/theme_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/loading_screen.dart';
 import 'widgets/app_drawer.dart';
@@ -52,10 +53,13 @@ class ArteiaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeService = ThemeService();
     return MaterialApp(
       title: 'Artéïa',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.arteiaTheme,
+      theme: themeService.theme,
+      darkTheme: AppTheme.arteiaDarkTheme,
+      themeMode: themeService.isDarkMode ? ThemeMode.dark : ThemeMode.light,
       home: const ErrorBoundary(
         child: LoadingScreenWrapper(),
       ),
