@@ -1,3 +1,15 @@
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  artistSchema,
+  artworkSchema,
+  discussionSchema,
+  loginSchema,
+  type ArtistForm,
+  type ArtworkForm,
+  type DiscussionForm,
+  type LoginForm,
+} from "./admin-schemas";
 import { useEffect, useState } from "react";
 import {
   LockKeyhole,
@@ -87,9 +99,26 @@ export function AdminApp() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const [artistForm, setArtistForm] = useState(initialArtist);
-  const [artworkForm, setArtworkForm] = useState(initialArtwork);
-  const [discussionForm, setDiscussionForm] = useState(initialDiscussion);
+  const loginForm = useForm<LoginForm>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
+  });
+
+  const artistForm = useForm<ArtistForm>({
+    resolver: zodResolver(artistSchema),
+    defaultValues: initialArtist,
+  });
+
+  const artworkForm = useForm<ArtworkForm>({
+    resolver: zodResolver(artworkSchema),
+    defaultValues: initialArtwork,
+  });
+
+  const discussionForm = useForm<DiscussionForm>({
+    resolver: zodResolver(discussionSchema),
+    defaultValues: initialDiscussion,
+  });
+
   const [trendForm, setTrendForm] = useState(initialTrend);
   const [eventForm, setEventForm] = useState(initialEvent);
   const [statForm, setStatForm] = useState(initialStat);
@@ -233,33 +262,34 @@ export function AdminApp() {
             <AdminCard title="Connexion administrateur">
               <form
                 className="space-y-4"
-                onSubmit={(event) => {
-                  event.preventDefault();
+                onSubmit={loginForm.handleSubmit((values) => {
                   runAction(
-                    () => signInAdmin(email, password),
+                    () => signInAdmin(values.email, values.password),
                     "Connexion réussie.",
                   );
-                }}
+                })}
               >
                 <Field label="Email">
                   <input
                     className={inputClassName}
                     type="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
+                    {...loginForm.register("email")}
                     placeholder="admin@arteia.com"
-                    required
                   />
+                  {loginForm.formState.errors.email && (
+                    <p className="mt-1 text-xs text-red-400">{loginForm.formState.errors.email.message}</p>
+                  )}
                 </Field>
                 <Field label="Mot de passe">
                   <input
                     className={inputClassName}
                     type="password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
+                    {...loginForm.register("password")}
                     placeholder="••••••••"
-                    required
                   />
+                  {loginForm.formState.errors.password && (
+                    <p className="mt-1 text-xs text-red-400">{loginForm.formState.errors.password.message}</p>
+                  )}
                 </Field>
                 <div className="flex flex-wrap gap-3">
                   <button
@@ -273,10 +303,12 @@ export function AdminApp() {
                     type="button"
                     className="rounded-lg border border-border px-5 py-3 text-sm transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
                     onClick={() =>
-                      runAction(
-                        () => signUpAdmin(email, password),
-                        "Compte créé. Il devra ensuite être promu au rôle admin dans Supabase.",
-                      )
+                      loginForm.handleSubmit((values) =>
+                        runAction(
+                          () => signUpAdmin(values.email, values.password),
+                          "Compte créé. Il devra ensuite être promu au rôle admin dans Supabase.",
+                        )
+                      )()
                     }
                     disabled={isBusy}
                   >
@@ -322,66 +354,62 @@ export function AdminApp() {
               <AdminCard title="Ajouter un artiste">
                 <form
                   className="space-y-4"
-                  onSubmit={(event) => {
-                    event.preventDefault();
+                  onSubmit={artistForm.handleSubmit((values) => {
                     runAction(async () => {
-                      await createArtist(artistForm);
-                      setArtistForm(initialArtist);
+                      await createArtist(values);
+                      artistForm.reset(initialArtist);
                     }, "Artiste ajouté.");
-                  }}
+                  })}
                 >
                   <Field label="Nom">
                     <input
                       className={inputClassName}
-                      value={artistForm.name}
-                      onChange={(e) =>
-                        setArtistForm({ ...artistForm, name: e.target.value })
-                      }
-                      required
+                      {...artistForm.register("name")}
                     />
+                    {artistForm.formState.errors.name && (
+                      <p className="mt-1 text-xs text-red-400">{artistForm.formState.errors.name.message}</p>
+                    )}
                   </Field>
                   <Field label="Catégorie">
-                    <CategorySelect
-                      value={artistForm.category_slug}
-                      onChange={(value) =>
-                        setArtistForm({ ...artistForm, category_slug: value })
-                      }
+                    <Controller
+                      name="category_slug"
+                      control={artistForm.control}
+                      render={({ field }) => (
+                        <CategorySelect
+                          value={field.value}
+                          onChange={field.onChange}
+                        />
+                      )}
                     />
                   </Field>
                   <Field label="Rôle">
                     <input
                       className={inputClassName}
-                      value={artistForm.role}
-                      onChange={(e) =>
-                        setArtistForm({ ...artistForm, role: e.target.value })
-                      }
-                      required
+                      {...artistForm.register("role")}
                     />
+                    {artistForm.formState.errors.role && (
+                      <p className="mt-1 text-xs text-red-400">{artistForm.formState.errors.role.message}</p>
+                    )}
                   </Field>
                   <Field label="Image URL">
                     <input
                       className={inputClassName}
-                      value={artistForm.image}
-                      onChange={(e) =>
-                        setArtistForm({ ...artistForm, image: e.target.value })
-                      }
-                      required
+                      {...artistForm.register("image")}
                     />
+                    {artistForm.formState.errors.image && (
+                      <p className="mt-1 text-xs text-red-400">{artistForm.formState.errors.image.message}</p>
+                    )}
                   </Field>
                   <Field label="Œuvre mise en avant">
                     <input
                       className={inputClassName}
-                      value={artistForm.featured_work}
-                      onChange={(e) =>
-                        setArtistForm({
-                          ...artistForm,
-                          featured_work: e.target.value,
-                        })
-                      }
-                      required
+                      {...artistForm.register("featured_work")}
                     />
+                    {artistForm.formState.errors.featured_work && (
+                      <p className="mt-1 text-xs text-red-400">{artistForm.formState.errors.featured_work.message}</p>
+                    )}
                   </Field>
-                  <SubmitButton disabled={isBusy}>
+                  <SubmitButton disabled={isBusy || !artistForm.formState.isValid}>
                     Ajouter l’artiste
                   </SubmitButton>
                 </form>

@@ -98,6 +98,17 @@ function showRiveTransition(onDone: () => void) {
 }
 
 export function openStaticPage(page: StaticPageId) {
+  // If we are inside the SPA (index.html with HashRouter), use hash navigation
+  // to avoid full page reloads. Otherwise fall back to the static HTML file.
+  const path = window.location.pathname;
+  const isInSpa = path.endsWith("/index.html") || path === "/" || path === "";
+
+  if (isInSpa) {
+    const route = page === "home" ? "/" : `/${page}`;
+    window.location.hash = `#${route}`;
+    return;
+  }
+
   const currentPage = document.body.dataset.page as StaticPageId | undefined;
   const isFromMusicOrCommunity = currentPage === "music" || currentPage === "community";
   const isToMusicOrCommunity = page === "music" || page === "community";

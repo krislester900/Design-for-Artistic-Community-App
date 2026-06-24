@@ -13,6 +13,7 @@ export type SectionId =
   | "artists"
   | "showcase"
   | "forum"
+  | "chat"
   | "join";
 
 export interface Category {
@@ -114,6 +115,7 @@ export const navigationItems: Array<{
   { label: "Artistes", sectionId: "artists" },
   { label: "Galerie", sectionId: "showcase" },
   { label: "Forum", sectionId: "forum" },
+  { label: "Chat", sectionId: "chat" },
   { label: "Rejoindre", sectionId: "join" },
 ];
 
@@ -131,6 +133,7 @@ export const footerSections: FooterSection[] = [
     links: [
       { text: "Artistes", sectionId: "artists" },
       { text: "Forum", sectionId: "forum" },
+      { text: "Chat", sectionId: "chat" },
       { text: "Créer un compte", sectionId: "join" },
     ],
   },
@@ -213,7 +216,7 @@ export const artists: Artist[] = [
     name: "Naya Pulse",
     category: "music",
     role: "Beatmaker & performeuse",
-    image: "",
+    image: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200&h=200&fit=crop&crop=faces",
     featuredWork: "Pulse Nocturne",
     likes: 1280,
   },
@@ -221,7 +224,7 @@ export const artists: Artist[] = [
     name: "Kiro Ink",
     category: "manga",
     role: "Mangaka indépendant",
-    image: "",
+    image: "https://images.unsplash.com/photo-1560972550-aba3456b5564?w=200&h=200&fit=crop&crop=faces",
     featuredWork: "Fragments de Néon",
     likes: 980,
   },
@@ -229,7 +232,7 @@ export const artists: Artist[] = [
     name: "Mila Chrom",
     category: "visual-art",
     role: "Illustratrice digitale",
-    image: "",
+    image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&crop=faces",
     featuredWork: "Portraits Urbains",
     likes: 1540,
   },
@@ -237,7 +240,7 @@ export const artists: Artist[] = [
     name: "Ari Vox",
     category: "literature",
     role: "Poète spoken word",
-    image: "",
+    image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=faces",
     featuredWork: "Minuit sur Béton",
     likes: 860,
   },
@@ -245,7 +248,7 @@ export const artists: Artist[] = [
     name: "Soren Frame",
     category: "film",
     role: "Réalisateur de courts-métrages",
-    image: "",
+    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&crop=faces",
     featuredWork: "Dernière Station",
     likes: 1110,
   },
@@ -253,7 +256,7 @@ export const artists: Artist[] = [
     name: "Luma Motion",
     category: "animation",
     role: "Motion designer 2D/3D",
-    image: "",
+    image: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=200&h=200&fit=crop&crop=faces",
     featuredWork: "Echo Loops",
     likes: 1205,
   },
@@ -261,7 +264,7 @@ export const artists: Artist[] = [
 
 export const artworks: Artwork[] = [
   {
-    image: "",
+    image: "https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=400&h=400&fit=crop",
     title: "Pulse Nocturne",
     artist: "Naya Pulse",
     category: "music",
@@ -271,7 +274,7 @@ export const artworks: Artwork[] = [
     height: "medium",
   },
   {
-    image: "",
+    image: "https://images.unsplash.com/photo-1549490349-8643362247b5?w=400&h=400&fit=crop",
     title: "Portraits Urbains",
     artist: "Mila Chrom",
     category: "visual-art",
@@ -281,7 +284,7 @@ export const artworks: Artwork[] = [
     height: "large",
   },
   {
-    image: "",
+    image: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&h=400&fit=crop",
     title: "Fragments de Néon",
     artist: "Kiro Ink",
     category: "manga",
@@ -291,7 +294,7 @@ export const artworks: Artwork[] = [
     height: "medium",
   },
   {
-    image: "",
+    image: "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&h=400&fit=crop",
     title: "Dernière Station",
     artist: "Soren Frame",
     category: "film",
@@ -301,7 +304,7 @@ export const artworks: Artwork[] = [
     height: "large",
   },
   {
-    image: "",
+    image: "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=400&h=400&fit=crop",
     title: "Minuit sur Béton",
     artist: "Ari Vox",
     category: "literature",
@@ -311,7 +314,7 @@ export const artworks: Artwork[] = [
     height: "small",
   },
   {
-    image: "",
+    image: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=400&h=400&fit=crop",
     title: "Echo Loops",
     artist: "Luma Motion",
     category: "animation",

@@ -8,7 +8,7 @@ import {
 import { openCategoryPage, openStaticPage } from "../lib/page-links";
 
 const cinematicHeroScene =
-  "https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=cinematic%20snow-covered%20japanese%20village%20courtyard%20at%20dusk%2C%20lone%20swordsman%20seen%20from%20behind%2C%20child%20nearby%2C%20wind-blown%20snow%2C%20wet%20ground%2C%20atmospheric%20fog%2C%20subtle%20film%20grain%2C%20grounded%20composition%2C%20natural%20lighting%2C%20high-end%20editorial%20key%20art%2C%20beautiful%20and%20believable%2C%20not%20over-stylized%2C%20premium%20website%20hero%20background&image_size=landscape_16_9";
+  "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=1920&h=1080&fit=crop&q=80";
 
 const snowParticles = Array.from({ length: 26 }, (_, index) => ({
   id: index,

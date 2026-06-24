@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Database, Menu, Palette, User, X } from "lucide-react";
 import {
   type CategorySlug,
@@ -39,47 +40,53 @@ export function Navigation({ selectedCategory, onNavigate }: NavigationProps) {
 
           <div className="hidden items-center gap-4 md:flex lg:gap-6">
             {navigationItems.map((item) => (
-              <button
-                key={item.label}
-                className="group flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
-                onClick={() => {
-                  if (item.sectionId === "forum") {
-                    openStaticPage("community");
-                    return;
-                  }
-                  onNavigate(item.sectionId, item.category);
-                }}
-              >
-                <span className="transition-colors group-hover:text-primary">
-                  {item.label}
-                </span>
-              </button>
+              item.sectionId === "forum" ? (
+                <Link
+                  key={item.label}
+                  to="/community"
+                  className="group flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <span className="transition-colors group-hover:text-primary">
+                    {item.label}
+                  </span>
+                </Link>
+              ) : (
+                <button
+                  key={item.label}
+                  className="group flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
+                  onClick={() => onNavigate(item.sectionId, item.category)}
+                >
+                  <span className="transition-colors group-hover:text-primary">
+                    {item.label}
+                  </span>
+                </button>
+              )
             ))}
           </div>
 
           <div className="flex items-center gap-3">
-            <button
+            <Link
+              to="/login"
               className="hidden rounded-xl border border-border bg-card/60 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-foreground transition-colors hover:border-primary hover:text-primary md:block"
-              onClick={() => openStaticPage("login")}
             >
               Connexion
-            </button>
-            <button
+            </Link>
+            <Link
+              to="/database"
               className="hidden rounded-xl border border-border bg-card/60 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-foreground transition-colors hover:border-accent hover:text-accent md:block"
-              onClick={() => openStaticPage("database")}
             >
               <span className="inline-flex items-center gap-2">
                 <Database className="h-4 w-4" />
                 Base
               </span>
-            </button>
-            <button
+            </Link>
+            <Link
+              to="/profile"
               className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground shadow-[0_10px_30px_rgba(255,106,26,0.25)] transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(255,106,26,0.35)]"
-              onClick={() => openStaticPage("profile")}
             >
               <User className="h-4 w-4" />
               <span>Profil</span>
-            </button>
+            </Link>
             <button
               className="flex items-center justify-center rounded-xl border border-border bg-card/60 p-2.5 md:hidden"
               onClick={() => setMobileOpen(!mobileOpen)}
@@ -106,43 +113,46 @@ export function Navigation({ selectedCategory, onNavigate }: NavigationProps) {
             </div>
             <div className="space-y-1 px-4 py-4">
               {navigationItems.map((item) => (
-                <button
-                  key={item.label}
-                  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                  onClick={() => {
-                    setMobileOpen(false);
-                    if (item.sectionId === "forum") {
-                      openStaticPage("community");
-                      return;
-                    }
-                    onNavigate(item.sectionId, item.category);
-                  }}
-                >
-                  <span>{item.label}</span>
-                </button>
+                item.sectionId === "forum" ? (
+                  <Link
+                    key={item.label}
+                    to="/community"
+                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <span>{item.label}</span>
+                  </Link>
+                ) : (
+                  <button
+                    key={item.label}
+                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                    onClick={() => {
+                      setMobileOpen(false);
+                      onNavigate(item.sectionId, item.category);
+                    }}
+                  >
+                    <span>{item.label}</span>
+                  </button>
+                )
               ))}
             </div>
             <div className="space-y-2 border-t border-border px-4 py-4">
-              <button
+              <Link
+                to="/login"
                 className="flex w-full items-center gap-3 rounded-xl border border-border bg-card/60 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-foreground transition-colors hover:border-primary hover:text-primary"
-                onClick={() => {
-                  setMobileOpen(false);
-                  openStaticPage("login");
-                }}
+                onClick={() => setMobileOpen(false)}
               >
                 <Database className="h-4 w-4" />
                 Connexion
-              </button>
-              <button
+              </Link>
+              <Link
+                to="/profile"
                 className="flex w-full items-center gap-3 rounded-xl border border-primary/30 bg-primary px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-primary-foreground shadow-[0_8px_20px_rgba(255,106,26,0.2)]"
-                onClick={() => {
-                  setMobileOpen(false);
-                  openStaticPage("profile");
-                }}
+                onClick={() => setMobileOpen(false)}
               >
                 <User className="h-4 w-4" />
                 Profil
-              </button>
+              </Link>
             </div>
           </div>
         </div>

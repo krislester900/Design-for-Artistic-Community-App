@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AppState extends ChangeNotifier {
   static final AppState _instance = AppState._();
@@ -99,7 +100,12 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
-    _supabase.client.removeChannel('app_state');
+    try {
+      final channel = _supabase.client.channel('app_state');
+      _supabase.client.removeChannel(channel);
+    } catch (e) {
+      // Channel might already be removed
+    }
     super.dispose();
   }
 }

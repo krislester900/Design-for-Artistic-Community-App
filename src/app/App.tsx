@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Navigation } from "./components/Navigation";
 import { Hero } from "./components/Hero";
 import { ArtCategories } from "./components/ArtCategories";
@@ -9,33 +9,50 @@ import { JoinCTA } from "./components/JoinCTA";
 import { Footer } from "./components/Footer";
 import { ArtisticPattern } from "./components/ArtisticPattern";
 import { ScrollReveal } from "./components/ScrollReveal";
-import { useCommunityData } from "./hooks/useCommunityData";
+import { useCommunityDataQuery } from "./hooks/useCommunityDataQuery";
+import { useAppStore } from "./store/useAppStore";
 import { MobileApp } from "./mobile/MobileApp";
 import { ArtLoadingScreen } from "./components/ArtLoadingScreen";
+import { ChatPage } from "./chat/ChatPage";
 import {
   type CategorySlug,
   type SectionId,
   getCategoryLabel,
 } from "./data/community";
 
-function isCapacitorApp(): boolean {
+function isMobileDevice(): boolean {
   const runtime = window as Window & {
     Capacitor?: unknown;
     cordova?: unknown;
     __capacitor?: unknown;
   };
+  const isCapacitor = Boolean(runtime.Capacitor || runtime.cordova || runtime.__capacitor !== undefined);
+  const isSmallScreen = window.matchMedia("(max-width: 768px)").matches;
+  return isCapacitor || isSmallScreen;
+}
 
-  return Boolean(runtime.Capacitor || runtime.cordova || runtime.__capacitor !== undefined);
+function useMobileDetection() {
+  const isMobile = useAppStore((state) => state.isMobile);
+  const setIsMobile = useAppStore((state) => state.setIsMobile);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 768px)");
+    const check = () => setIsMobile(isMobileDevice());
+    check();
+    mql.addEventListener("change", check);
+    return () => mql.removeEventListener("change", check);
+  }, [setIsMobile]);
+
+  return isMobile;
 }
 
 export default function App() {
-  const [selectedCategory, setSelectedCategory] = useState<CategorySlug>("all");
-  const { data, source, isLoading } = useCommunityData();
-  const [isMobile, setIsMobile] = useState<boolean | null>(null);
+  const selectedCategory = useAppStore((state) => state.selectedCategory);
+  const setSelectedCategory = useAppStore((state) => state.setSelectedCategory);
+  const isMobile = useMobileDetection();
+  const setDataSource = useAppStore((state) => state.setDataSource);
 
-  useEffect(() => {
-    setIsMobile(isCapacitorApp());
-  }, []);
+  const { data, isLoading } = useCommunityDataQuery();
 
   if (isMobile === null) {
     return <ArtLoadingScreen onComplete={() => {}} />;
@@ -84,7 +101,7 @@ export default function App() {
                 <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground/80">
                   Source de données :{" "}
                   <span className="font-semibold text-foreground">
-                    {source === "supabase" ? "Supabase" : "Mock local"}
+                    {isLoading ? "Supabase" : "Mock local"}
                   </span>
                   {isLoading ? " · chargement..." : ""}
                 </p>
@@ -139,6 +156,9 @@ export default function App() {
               selectedCategory={selectedCategory}
               onNavigate={handleNavigate}
             />
+          </ScrollReveal>
+          <ScrollReveal delay={0.1}>
+            <ChatPage />
           </ScrollReveal>
           <ScrollReveal delay={0.15} direction="none">
             <JoinCTA
