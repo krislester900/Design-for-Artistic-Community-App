@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io' show Platform;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'utils/app_constants.dart';
 import 'services/supabase_service.dart';
@@ -31,9 +32,15 @@ import 'widgets/page_transition.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Hive for local cache
-  await Hive.initFlutter();
-  await Hive.openBox('arteia_cache');
+  // Initialize Hive for local cache (skip on web)
+  if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+    try {
+      await Hive.initFlutter();
+      await Hive.openBox('arteia_cache');
+    } catch (e) {
+      debugPrint('Hive initialization skipped: $e');
+    }
+  }
   
   await Supabase.initialize(
     url: SupabaseConfig.supabaseUrl,
