@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/theme_service.dart';
-import '../services/theme_service_simple.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -30,13 +29,13 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Section Apparence
+                // SECTION 1: Apparence
                 _buildSectionTitle('Apparence'),
                 const SizedBox(height: 12),
                 _buildThemeCard(),
                 const SizedBox(height: 24),
 
-                // Section Personnalisation
+                // SECTION 2: Personnalisation (palettes)
                 _buildSectionTitle('Personnalisation'),
                 const SizedBox(height: 12),
                 Text(
@@ -47,10 +46,34 @@ class _SettingsPageState extends State<SettingsPage> {
                 _buildPalettesGrid(),
                 const SizedBox(height: 24),
 
-                // Section Informations
-                _buildSectionTitle('Informations'),
+                // SECTION 3: Langue & Région
+                _buildSectionTitle('Langue & Région'),
                 const SizedBox(height: 12),
-                _buildInfoCard(),
+                _buildLanguageCard(),
+                const SizedBox(height: 24),
+
+                // SECTION 4: Notifications
+                _buildSectionTitle('Notifications'),
+                const SizedBox(height: 12),
+                _buildNotificationsCard(),
+                const SizedBox(height: 24),
+
+                // SECTION 5: Cache & Stockage
+                _buildSectionTitle('Cache & Stockage'),
+                const SizedBox(height: 12),
+                _buildCacheCard(),
+                const SizedBox(height: 24),
+
+                // SECTION 6: Confidentialité
+                _buildSectionTitle('Confidentialité'),
+                const SizedBox(height: 12),
+                _buildPrivacyCard(),
+                const SizedBox(height: 24),
+
+                // SECTION 7: À propos
+                _buildSectionTitle('À propos'),
+                const SizedBox(height: 12),
+                _buildAboutCard(),
                 const SizedBox(height: 32),
               ],
             ),
@@ -59,6 +82,8 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
   }
+
+  // ============= WIDGETS SECTIONS =============
 
   Widget _buildSectionTitle(String title) {
     return Text(
@@ -69,27 +94,10 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildThemeCard() {
     final isDark = _themeService.isDarkMode;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
+    return _settingsCard(
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              isDark ? Icons.dark_mode : Icons.light_mode,
-              color: Colors.black,
-              size: 24,
-            ),
-          ),
+          _iconContainer(isDark ? Icons.dark_mode : Icons.light_mode),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -117,6 +125,214 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
   }
+
+  Widget _buildLanguageCard() {
+    return _settingsCard(
+      child: Column(
+        children: [
+          _settingRow(
+            icon: Icons.language,
+            title: 'Langue',
+            subtitle: 'Français',
+            trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+            onTap: () {
+              // TODO: Language picker dialog
+            },
+          ),
+          const Divider(height: 1),
+          _settingRow(
+            icon: Icons.public,
+            title: 'Région',
+            subtitle: 'France',
+            trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+            onTap: () {},
+          ),
+          const Divider(height: 1),
+          _settingRow(
+            icon: Icons.access_time,
+            title: 'Fuseau horaire',
+            subtitle: 'UTC+1 (Paris)',
+            trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+            onTap: () {},
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationsCard() {
+    return _settingsCard(
+      child: Column(
+        children: [
+          _settingRow(
+            icon: Icons.notifications_active_outlined,
+            title: 'Notifications push',
+            subtitle: 'Recevoir des alertes',
+            trailing: Switch(
+              value: true,
+              onChanged: (_) {},
+              activeColor: Colors.black,
+              activeTrackColor: Colors.black.withOpacity(0.3),
+            ),
+          ),
+          const Divider(height: 1),
+          _settingRow(
+            icon: Icons.favorite_outline,
+            title: 'Likes et commentaires',
+            subtitle: 'Quand on aime vos publications',
+            trailing: Switch(
+              value: true,
+              onChanged: (_) {},
+              activeColor: Colors.black,
+              activeTrackColor: Colors.black.withOpacity(0.3),
+            ),
+          ),
+          const Divider(height: 1),
+          _settingRow(
+            icon: Icons.people_outline,
+            title: 'Nouveaux abonnés',
+            subtitle: 'Quand quelqu\'un vous suit',
+            trailing: Switch(
+              value: true,
+              onChanged: (_) {},
+              activeColor: Colors.black,
+              activeTrackColor: Colors.black.withOpacity(0.3),
+            ),
+          ),
+          const Divider(height: 1),
+          _settingRow(
+            icon: Icons.message_outlined,
+            title: 'Messages',
+            subtitle: 'Nouveaux messages privés',
+            trailing: Switch(
+              value: true,
+              onChanged: (_) {},
+              activeColor: Colors.black,
+              activeTrackColor: Colors.black.withOpacity(0.3),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCacheCard() {
+    return _settingsCard(
+      child: Column(
+        children: [
+          _settingRow(
+            icon: Icons.storage,
+            title: 'Cache images',
+            subtitle: '24 images en cache (320 Ko)',
+            trailing: TextButton(
+              onPressed: () {},
+              child: const Text('Vider', style: TextStyle(color: Colors.red, fontSize: 13)),
+            ),
+          ),
+          const Divider(height: 1),
+          _settingRow(
+            icon: Icons.offline_bolt,
+            title: 'Téléchargements',
+            subtitle: '12 œuvres sauvegardées',
+            trailing: TextButton(
+              onPressed: () {},
+              child: const Text('Gérer', style: TextStyle(color: Colors.black, fontSize: 13)),
+            ),
+          ),
+          const Divider(height: 1),
+          _settingRow(
+            icon: Icons.wifi,
+            title: 'Téléchargement auto',
+            subtitle: 'Wi-Fi uniquement',
+            trailing: Switch(
+              value: true,
+              onChanged: (_) {},
+              activeColor: Colors.black,
+              activeTrackColor: Colors.black.withOpacity(0.3),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrivacyCard() {
+    return _settingsCard(
+      child: Column(
+        children: [
+          _settingRow(
+            icon: Icons.visibility_outlined,
+            title: 'Profil public',
+            subtitle: 'Visible par tous',
+            trailing: Switch(
+              value: true,
+              onChanged: (_) {},
+              activeColor: Colors.black,
+              activeTrackColor: Colors.black.withOpacity(0.3),
+            ),
+          ),
+          const Divider(height: 1),
+          _settingRow(
+            icon: Icons.near_me_disabled,
+            title: 'Activité en ligne',
+            subtitle: 'Masquer mon statut',
+            trailing: Switch(
+              value: false,
+              onChanged: (_) {},
+              activeColor: Colors.black,
+              activeTrackColor: Colors.black.withOpacity(0.3),
+            ),
+          ),
+          const Divider(height: 1),
+          _settingRow(
+            icon: Icons.block,
+            title: 'Comptes bloqués',
+            subtitle: 'Aucun compte bloqué',
+            trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+            onTap: () {},
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAboutCard() {
+    return _settingsCard(
+      child: Column(
+        children: [
+          _infoRow(Icons.palette, 'Palette active', '${_themeService.currentPalette.emoji} ${_themeService.currentPalette.name}'),
+          const Divider(height: 1),
+          _infoRow(Icons.brightness_6, 'Thème', _themeService.isDarkMode ? 'Sombre' : 'Clair'),
+          const Divider(height: 1),
+          _infoRow(Icons.info_outline, 'Version', '1.0.0'),
+          const Divider(height: 1),
+          _settingRow(
+            icon: Icons.code,
+            title: 'Développeurs',
+            subtitle: 'Artéïa Team',
+            trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+            onTap: () {},
+          ),
+          const Divider(height: 1),
+          _settingRow(
+            icon: Icons.description,
+            title: 'Conditions d\'utilisation',
+            trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+            onTap: () {},
+          ),
+          const Divider(height: 1),
+          _settingRow(
+            icon: Icons.shield,
+            title: 'Politique de confidentialité',
+            trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+            onTap: () {},
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============= PALETTES GRID =============
 
   Widget _buildPalettesGrid() {
     return GridView.builder(
@@ -149,7 +365,6 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Color preview row
                 Row(
                   children: [
                     _colorPreview(palette.primaryViolet),
@@ -195,6 +410,81 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  // ============= HELPERS =============
+
+  Widget _settingsCard({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _iconContainer(IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, color: Colors.black, size: 22),
+    );
+  }
+
+  Widget _settingRow({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: Colors.grey[700]),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontSize: 14, color: Colors.black)),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                  ],
+                ],
+              ),
+            ),
+            if (trailing != null) trailing,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Colors.grey[600]),
+          const SizedBox(width: 14),
+          Text(label, style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+          const Spacer(),
+          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black)),
+        ],
+      ),
+    );
+  }
+
   Widget _colorPreview(Color color) {
     return Container(
       width: 22,
@@ -204,38 +494,6 @@ class _SettingsPageState extends State<SettingsPage> {
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
       ),
-    );
-  }
-
-  Widget _buildInfoCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: Column(
-        children: [
-          _infoRow(Icons.palette, 'Palette active', '${_themeService.currentPalette.emoji} ${_themeService.currentPalette.name}'),
-          const Divider(height: 20),
-          _infoRow(Icons.brightness_6, 'Thème', _themeService.isDarkMode ? 'Sombre' : 'Clair'),
-          const Divider(height: 20),
-          _infoRow(Icons.info_outline, 'Version', '1.0.0'),
-        ],
-      ),
-    );
-  }
-
-  Widget _infoRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: Colors.grey[600]),
-        const SizedBox(width: 10),
-        Text(label, style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-        const Spacer(),
-        Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black)),
-      ],
     );
   }
 }
