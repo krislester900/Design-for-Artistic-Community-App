@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/theme_service.dart';
+import '../services/localization_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -10,6 +11,7 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   final ThemeService _themeService = ThemeService();
+  final LocalizationService _localizationService = LocalizationService();
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +24,7 @@ class _SettingsPageState extends State<SettingsPage> {
         foregroundColor: Colors.black,
       ),
       body: ListenableBuilder(
-        listenable: _themeService,
+        listenable: Listenable.merge([_themeService, _localizationService]),
         builder: (context, _) {
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
@@ -133,11 +135,9 @@ class _SettingsPageState extends State<SettingsPage> {
           _settingRow(
             icon: Icons.language,
             title: 'Langue',
-            subtitle: 'Français',
+            subtitle: _localizationService.languageName(_localizationService.currentLang),
             trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
-            onTap: () {
-              // TODO: Language picker dialog
-            },
+            onTap: () => _showLanguagePicker(),
           ),
           const Divider(height: 1),
           _settingRow(
@@ -156,6 +156,39 @@ class _SettingsPageState extends State<SettingsPage> {
             onTap: () {},
           ),
         ],
+      ),
+    );
+  }
+
+  void _showLanguagePicker() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Choisir la langue'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: _localizationService.supportedLanguages.map((lang) {
+            final isSelected = _localizationService.currentLang == lang;
+            return ListTile(
+              leading: Icon(
+                isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
+                color: isSelected ? Colors.black : Colors.grey,
+              ),
+              title: Text(
+                _localizationService.languageName(lang),
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? Colors.black : Colors.black87,
+                ),
+              ),
+              subtitle: Text(lang == 'fr' ? 'Français' : 'English'),
+              onTap: () {
+                _localizationService.setLang(lang);
+                Navigator.pop(context);
+              },
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -303,6 +336,8 @@ class _SettingsPageState extends State<SettingsPage> {
           _infoRow(Icons.palette, 'Palette active', '${_themeService.currentPalette.emoji} ${_themeService.currentPalette.name}'),
           const Divider(height: 1),
           _infoRow(Icons.brightness_6, 'Thème', _themeService.isDarkMode ? 'Sombre' : 'Clair'),
+          const Divider(height: 1),
+          _infoRow(Icons.language, 'Langue', _localizationService.languageName(_localizationService.currentLang)),
           const Divider(height: 1),
           _infoRow(Icons.info_outline, 'Version', '1.0.0'),
           const Divider(height: 1),
