@@ -362,6 +362,50 @@ class _SettingsPageState extends State<SettingsPage> {
             trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
             onTap: () {},
           ),
+          const Divider(height: 1),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.favorite, size: 18, color: Colors.grey[600]),
+                    const SizedBox(width: 14),
+                    Text('Remerciements', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey[700])),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.only(left: 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Inspiration',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Fatmé Sleiman',
+                        style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Colors.grey[800]),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Créé par',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Kris N\'dri',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
