@@ -1,81 +1,47 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Fond clair minimaliste
-  static const Color bgLight = Color(0xFFF8F9FC);       // Fond blanc doux
-  static const Color bgDark = Color(0xFF0D0D1A);         // Fond sombre profond
+  // Pure black & white minimalism (default theme)
+  static const Color bgLight = Color(0xFFFFFFFF);        // Fond blanc pur
+  static const Color bgDark = Color(0xFF000000);          // Fond noir pur
   static const Color cardLight = Color(0xFFFFFFFF);       // Cartes blanches
-  static const Color cardLightHover = Color(0xFFF0F0F5);
-  static const Color cardDark = Color(0xFF1A1A2E);        // Cartes sombres
-  static const Color cardDarkLight = Color(0xFF252540);
+  static const Color cardLightHover = Color(0xFFF5F5F5);
+  static const Color cardDark = Color(0xFF1A1A1A);        // Cartes sombres
+  static const Color cardDarkLight = Color(0xFF2A2A2A);
   static const Color textPrimary = Color(0xFF000000);     // Texte principal NOIR
   static const Color textSecondary = Color(0xFF6B7280);   // Texte secondaire gris
-  static const Color textLight = Color(0xFF9CA3AF);        // Texte très clair
+  static const Color textLight = Color(0xFF9CA3AF);       // Texte très clair
   static const Color border = Color(0xFFE5E7EB);          // Bordures
   static const Color borderLight = Color(0xFFD1D5DB);
   static const Color overlay = Color(0x1A000000);
 
-  // Marque - Noir minimaliste
-  static const Color brandBlack = Color(0xFF000000);      // Logo, marque, titres NOIR
-  static const Color brandGray = Color(0xFF333333);       // Gris foncé pour variantes
-
-  // Accents artistiques (secondaires)
-  static const Color primaryTeal = Color(0xFF00D4AA);     // Teal - univers, nature
-  static const Color primaryPink = Color(0xFFFF6B9D);     // Rose - likes, émotions
-  static const Color primaryCyan = Color(0xFF00D4FF);     // Cyan - complément
-
-  // Anciens noms (compatibilité)
-  static const Color primaryViolet = Color(0xFF000000);    // = brandBlack (rétrocompatibilité)
+  // Rétrocompatibilité (tous pointent vers noir/blanc)
+  static const Color primaryViolet = Color(0xFF000000);    // = noir
+  static const Color primaryTeal = Color(0xFF000000);      // = noir
+  static const Color primaryPink = Color(0xFF000000);      // = noir
+  static const Color primaryCyan = Color(0xFF000000);      // = noir
   static const Color textMuted = Color(0xFF9CA3AF);
   static const Color textWhite = Color(0xFFFFFFFF);
   static const Color grey = Color(0xFF9CA3AF);
   static const Color greyLight = Color(0xFFE5E7EB);
   static const Color greyDark = Color(0xFF6B7280);
 
-  // Dégradés
-  static const Gradient gradientBlack = LinearGradient(
-    colors: [Color(0xFF000000), Color(0xFF333333)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-  static const Gradient gradientTeal = LinearGradient(
-    colors: [primaryTeal, Color(0xFF00B894)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-  static const Gradient gradientPink = LinearGradient(
-    colors: [primaryPink, Color(0xFFFF4D7A)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-  static const Gradient gradientBlackTeal = LinearGradient(
-    colors: [Color(0xFF000000), primaryTeal],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-
-  // Ombres
-  static List<BoxShadow> shadowBlack = [
-    BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 12, offset: const Offset(0, 4)),
-  ];
-  static List<BoxShadow> shadowTeal = [
-    BoxShadow(color: primaryTeal.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4)),
-  ];
+  // Ombres minimalistes
   static List<BoxShadow> shadowCard = [
     BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, 2)),
   ];
 
-  // Thème clair minimaliste
+  // Thème clair - Noir & Blanc pur
   static ThemeData get arteiaTheme => ThemeData(
     brightness: Brightness.light,
     primaryColor: Colors.black,
-    scaffoldBackgroundColor: bgLight,
-    cardColor: cardLight,
+    scaffoldBackgroundColor: Colors.white,
+    cardColor: Colors.white,
     colorScheme: const ColorScheme.light(
       primary: Color(0xFF000000),
-      secondary: Color(0xFF00D4AA),
+      secondary: Color(0xFF000000),
       surface: Color(0xFFFFFFFF),
-      background: Color(0xFFF8F9FC),
+      background: Color(0xFFFFFFFF),
       error: Color(0xFFDC2626),
     ),
     textTheme: const TextTheme(
@@ -106,7 +72,7 @@ class AppTheme {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: const Color(0xFFF3F4F6),
+      fillColor: const Color(0xFFF5F5F5),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
@@ -135,17 +101,17 @@ class AppTheme {
     ),
   );
 
-  // Thème sombre
+  // Thème sombre - Noir & Blanc
   static ThemeData get arteiaDarkTheme => ThemeData(
     brightness: Brightness.dark,
     primaryColor: Colors.white,
-    scaffoldBackgroundColor: const Color(0xFF0D0D1A),
-    cardColor: const Color(0xFF1A1A2E),
+    scaffoldBackgroundColor: const Color(0xFF000000),
+    cardColor: const Color(0xFF1A1A1A),
     colorScheme: const ColorScheme.dark(
       primary: Color(0xFFFFFFFF),
-      secondary: Color(0xFF00D4AA),
-      surface: Color(0xFF1A1A2E),
-      background: Color(0xFF0D0D1A),
+      secondary: Color(0xFFFFFFFF),
+      surface: Color(0xFF1A1A1A),
+      background: Color(0xFF000000),
       error: Color(0xFFDC2626),
     ),
     textTheme: const TextTheme(
@@ -159,7 +125,7 @@ class AppTheme {
       labelLarge: TextStyle(color: Color(0xFFFFFFFF), fontWeight: FontWeight.w500),
     ),
     appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFF1A1A2E),
+      backgroundColor: Color(0xFF1A1A1A),
       elevation: 0,
       foregroundColor: Color(0xFFFFFFFF),
       centerTitle: false,
@@ -175,7 +141,7 @@ class AppTheme {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: const Color(0xFF252540),
+      fillColor: const Color(0xFF2A2A2A),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
