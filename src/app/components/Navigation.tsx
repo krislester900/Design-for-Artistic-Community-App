@@ -22,14 +22,15 @@ export function Navigation({ selectedCategory, onNavigate }: NavigationProps) {
       <nav className="fixed left-0 right-0 top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
           <button
-            className="flex items-center gap-3"
+            className="group flex items-center gap-3"
             onClick={() => onNavigate("hero")}
           >
-            <div className="flex h-11 w-11 -rotate-3 items-center justify-center rounded-2xl border border-foreground/10 bg-gradient-to-br from-primary via-primary to-accent shadow-[0_12px_30px_rgba(255,106,26,0.25)]">
-              <Palette className="h-6 w-6 text-primary-foreground" />
+            <div className="relative flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 via-fuchsia-500 to-emerald-500 shadow-[0_0_20px_rgba(124,92,252,0.3)] transition-all duration-500 group-hover:shadow-[0_0_35px_rgba(124,92,252,0.5)] group-hover:scale-110">
+              <div className="absolute inset-1 rounded-full bg-gradient-to-br from-violet-600 via-fuchsia-600 to-emerald-600 opacity-75 animate-spin" style={{ animationDuration: '3s' }} />
+              <span className="relative text-white font-black text-lg" style={{ fontFamily: "'Alien Block', cursive" }}>A</span>
             </div>
             <div className="text-left">
-              <h1 className="text-2xl uppercase tracking-[0.18em] text-foreground" style={{ fontFamily: "'Alien Block', cursive" }}>
+              <h1 className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-emerald-400 bg-clip-text text-transparent text-2xl uppercase tracking-[0.18em]" style={{ fontFamily: "'Alien Block', cursive" }}>
                 Arteïa
               </h1>
               <p className="hidden text-[11px] uppercase tracking-[0.24em] text-muted-foreground md:block">

@@ -28,6 +28,7 @@ import 'pages/comics_upload_page.dart';
 import 'pages/quests_page.dart';
 import 'pages/theme_customizer_page.dart';
 import 'widgets/page_transition.dart';
+import 'widgets/arteia_logo.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -313,23 +314,11 @@ class MainScreenState extends State<MainScreen> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Container(
-                      width: 32, height: 32,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF7C5CFC), Color(0xFF00D4AA)],
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF7C5CFC).withOpacity(0.3),
-                            blurRadius: 12,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(Icons.auto_awesome, color: Colors.white, size: 16),
+                    const ArteiaLogo(
+                      size: 32,
+                      showText: false,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     Text('Artéïa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color)),
                     const Spacer(),
                     IconButton(

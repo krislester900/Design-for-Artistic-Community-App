@@ -4,10 +4,16 @@ import {
   artistSchema,
   artworkSchema,
   discussionSchema,
+  trendSchema,
+  eventSchema,
+  statSchema,
   loginSchema,
   type ArtistForm,
   type ArtworkForm,
   type DiscussionForm,
+  type TrendForm,
+  type EventForm,
+  type StatForm,
   type LoginForm,
 } from "./admin-schemas";
 import { useEffect, useState } from "react";
@@ -40,7 +46,7 @@ import {
 } from "./admin-service";
 import { ThemeToggle } from "../components/ui/ThemeToggle.tsx";
 
-const initialArtist = {
+const initialArtist: ArtistForm = {
   name: "",
   category_slug: "music",
   role: "",
@@ -48,7 +54,7 @@ const initialArtist = {
   featured_work: "",
 };
 
-const initialArtwork = {
+const initialArtwork: ArtworkForm = {
   title: "",
   artist_name: "",
   category_slug: "music",
@@ -57,7 +63,7 @@ const initialArtwork = {
   height: "aspect-square",
 };
 
-const initialDiscussion = {
+const initialDiscussion: DiscussionForm = {
   title: "",
   author_name: "",
   category_slug: "music",
@@ -65,29 +71,31 @@ const initialDiscussion = {
   trending: false,
 };
 
-const initialTrend = {
+const initialTrend: TrendForm = {
   tag: "",
   category_slug: "music",
   sort_order: 1,
 };
 
-const initialEvent = {
+const initialEvent: EventForm = {
   title: "",
   date_label: "",
   category_slug: "music",
   sort_order: 1,
 };
 
-const initialStat = {
+const initialStat: StatForm = {
   label: "",
   number_label: "0",
   sort_order: 1,
 };
 
-type FlashMessage = {
-  type: "success" | "error" | "info";
-  text: string;
-} | null;
+type FlashMessage =
+  | {
+      type: "success" | "error" | "info";
+      text: string;
+    }
+  | null;
 
 export function AdminApp() {
   const [session, setSession] = useState<Session | null>(null);
@@ -119,9 +127,20 @@ export function AdminApp() {
     defaultValues: initialDiscussion,
   });
 
-  const [trendForm, setTrendForm] = useState(initialTrend);
-  const [eventForm, setEventForm] = useState(initialEvent);
-  const [statForm, setStatForm] = useState(initialStat);
+  const trendForm = useForm<TrendForm>({
+    resolver: zodResolver(trendSchema),
+    defaultValues: initialTrend,
+  });
+
+  const eventForm = useForm<EventForm>({
+    resolver: zodResolver(eventSchema),
+    defaultValues: initialEvent,
+  });
+
+  const statForm = useForm<StatForm>({
+    resolver: zodResolver(statSchema),
+    defaultValues: initialStat,
+  });
 
   const isAdmin = profile?.role === "admin";
 
@@ -179,7 +198,10 @@ export function AdminApp() {
     }
   }
 
-  async function runAction(action: () => Promise<void>, successText: string) {
+  async function runAction(
+    action: () => Promise<void>,
+    successText: string
+  ) {
     setIsBusy(true);
     setFlash(null);
 
@@ -206,7 +228,10 @@ export function AdminApp() {
               <ShieldCheck className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-2xl italic tracking-wide text-primary" style={{ fontFamily: "'Alien Block', cursive" }}>
+              <h1
+                className="text-2xl italic tracking-wide text-primary"
+                style={{ fontFamily: "'Alien Block', cursive" }}
+              >
                 Admin Artéïa
               </h1>
               <p className="text-sm text-muted-foreground">
@@ -265,7 +290,7 @@ export function AdminApp() {
                 onSubmit={loginForm.handleSubmit((values) => {
                   runAction(
                     () => signInAdmin(values.email, values.password),
-                    "Connexion réussie.",
+                    "Connexion réussie."
                   );
                 })}
               >
@@ -277,7 +302,9 @@ export function AdminApp() {
                     placeholder="admin@arteia.com"
                   />
                   {loginForm.formState.errors.email && (
-                    <p className="mt-1 text-xs text-red-400">{loginForm.formState.errors.email.message}</p>
+                    <p className="mt-1 text-xs text-red-400">
+                      {loginForm.formState.errors.email.message}
+                    </p>
                   )}
                 </Field>
                 <Field label="Mot de passe">
@@ -288,7 +315,9 @@ export function AdminApp() {
                     placeholder="••••••••"
                   />
                   {loginForm.formState.errors.password && (
-                    <p className="mt-1 text-xs text-red-400">{loginForm.formState.errors.password.message}</p>
+                    <p className="mt-1 text-xs text-red-400">
+                      {loginForm.formState.errors.password.message}
+                    </p>
                   )}
                 </Field>
                 <div className="flex flex-wrap gap-3">
@@ -306,7 +335,7 @@ export function AdminApp() {
                       loginForm.handleSubmit((values) =>
                         runAction(
                           () => signUpAdmin(values.email, values.password),
-                          "Compte créé. Il devra ensuite être promu au rôle admin dans Supabase.",
+                          "Compte créé. Il devra ensuite être promu au rôle admin dans Supabase."
                         )
                       )()
                     }
@@ -339,7 +368,7 @@ export function AdminApp() {
                   onClick={() =>
                     runAction(
                       () => syncDefaultCategories(),
-                      "Catégories synchronisées avec succès.",
+                      "Catégories synchronisées avec succès."
                     )
                   }
                   disabled={isBusy}
@@ -351,6 +380,7 @@ export function AdminApp() {
             </div>
 
             <div className="grid gap-6 xl:grid-cols-2">
+              {/* === Artiste === */}
               <AdminCard title="Ajouter un artiste">
                 <form
                   className="space-y-4"
@@ -367,7 +397,9 @@ export function AdminApp() {
                       {...artistForm.register("name")}
                     />
                     {artistForm.formState.errors.name && (
-                      <p className="mt-1 text-xs text-red-400">{artistForm.formState.errors.name.message}</p>
+                      <p className="mt-1 text-xs text-red-400">
+                        {artistForm.formState.errors.name.message}
+                      </p>
                     )}
                   </Field>
                   <Field label="Catégorie">
@@ -388,7 +420,9 @@ export function AdminApp() {
                       {...artistForm.register("role")}
                     />
                     {artistForm.formState.errors.role && (
-                      <p className="mt-1 text-xs text-red-400">{artistForm.formState.errors.role.message}</p>
+                      <p className="mt-1 text-xs text-red-400">
+                        {artistForm.formState.errors.role.message}
+                      </p>
                     )}
                   </Field>
                   <Field label="Image URL">
@@ -397,7 +431,9 @@ export function AdminApp() {
                       {...artistForm.register("image")}
                     />
                     {artistForm.formState.errors.image && (
-                      <p className="mt-1 text-xs text-red-400">{artistForm.formState.errors.image.message}</p>
+                      <p className="mt-1 text-xs text-red-400">
+                        {artistForm.formState.errors.image.message}
+                      </p>
                     )}
                   </Field>
                   <Field label="Œuvre mise en avant">
@@ -406,345 +442,351 @@ export function AdminApp() {
                       {...artistForm.register("featured_work")}
                     />
                     {artistForm.formState.errors.featured_work && (
-                      <p className="mt-1 text-xs text-red-400">{artistForm.formState.errors.featured_work.message}</p>
+                      <p className="mt-1 text-xs text-red-400">
+                        {artistForm.formState.errors.featured_work.message}
+                      </p>
                     )}
                   </Field>
-                  <SubmitButton disabled={isBusy || !artistForm.formState.isValid}>
+                  <SubmitButton
+                    disabled={isBusy || !artistForm.formState.isValid}
+                  >
                     Ajouter l’artiste
                   </SubmitButton>
                 </form>
               </AdminCard>
 
+              {/* === Œuvre === */}
               <AdminCard title="Ajouter une œuvre">
                 <form
                   className="space-y-4"
-                  onSubmit={(event) => {
-                    event.preventDefault();
+                  onSubmit={artworkForm.handleSubmit((values) => {
                     runAction(async () => {
-                      await createArtwork(artworkForm);
-                      setArtworkForm(initialArtwork);
+                      await createArtwork(values);
+                      artworkForm.reset(initialArtwork);
                     }, "Œuvre ajoutée.");
-                  }}
+                  })}
                 >
                   <Field label="Titre">
                     <input
                       className={inputClassName}
-                      value={artworkForm.title}
-                      onChange={(e) =>
-                        setArtworkForm({
-                          ...artworkForm,
-                          title: e.target.value,
-                        })
-                      }
-                      required
+                      {...artworkForm.register("title")}
                     />
+                    {artworkForm.formState.errors.title && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {artworkForm.formState.errors.title.message}
+                      </p>
+                    )}
                   </Field>
                   <Field label="Nom de l’artiste">
                     <input
                       className={inputClassName}
-                      value={artworkForm.artist_name}
-                      onChange={(e) =>
-                        setArtworkForm({
-                          ...artworkForm,
-                          artist_name: e.target.value,
-                        })
-                      }
-                      required
+                      {...artworkForm.register("artist_name")}
                     />
+                    {artworkForm.formState.errors.artist_name && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {artworkForm.formState.errors.artist_name.message}
+                      </p>
+                    )}
                   </Field>
                   <Field label="Catégorie">
-                    <CategorySelect
-                      value={artworkForm.category_slug}
-                      onChange={(value) =>
-                        setArtworkForm({ ...artworkForm, category_slug: value })
-                      }
+                    <Controller
+                      name="category_slug"
+                      control={artworkForm.control}
+                      render={({ field }) => (
+                        <CategorySelect
+                          value={field.value}
+                          onChange={field.onChange}
+                        />
+                      )}
                     />
                   </Field>
                   <Field label="Medium">
                     <input
                       className={inputClassName}
-                      value={artworkForm.medium}
-                      onChange={(e) =>
-                        setArtworkForm({
-                          ...artworkForm,
-                          medium: e.target.value,
-                        })
-                      }
-                      required
+                      {...artworkForm.register("medium")}
                     />
+                    {artworkForm.formState.errors.medium && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {artworkForm.formState.errors.medium.message}
+                      </p>
+                    )}
                   </Field>
                   <Field label="Image URL">
                     <input
                       className={inputClassName}
-                      value={artworkForm.image}
-                      onChange={(e) =>
-                        setArtworkForm({
-                          ...artworkForm,
-                          image: e.target.value,
-                        })
-                      }
-                      required
+                      {...artworkForm.register("image")}
                     />
+                    {artworkForm.formState.errors.image && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {artworkForm.formState.errors.image.message}
+                      </p>
+                    )}
                   </Field>
                   <Field label="Format">
                     <input
                       className={inputClassName}
-                      value={artworkForm.height}
-                      onChange={(e) =>
-                        setArtworkForm({
-                          ...artworkForm,
-                          height: e.target.value,
-                        })
-                      }
-                      required
+                      {...artworkForm.register("height")}
                     />
+                    {artworkForm.formState.errors.height && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {artworkForm.formState.errors.height.message}
+                      </p>
+                    )}
                   </Field>
-                  <SubmitButton disabled={isBusy}>Ajouter l’œuvre</SubmitButton>
+                  <SubmitButton
+                    disabled={isBusy || !artworkForm.formState.isValid}
+                  >
+                    Ajouter l’œuvre
+                  </SubmitButton>
                 </form>
               </AdminCard>
 
+              {/* === Discussion === */}
               <AdminCard title="Ajouter une discussion">
                 <form
                   className="space-y-4"
-                  onSubmit={(event) => {
-                    event.preventDefault();
+                  onSubmit={discussionForm.handleSubmit((values) => {
                     runAction(async () => {
-                      await createDiscussion(discussionForm);
-                      setDiscussionForm(initialDiscussion);
+                      await createDiscussion(values);
+                      discussionForm.reset(initialDiscussion);
                     }, "Discussion ajoutée.");
-                  }}
+                  })}
                 >
                   <Field label="Titre">
                     <input
                       className={inputClassName}
-                      value={discussionForm.title}
-                      onChange={(e) =>
-                        setDiscussionForm({
-                          ...discussionForm,
-                          title: e.target.value,
-                        })
-                      }
-                      required
+                      {...discussionForm.register("title")}
                     />
+                    {discussionForm.formState.errors.title && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {discussionForm.formState.errors.title.message}
+                      </p>
+                    )}
                   </Field>
                   <Field label="Auteur">
                     <input
                       className={inputClassName}
-                      value={discussionForm.author_name}
-                      onChange={(e) =>
-                        setDiscussionForm({
-                          ...discussionForm,
-                          author_name: e.target.value,
-                        })
-                      }
-                      required
+                      {...discussionForm.register("author_name")}
                     />
+                    {discussionForm.formState.errors.author_name && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {discussionForm.formState.errors.author_name.message}
+                      </p>
+                    )}
                   </Field>
                   <Field label="Catégorie">
-                    <CategorySelect
-                      value={discussionForm.category_slug}
-                      onChange={(value) =>
-                        setDiscussionForm({
-                          ...discussionForm,
-                          category_slug: value,
-                        })
-                      }
+                    <Controller
+                      name="category_slug"
+                      control={discussionForm.control}
+                      render={({ field }) => (
+                        <CategorySelect
+                          value={field.value}
+                          onChange={field.onChange}
+                        />
+                      )}
                     />
                   </Field>
                   <Field label="Label temps">
                     <input
                       className={inputClassName}
-                      value={discussionForm.time_label}
-                      onChange={(e) =>
-                        setDiscussionForm({
-                          ...discussionForm,
-                          time_label: e.target.value,
-                        })
-                      }
-                      required
+                      {...discussionForm.register("time_label")}
                     />
+                    {discussionForm.formState.errors.time_label && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {discussionForm.formState.errors.time_label.message}
+                      </p>
+                    )}
                   </Field>
                   <label className="flex items-center gap-3 text-sm text-muted-foreground">
                     <input
                       type="checkbox"
-                      checked={discussionForm.trending}
-                      onChange={(e) =>
-                        setDiscussionForm({
-                          ...discussionForm,
-                          trending: e.target.checked,
-                        })
-                      }
+                      {...discussionForm.register("trending")}
                     />
                     Marquer comme tendance
                   </label>
-                  <SubmitButton disabled={isBusy}>
+                  <SubmitButton
+                    disabled={isBusy || !discussionForm.formState.isValid}
+                  >
                     Ajouter la discussion
                   </SubmitButton>
                 </form>
               </AdminCard>
 
+              {/* === Tendance === */}
               <AdminCard title="Ajouter une tendance">
                 <form
                   className="space-y-4"
-                  onSubmit={(event) => {
-                    event.preventDefault();
+                  onSubmit={trendForm.handleSubmit((values) => {
                     runAction(async () => {
-                      await createTrend(trendForm);
-                      setTrendForm(initialTrend);
+                      await createTrend(values);
+                      trendForm.reset(initialTrend);
                     }, "Tendance ajoutée.");
-                  }}
+                  })}
                 >
                   <Field label="Tag">
                     <input
                       className={inputClassName}
-                      value={trendForm.tag}
-                      onChange={(e) =>
-                        setTrendForm({ ...trendForm, tag: e.target.value })
-                      }
+                      {...trendForm.register("tag")}
                       placeholder="#MonTag"
-                      required
                     />
+                    {trendForm.formState.errors.tag && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {trendForm.formState.errors.tag.message}
+                      </p>
+                    )}
                   </Field>
                   <Field label="Catégorie">
-                    <CategorySelect
-                      value={trendForm.category_slug}
-                      onChange={(value) =>
-                        setTrendForm({ ...trendForm, category_slug: value })
-                      }
+                    <Controller
+                      name="category_slug"
+                      control={trendForm.control}
+                      render={({ field }) => (
+                        <CategorySelect
+                          value={field.value}
+                          onChange={field.onChange}
+                        />
+                      )}
                     />
                   </Field>
                   <Field label="Ordre">
                     <input
                       className={inputClassName}
                       type="number"
-                      value={trendForm.sort_order}
-                      onChange={(e) =>
-                        setTrendForm({
-                          ...trendForm,
-                          sort_order: Number(e.target.value),
-                        })
-                      }
-                      required
+                      {...trendForm.register("sort_order", {
+                        valueAsNumber: true,
+                      })}
                     />
+                    {trendForm.formState.errors.sort_order && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {trendForm.formState.errors.sort_order.message}
+                      </p>
+                    )}
                   </Field>
-                  <SubmitButton disabled={isBusy}>
+                  <SubmitButton
+                    disabled={isBusy || !trendForm.formState.isValid}
+                  >
                     Ajouter la tendance
                   </SubmitButton>
                 </form>
               </AdminCard>
 
+              {/* === Événement === */}
               <AdminCard title="Ajouter un événement">
                 <form
                   className="space-y-4"
-                  onSubmit={(event) => {
-                    event.preventDefault();
+                  onSubmit={eventForm.handleSubmit((values) => {
                     runAction(async () => {
-                      await createEvent(eventForm);
-                      setEventForm(initialEvent);
+                      await createEvent(values);
+                      eventForm.reset(initialEvent);
                     }, "Événement ajouté.");
-                  }}
+                  })}
                 >
                   <Field label="Titre">
                     <input
                       className={inputClassName}
-                      value={eventForm.title}
-                      onChange={(e) =>
-                        setEventForm({ ...eventForm, title: e.target.value })
-                      }
-                      required
+                      {...eventForm.register("title")}
                     />
+                    {eventForm.formState.errors.title && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {eventForm.formState.errors.title.message}
+                      </p>
+                    )}
                   </Field>
                   <Field label="Date label">
                     <input
                       className={inputClassName}
-                      value={eventForm.date_label}
-                      onChange={(e) =>
-                        setEventForm({
-                          ...eventForm,
-                          date_label: e.target.value,
-                        })
-                      }
-                      required
+                      {...eventForm.register("date_label")}
                     />
+                    {eventForm.formState.errors.date_label && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {eventForm.formState.errors.date_label.message}
+                      </p>
+                    )}
                   </Field>
                   <Field label="Catégorie">
-                    <CategorySelect
-                      value={eventForm.category_slug}
-                      onChange={(value) =>
-                        setEventForm({ ...eventForm, category_slug: value })
-                      }
+                    <Controller
+                      name="category_slug"
+                      control={eventForm.control}
+                      render={({ field }) => (
+                        <CategorySelect
+                          value={field.value}
+                          onChange={field.onChange}
+                        />
+                      )}
                     />
                   </Field>
                   <Field label="Ordre">
                     <input
                       className={inputClassName}
                       type="number"
-                      value={eventForm.sort_order}
-                      onChange={(e) =>
-                        setEventForm({
-                          ...eventForm,
-                          sort_order: Number(e.target.value),
-                        })
-                      }
-                      required
+                      {...eventForm.register("sort_order", {
+                        valueAsNumber: true,
+                      })}
                     />
+                    {eventForm.formState.errors.sort_order && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {eventForm.formState.errors.sort_order.message}
+                      </p>
+                    )}
                   </Field>
-                  <SubmitButton disabled={isBusy}>
+                  <SubmitButton
+                    disabled={isBusy || !eventForm.formState.isValid}
+                  >
                     Ajouter l’événement
                   </SubmitButton>
                 </form>
               </AdminCard>
 
+              {/* === Statistique === */}
               <AdminCard title="Mettre à jour une statistique">
                 <form
                   className="space-y-4"
-                  onSubmit={(event) => {
-                    event.preventDefault();
+                  onSubmit={statForm.handleSubmit((values) => {
                     runAction(async () => {
-                      await upsertStat(statForm);
-                      setStatForm(initialStat);
+                      await upsertStat(values);
+                      statForm.reset(initialStat);
                     }, "Statistique enregistrée.");
-                  }}
+                  })}
                 >
                   <Field label="Label">
                     <input
                       className={inputClassName}
-                      value={statForm.label}
-                      onChange={(e) =>
-                        setStatForm({ ...statForm, label: e.target.value })
-                      }
+                      {...statForm.register("label")}
                       placeholder="Artistes actifs"
-                      required
                     />
+                    {statForm.formState.errors.label && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {statForm.formState.errors.label.message}
+                      </p>
+                    )}
                   </Field>
                   <Field label="Valeur">
                     <input
                       className={inputClassName}
-                      value={statForm.number_label}
-                      onChange={(e) =>
-                        setStatForm({
-                          ...statForm,
-                          number_label: e.target.value,
-                        })
-                      }
-                      required
+                      {...statForm.register("number_label")}
                     />
+                    {statForm.formState.errors.number_label && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {statForm.formState.errors.number_label.message}
+                      </p>
+                    )}
                   </Field>
                   <Field label="Ordre">
                     <input
                       className={inputClassName}
                       type="number"
-                      value={statForm.sort_order}
-                      onChange={(e) =>
-                        setStatForm({
-                          ...statForm,
-                          sort_order: Number(e.target.value),
-                        })
-                      }
-                      required
+                      {...statForm.register("sort_order", {
+                        valueAsNumber: true,
+                      })}
                     />
+                    {statForm.formState.errors.sort_order && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {statForm.formState.errors.sort_order.message}
+                      </p>
+                    )}
                   </Field>
-                  <SubmitButton disabled={isBusy}>
+                  <SubmitButton
+                    disabled={isBusy || !statForm.formState.isValid}
+                  >
                     Enregistrer la statistique
                   </SubmitButton>
                 </form>
@@ -898,7 +940,11 @@ function SubmitButton({
   );
 }
 
-function FlashBanner({ flash }: { flash: Exclude<FlashMessage, null> }) {
+function FlashBanner({
+  flash,
+}: {
+  flash: Exclude<FlashMessage, null>;
+}) {
   const styles =
     flash.type === "success"
       ? "border-primary/30 bg-primary/10 text-primary"

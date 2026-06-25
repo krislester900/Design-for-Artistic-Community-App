@@ -13,6 +13,7 @@ import '../pages/music_upload_page.dart';
 import '../pages/writing_page.dart';
 import '../pages/comics_upload_page.dart';
 import '../pages/auth_page.dart';
+import 'arteia_logo.dart';
 
 class AppDrawer extends StatelessWidget {
   final Function(int) onTabSelected;
@@ -54,21 +55,20 @@ class AppDrawer extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(colors: [Color(0xFF7C5CFC), Color(0xFF00D4AA)]),
-              borderRadius: BorderRadius.all(Radius.circular(10)),
-              boxShadow: [BoxShadow(color: Color(0xFF7C5CFC), blurRadius: 12, spreadRadius: 0.3)],
-            ),
-            child: const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+          const ArteiaLogo(
+            size: 36,
+            showText: false,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Artéïa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [Color(0xFF7C5CFC), Color(0xFF00D4AA)],
+                ).createShader(bounds),
+                child: const Text('Artéïa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
+              ),
               Text('Communauté artistique', style: TextStyle(fontSize: 10, color: Colors.grey)),
             ],
           ),
