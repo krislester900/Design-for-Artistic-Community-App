@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../services/supabase_service.dart';
 import '../services/image_upload_service.dart';
 import '../services/quests_service.dart';
+import '../services/voice_recorder_service.dart';
 import '../theme/app_theme.dart';
 
 class ThoughtBubbleUploadPage extends StatefulWidget {
@@ -20,6 +21,7 @@ class _ThoughtBubbleUploadPageState extends State<ThoughtBubbleUploadPage> {
   final SupabaseService _supabase = SupabaseService();
   final ImageUploadService _imageUploadService = ImageUploadService();
   final QuestsService _questsService = QuestsService();
+  final VoiceRecorderService _voiceRecorder = VoiceRecorderService();
   final ImagePicker _imagePicker = ImagePicker();
   final Uuid _uuid = const Uuid();
 
@@ -31,11 +33,31 @@ class _ThoughtBubbleUploadPageState extends State<ThoughtBubbleUploadPage> {
   bool _isUploading = false;
   bool _isSubmitting = false;
   Duration _recordingDuration = Duration.zero;
+  Duration? _actualAudioDuration;
   bool get _isWeb => kIsWeb;
+  bool _hasMicPermission = false;
+  int _recordSeconds = 0;
+  bool get _canRecord => _hasMicPermission || _isWeb;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkMicrophonePermission();
+  }
+
+  Future<void> _checkMicrophonePermission() async {
+    if (!_isWeb) {
+      final hasPerm = await _voiceRecorder.hasPermission();
+      if (mounted) {
+        setState(() => _hasMicPermission = hasPerm);
+      }
+    }
+  }
 
   @override
   void dispose() {
     _textController.dispose();
+    _voiceRecorder.dispose();
     super.dispose();
   }
 
@@ -73,38 +95,46 @@ class _ThoughtBubbleUploadPageState extends State<ThoughtBubbleUploadPage> {
     }
     
     try {
-      setState(() {
-        _isRecording = true;
-        _recordingDuration = Duration.zero;
-      });
-      _startDurationTimer();
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enregistrement simulé - Fonctionnalité native requise'), backgroundColor: Colors.orange),
-        );
+      final path = await _voiceRecorder.startRecording();
+      if (path != null) {
+        setState(() {
+          _isRecording = true;
+          _recordingDuration = Duration.zero;
+          _recordSeconds = 0;
+        });
+        _startDurationTimer();
+        _audioPath = path;
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
         );
+        setState(() => _hasMicPermission = false);
       }
     }
   }
 
   Future<void> _stopRecording() async {
+    final path = await _voiceRecorder.stopRecording();
+    if (path != null) {
+      _audioPath = path;
+      _actualAudioDuration = Duration(seconds: _recordSeconds);
+    }
     setState(() => _isRecording = false);
   }
 
   void _startDurationTimer() {
-    const oneSecond = Duration(seconds: 1);
+    _recordSeconds = 0;
     Future.doWhile(() async {
-      await Future.delayed(oneSecond);
+      await Future.delayed(const Duration(seconds: 1));
       if (mounted && _isRecording) {
-        setState(() {
-          _recordingDuration += oneSecond;
-        });
+        _recordSeconds++;
+        if (mounted) {
+          setState(() {
+            _recordingDuration = Duration(seconds: _recordSeconds);
+          });
+        }
         return true;
       }
       return false;

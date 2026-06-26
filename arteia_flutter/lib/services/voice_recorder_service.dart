@@ -1,12 +1,13 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:uuid/uuid.dart';
 
-/// Service to handle voice recording on mobile platforms.
-/// Uses platform channels via MethodChannel for actual recording.
-/// Falls back to a simulated recording for testing.
+/// Real voice recording service using the `record` package
 class VoiceRecorderService {
+  final AudioRecorder _recorder = AudioRecorder();
   bool _isRecording = false;
   String? _currentFilePath;
   DateTime? _startTime;
@@ -15,10 +16,30 @@ class VoiceRecorderService {
   bool get isRecording => _isRecording;
   String? get currentFilePath => _currentFilePath;
 
+  /// Request microphone permission
+  Future<bool> requestPermission() async {
+    if (kIsWeb) return false;
+    
+    final status = await Permission.microphone.request();
+    return status.isGranted;
+  }
+
+  /// Check if microphone permission is granted
+  Future<bool> hasPermission() async {
+    if (kIsWeb) return false;
+    return await Permission.microphone.isGranted;
+  }
+
   /// Start recording audio
   Future<String?> startRecording() async {
     if (kIsWeb) {
       throw UnsupportedError('Recording not supported on web');
+    }
+
+    // Request permission first
+    final hasMic = await requestPermission();
+    if (!hasMic) {
+      throw Exception('Permission microphone refusée');
     }
 
     try {
@@ -26,13 +47,25 @@ class VoiceRecorderService {
       final fileName = 'voice_${_uuid.v4()}.m4a';
       _currentFilePath = '${dir.path}/$fileName';
       _startTime = DateTime.now();
-      _isRecording = true;
 
+      // Start actual recording
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 64000,
+          sampleRate: 44100,
+          numChannels: 1,
+        ),
+        path: _currentFilePath!,
+      );
+
+      _isRecording = true;
       debugPrint('Recording started: $_currentFilePath');
       return _currentFilePath;
     } catch (e) {
       debugPrint('Error starting recording: $e');
       _isRecording = false;
+      _currentFilePath = null;
       rethrow;
     }
   }
@@ -41,12 +74,22 @@ class VoiceRecorderService {
   Future<String?> stopRecording() async {
     if (!_isRecording) return null;
 
-    _isRecording = false;
-    final filePath = _currentFilePath;
-
-    debugPrint('Recording stopped: $filePath (${_startTime != null ? DateTime.now().difference(_startTime!).inSeconds : 0}s)');
-    
-    return filePath;
+    try {
+      final path = await _recorder.stop();
+      _isRecording = false;
+      
+      if (path != null) {
+        _currentFilePath = path;
+        final duration = getDuration();
+        debugPrint('Recording stopped: $path (${duration.inSeconds}s)');
+      }
+      
+      return _currentFilePath;
+    } catch (e) {
+      debugPrint('Error stopping recording: $e');
+      _isRecording = false;
+      return _currentFilePath;
+    }
   }
 
   /// Get recording duration
@@ -57,6 +100,9 @@ class VoiceRecorderService {
 
   /// Delete the recorded file
   Future<void> deleteRecording() async {
+    await _recorder.cancel(); // Cancel if recording
+    _isRecording = false;
+    
     if (_currentFilePath != null) {
       try {
         final file = File(_currentFilePath!);
@@ -68,11 +114,10 @@ class VoiceRecorderService {
       }
       _currentFilePath = null;
     }
-    _isRecording = false;
     _startTime = null;
   }
 
-  /// Check if file exists
+  /// Check if currently has a valid recording file
   Future<bool> hasRecordingFile() async {
     if (_currentFilePath == null) return false;
     try {
@@ -80,5 +125,10 @@ class VoiceRecorderService {
     } catch (e) {
       return false;
     }
+  }
+
+  /// Clean up resources
+  void dispose() {
+    _recorder.dispose();
   }
 }
