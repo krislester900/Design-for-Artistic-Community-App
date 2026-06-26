@@ -72,7 +72,7 @@ export function MobileProfile() {
 
   useEffect(() => {
     getCurrentSession().then(({ user }) => { if (user) setAuthUser(user); });
-    const { subscription } = onAuthChange((u: any) => setAuthUser(u));
+    const { subscription } = onAuthChange(({ user }) => setAuthUser(user));
     return () => subscription?.unsubscribe();
   }, []);
 

@@ -104,9 +104,6 @@ export function AdminApp() {
   const [isBusy, setIsBusy] = useState(false);
   const [flash, setFlash] = useState<FlashMessage>(null);
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
@@ -349,7 +346,7 @@ export function AdminApp() {
           </div>
         ) : !isAdmin ? (
           <AccessDeniedPanel
-            email={profile?.email ?? session.user.email ?? email}
+            email={profile?.email ?? session.user.email ?? "admin"}
           />
         ) : (
           <div className="space-y-8">

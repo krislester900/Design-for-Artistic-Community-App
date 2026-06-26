@@ -73,6 +73,8 @@ export function ChatPage() {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unsubscribeMessagesRef = useRef<(() => void) | null>(null);
   const unsubscribeTypingRef = useRef<(() => void) | null>(null);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
   const activeChannel = channels.find((c) => c.id === activeChannelId) || null;
 
@@ -80,9 +82,19 @@ export function ChatPage() {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+  const prevMessagesLength = useRef(0);
+  useEffect(() => {
+    if (messages.length > prevMessagesLength.current) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg?.author_id === currentUserId) {
+        scrollToBottom();
+      }
+    }
+    prevMessagesLength.current = messages.length;
+  }, [messages, currentUserId]);
   useEffect(() => {
     scrollToBottom();
-  }, [messages, searchResults]);
+  }, [searchResults]);
 
   // ─── Load current user ───
   useEffect(() => {
@@ -288,11 +300,11 @@ export function ChatPage() {
   }, []);
 
   const handleReply = useCallback((id: string) => {
-    const msg = messages.find((m) => m.id === id);
+    const msg = messagesRef.current.find((m) => m.id === id);
     if (msg) {
       setReplyTo({ id: msg.id, content: msg.content.slice(0, 80) + (msg.content.length > 80 ? "..." : "") });
     }
-  }, [messages]);
+  }, []);
 
   const handleReact = useCallback(async (messageId: string, emoji: string) => {
     try {
@@ -317,11 +329,11 @@ export function ChatPage() {
       setMessages((prev) =>
         prev.map((m) => (m.id === messageId ? { ...m, is_pinned: !m.is_pinned } : m)),
       );
-      setPinnedCount((prev) => (messages.find((m) => m.id === messageId)?.is_pinned ? prev - 1 : prev + 1));
+      setPinnedCount((prev) => (messagesRef.current.find((m) => m.id === messageId)?.is_pinned ? prev - 1 : prev + 1));
     } catch (err) {
       console.error("Pin error:", err);
     }
-  }, [messages]);
+  }, []);
 
   const handleLeave = useCallback(async () => {
     if (!activeChannelId) return;

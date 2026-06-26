@@ -25,13 +25,6 @@ function mustHaveSession(session: Session | null): string {
   return session.user.id;
 }
 
-function mustHaveCustomSession(): { supabase: ReturnType<typeof mustHaveSupabase>; userId: string } {
-  const sb = mustHaveSupabase();
-  // We rely on the caller to ensure they're authenticated.
-  // The RLS policies will enforce auth.uid() checks server-side.
-  return { supabase: sb, userId: "" };
-}
-
 /* ───── Channels ───── */
 
 export async function fetchChannels() {

@@ -1,7 +1,7 @@
 import { Trash2, Edit2, Reply, Check, X, SmilePlus, Pin, Play, Pause, Volume2 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import type { ChatMessage as ChatMessageType, MessageReaction } from "./chat-types";
 import { EmojiPicker } from "./EmojiPicker";
 
@@ -35,6 +35,32 @@ export function ChatMessage({
   const audioRef = useRef<HTMLAudioElement>(null);
   const reactionPickerRef = useRef<HTMLDivElement>(null);
 
+  // Audio state sync
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onEnded = () => setIsPlaying(false);
+    const onError = () => setIsPlaying(false);
+    audio.addEventListener("ended", onEnded);
+    audio.addEventListener("error", onError);
+    return () => {
+      audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("error", onError);
+    };
+  }, []);
+
+  // Click-outside for reaction picker
+  useEffect(() => {
+    if (!showReactionPicker) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (reactionPickerRef.current && !reactionPickerRef.current.contains(event.target as Node)) {
+        setShowReactionPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showReactionPicker]);
+
   const time = (() => {
     try {
       return format(new Date(message.created_at), "HH:mm", { locale: fr });
@@ -67,10 +93,10 @@ export function ChatMessage({
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
+      setIsPlaying(false);
     } else {
-      audioRef.current.play();
+      audioRef.current.play().catch(() => setIsPlaying(false));
     }
-    setIsPlaying(!isPlaying);
   }
 
   const formatVoiceDuration = useCallback((seconds: number) => {

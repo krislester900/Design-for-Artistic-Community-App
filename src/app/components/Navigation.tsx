@@ -25,12 +25,11 @@ export function Navigation({ selectedCategory, onNavigate }: NavigationProps) {
             className="group flex items-center gap-3"
             onClick={() => onNavigate("hero")}
           >
-            <div className="relative flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 via-fuchsia-500 to-emerald-500 shadow-[0_0_20px_rgba(124,92,252,0.3)] transition-all duration-500 group-hover:shadow-[0_0_35px_rgba(124,92,252,0.5)] group-hover:scale-110">
-              <div className="absolute inset-1 rounded-full bg-gradient-to-br from-violet-600 via-fuchsia-600 to-emerald-600 opacity-75 animate-spin" style={{ animationDuration: '3s' }} />
-              <span className="relative text-white font-black text-lg" style={{ fontFamily: "'Alien Block', cursive" }}>A</span>
+            <div className="flex h-11 w-11 items-center justify-center rounded-full border border-foreground/20 bg-foreground shadow-[0_0_15px_rgba(0,0,0,0.1)] transition-all duration-500 group-hover:shadow-[0_0_25px_rgba(0,0,0,0.2)] group-hover:scale-110 dark:shadow-[0_0_15px_rgba(255,255,255,0.1)] dark:group-hover:shadow-[0_0_25px_rgba(255,255,255,0.2)]">
+              <span className="text-background font-black text-lg dark:text-foreground" style={{ fontFamily: "'Alien Block', cursive" }}>A</span>
             </div>
             <div className="text-left">
-              <h1 className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-emerald-400 bg-clip-text text-transparent text-2xl uppercase tracking-[0.18em]" style={{ fontFamily: "'Alien Block', cursive" }}>
+              <h1 className="text-foreground text-2xl uppercase tracking-[0.18em]" style={{ fontFamily: "'Alien Block', cursive" }}>
                 Arteïa
               </h1>
               <p className="hidden text-[11px] uppercase tracking-[0.24em] text-muted-foreground md:block">

@@ -63,12 +63,7 @@ class AppDrawer extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [Color(0xFF7C5CFC), Color(0xFF00D4AA)],
-                ).createShader(bounds),
-                child: const Text('Artéïa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
-              ),
+              const Text('Artéïa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
               Text('Communauté artistique', style: TextStyle(fontSize: 10, color: Colors.grey)),
             ],
           ),

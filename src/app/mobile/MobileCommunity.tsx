@@ -10,42 +10,17 @@ import { EmojiPicker } from "../chat/EmojiPicker";
 import { StickerPicker } from "../chat/StickerPicker";
 import { GifPicker } from "../chat/GifPicker";
 import { VoiceRecorder } from "../chat/VoiceRecorder";
+import type { ChatChannel, ChatMessage } from "../chat/chat-types";
 
-// Types from chat system
-interface ChatChannel {
-  id: string;
-  name: string;
-  type: "public" | "private" | "dm";
-  description: string;
-  created_at: string;
-}
+// Mock channels
+const DEFAULT_CHANNELS = [
+  { id: "general", name: "Général", type: "public" as const, description: "Discussions générales", created_at: new Date().toISOString(), category_slug: null, background_image: null, created_by: "system", is_locked: false, sort_order: 0 },
+  { id: "music", name: "Musique Urbaine", type: "public" as const, description: "Sons, beats, productions", created_at: new Date().toISOString(), category_slug: null, background_image: null, created_by: "system", is_locked: false, sort_order: 0 },
+  { id: "visual-art", name: "Art Visuel Paris", type: "public" as const, description: "Expos, street art, galeries", created_at: new Date().toISOString(), category_slug: null, background_image: null, created_by: "system", is_locked: false, sort_order: 0 },
+  { id: "manga", name: "Manga Club", type: "public" as const, description: "Chapitres, reviews, fan arts", created_at: new Date().toISOString(), category_slug: null, background_image: null, created_by: "system", is_locked: false, sort_order: 0 },
+] as ChatChannel[];
 
-interface ChatMessage {
-  id: string;
-  channel_id: string;
-  author_id: string;
-  author_email?: string;
-  content: string;
-  attachment_url?: string;
-  reply_to?: string;
-  edited_at?: string;
-  created_at: string;
-  message_type?: "text" | "voice" | "sticker" | "gif" | "image";
-  voice_url?: string;
-  voice_duration?: number;
-  reactions?: any[];
-  is_pinned?: boolean;
-}
-
-// Mock channels (replace with Supabase query when data exists)
-const DEFAULT_CHANNELS: ChatChannel[] = [
-  { id: "general", name: "Général", type: "public", description: "Discussions générales", created_at: new Date().toISOString() },
-  { id: "music", name: "Musique Urbaine", type: "public", description: "Sons, beats, productions", created_at: new Date().toISOString() },
-  { id: "visual-art", name: "Art Visuel Paris", type: "public", description: "Expos, street art, galeries", created_at: new Date().toISOString() },
-  { id: "manga", name: "Manga Club", type: "public", description: "Chapitres, reviews, fan arts", created_at: new Date().toISOString() },
-];
-
-const DEFAULT_MESSAGES: Record<string, ChatMessage[]> = {
+const DEFAULT_MESSAGES = {
   general: [
     {
       id: "general-1",

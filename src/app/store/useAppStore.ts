@@ -11,9 +11,6 @@ interface AppState {
 
   isMobile: boolean | null;
   setIsMobile: (value: boolean | null) => void;
-
-  dataSource: "mock" | "supabase" | null;
-  setDataSource: (source: "mock" | "supabase" | null) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -25,7 +22,4 @@ export const useAppStore = create<AppState>((set) => ({
 
   isMobile: null,
   setIsMobile: (value) => set({ isMobile: value }),
-
-  dataSource: null,
-  setDataSource: (source) => set({ dataSource: source }),
 }));

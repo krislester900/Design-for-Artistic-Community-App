@@ -9,7 +9,7 @@ import { JoinCTA } from "./components/JoinCTA";
 import { Footer } from "./components/Footer";
 import { ArtisticPattern } from "./components/ArtisticPattern";
 import { ScrollReveal } from "./components/ScrollReveal";
-import { useCommunityDataQuery } from "./hooks/useCommunityDataQuery";
+import { useCommunityData } from "./hooks/useCommunityData";
 import { useAppStore } from "./store/useAppStore";
 import { MobileApp } from "./mobile/MobileApp";
 import { ArtLoadingScreen } from "./components/ArtLoadingScreen";
@@ -50,9 +50,8 @@ export default function App() {
   const selectedCategory = useAppStore((state) => state.selectedCategory);
   const setSelectedCategory = useAppStore((state) => state.setSelectedCategory);
   const isMobile = useMobileDetection();
-  const setDataSource = useAppStore((state) => state.setDataSource);
 
-  const { data, isLoading } = useCommunityDataQuery();
+  const { data, source, isLoading } = useCommunityData();
 
   if (isMobile === null) {
     return <ArtLoadingScreen onComplete={() => {}} />;
@@ -101,7 +100,7 @@ export default function App() {
                 <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground/80">
                   Source de données :{" "}
                   <span className="font-semibold text-foreground">
-                    {isLoading ? "Supabase" : "Mock local"}
+                    {source === "supabase" ? "Supabase" : "Mock local"}
                   </span>
                   {isLoading ? " · chargement..." : ""}
                 </p>
