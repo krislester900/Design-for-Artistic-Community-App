@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../services/chat_service_enhanced.dart';
+import '../services/voice_recorder_service.dart';
+import '../services/supabase_service.dart';
 import '../widgets/ephemeral_message_widget.dart';
 
 class ChatRoomPageEnhanced extends StatefulWidget {
@@ -18,6 +21,8 @@ class ChatRoomPageEnhanced extends StatefulWidget {
 
 class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
   final ChatServiceEnhanced _chatService = ChatServiceEnhanced();
+  final VoiceRecorderService _voiceRecorder = VoiceRecorderService();
+  final SupabaseService _supabase = SupabaseService();
   final TextEditingController _controller = TextEditingController();
   List<Map<String, dynamic>> _messages = [];
   bool _isLoading = true;
@@ -26,10 +31,23 @@ class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
   bool _isEphemeralMode = false;
   Duration _ephemeralDuration = const Duration(seconds: 30);
 
+  // Voice message state
+  bool _isRecordingVoice = false;
+  Duration _voiceRecordingDuration = Duration.zero;
+  String? _voiceRecordingPath;
+  int _voiceRecordSeconds = 0;
+
   @override
   void initState() {
     super.initState();
     _loadMessages();
+    _checkMicPermission();
+  }
+
+  Future<void> _checkMicPermission() async {
+    if (!kIsWeb) {
+      await _voiceRecorder.hasPermission();
+    }
   }
 
   Future<void> _loadMessages() async {
@@ -120,6 +138,117 @@ class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
     );
   }
 
+  Future<void> _startVoiceRecording() async {
+    if (kIsWeb) return;
+    try {
+      final path = await _voiceRecorder.startRecording();
+      if (path != null) {
+        setState(() {
+          _isRecordingVoice = true;
+          _voiceRecordingPath = path;
+          _voiceRecordSeconds = 0;
+          _voiceRecordingDuration = Duration.zero;
+        });
+        _startVoiceTimer();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur micro: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _stopVoiceRecording() async {
+    final path = await _voiceRecorder.stopRecording();
+    if (path != null) {
+      _voiceRecordingPath = path;
+    }
+    setState(() => _isRecordingVoice = false);
+  }
+
+  void _cancelVoiceRecording() {
+    _voiceRecorder.deleteRecording();
+    setState(() {
+      _isRecordingVoice = false;
+      _voiceRecordingPath = null;
+      _voiceRecordingDuration = Duration.zero;
+      _voiceRecordSeconds = 0;
+    });
+  }
+
+  void _startVoiceTimer() {
+    _voiceRecordSeconds = 0;
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(seconds: 1));
+      if (mounted && _isRecordingVoice) {
+        _voiceRecordSeconds++;
+        setState(() {
+          _voiceRecordingDuration = Duration(seconds: _voiceRecordSeconds);
+        });
+        return true;
+      }
+      return false;
+    });
+  }
+
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _sendVoiceMessage() async {
+    if (_voiceRecordingPath == null) return;
+
+    try {
+      final user = _supabase.currentUser;
+      if (user == null) return;
+
+      final audioFile = File(_voiceRecordingPath!);
+      final audioFileName = 'voice_messages/${DateTime.now().millisecondsSinceEpoch}.m4a';
+      
+      await _supabase.client.storage
+          .from('posts')
+          .upload(audioFileName, audioFile);
+
+      final audioUrl = _supabase.client.storage
+          .from('posts')
+          .getPublicUrl(audioFileName);
+
+      await _chatService.sendMessage(
+        widget.channelId,
+        content: '🎤 Message vocal',
+        audioUrl: audioUrl,
+        audioDuration: _voiceRecordingDuration.inSeconds,
+        isEphemeral: _isEphemeralMode,
+        ephemeralDuration: _isEphemeralMode ? _ephemeralDuration : null,
+      );
+
+      _voiceRecorder.deleteRecording();
+      setState(() {
+        _isRecordingVoice = false;
+        _voiceRecordingPath = null;
+        _voiceRecordingDuration = Duration.zero;
+        _voiceRecordSeconds = 0;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur envoi: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _voiceRecorder.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -129,7 +258,6 @@ class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
         elevation: 0,
         title: Text(widget.channelName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 20)),
         actions: [
-          // Toggle mode éphémère
           IconButton(
             icon: Icon(
               _isEphemeralMode ? Icons.timer : Icons.timer_outlined,
@@ -145,7 +273,6 @@ class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
       ),
       body: Column(
         children: [
-          // Indicateur mode éphémère
           if (_isEphemeralMode)
             Container(
               padding: const EdgeInsets.all(12),
@@ -163,7 +290,6 @@ class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
                 ],
               ),
             ),
-          // Messages
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: Colors.black))
@@ -189,7 +315,6 @@ class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
                         },
                       ),
           ),
-          // Input
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -198,32 +323,73 @@ class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
             ),
             child: Row(
               children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                if (_isRecordingVoice) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.grey[100],
+                      color: Colors.red.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(24),
                     ),
-                    child: TextField(
-                      controller: _controller,
-                      style: const TextStyle(color: Colors.black),
-                      decoration: InputDecoration(
-                        hintText: _isEphemeralMode ? 'Message éphémère...' : 'Écrire un message...',
-                        hintStyle: const TextStyle(color: Color(0xFF999999)),
-                        border: InputBorder.none,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.fiber_manual_record, color: Colors.red, size: 16),
+                        const SizedBox(width: 8),
+                        Text(
+                          _formatDuration(_voiceRecordingDuration),
+                          style: const TextStyle(color: Colors.red, fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.red, size: 20),
+                          onPressed: _cancelVoiceRecording,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.send, color: Colors.red, size: 20),
+                          onPressed: _sendVoiceMessage,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: TextField(
+                        controller: _controller,
+                        style: const TextStyle(color: Colors.black),
+                        decoration: InputDecoration(
+                          hintText: _isEphemeralMode ? 'Message éphémère...' : 'Écrire un message...',
+                          hintStyle: const TextStyle(color: Color(0xFF999999)),
+                          border: InputBorder.none,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: Icon(
-                    Icons.send,
-                    color: _isEphemeralMode ? Colors.red : Colors.black,
+                  IconButton(
+                    icon: Icon(
+                      Icons.mic,
+                      color: _isEphemeralMode ? Colors.red : Colors.black,
+                    ),
+                    onPressed: _startVoiceRecording,
                   ),
-                  onPressed: _sendMessage,
-                ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: Icon(
+                      Icons.send,
+                      color: _isEphemeralMode ? Colors.red : Colors.black,
+                    ),
+                    onPressed: _sendMessage,
+                  ),
+                ],
               ],
             ),
           ),

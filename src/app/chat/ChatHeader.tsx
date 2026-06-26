@@ -6,9 +6,7 @@ type ChatHeaderProps = {
   channel: ChatChannel | null;
   members: ChatChannelMember[];
   currentUserId: string | null;
-  onShowMembers: () => void;
   onLeaveChannel: () => void;
-  showMembers: boolean;
   userPresence?: Record<string, PresenceStatus>;
   pinnedCount?: number;
   onSearch?: (query: string) => void;
@@ -18,9 +16,7 @@ export function ChatHeader({
   channel,
   members,
   currentUserId,
-  onShowMembers,
   onLeaveChannel,
-  showMembers,
   userPresence = {},
   pinnedCount = 0,
   onSearch,
@@ -98,21 +94,14 @@ export function ChatHeader({
           </button>
         )}
 
-        {/* Members toggle */}
-        <button
-          onClick={onShowMembers}
-          className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs transition-all ${
-            showMembers
-              ? "bg-primary/12 text-primary"
-              : "text-muted-foreground hover:bg-card/40 hover:text-foreground"
-          }`}
-        >
+        {/* Members count */}
+        <div className="flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs text-muted-foreground">
           <Users className="h-3.5 w-3.5" />
           <span>{members.length}</span>
           {onlineCount > 0 && (
             <span className="flex h-1.5 w-1.5 rounded-full bg-green-500 shadow-sm shadow-green-500/30" />
           )}
-        </button>
+        </div>
 
         {/* Leave channel */}
         {isMember && !isOwner && (

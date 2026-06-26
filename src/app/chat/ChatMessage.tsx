@@ -1,19 +1,21 @@
 import { Trash2, Edit2, Reply, Check, X, SmilePlus, Pin, Play, Pause, Volume2 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import type { ChatMessage as ChatMessageType, MessageReaction } from "./chat-types";
 import { EmojiPicker } from "./EmojiPicker";
 
 type ChatMessageProps = {
   message: ChatMessageType;
   isOwn: boolean;
+  currentUserId: string;
   onDelete: (id: string) => void;
   onEdit: (id: string, content: string) => void;
   onReply: (id: string) => void;
   onReact?: (messageId: string, emoji: string) => void;
   onPin?: (messageId: string) => void;
   showAuthor?: boolean;
+  replySource?: { content: string; author_email?: string } | null;
 };
 
 const QUICK_REACTIONS = ["👍", "❤️", "🔥", "😂", "😍", "🎉"];
@@ -21,12 +23,14 @@ const QUICK_REACTIONS = ["👍", "❤️", "🔥", "😂", "😍", "🎉"];
 export function ChatMessage({
   message,
   isOwn,
+  currentUserId,
   onDelete,
   onEdit,
   onReply,
   onReact,
   onPin,
   showAuthor = true,
+  replySource,
 }: ChatMessageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
@@ -61,35 +65,35 @@ export function ChatMessage({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showReactionPicker]);
 
-  const time = (() => {
+  const time = useCallback(() => {
     try {
       return format(new Date(message.created_at), "HH:mm", { locale: fr });
     } catch {
       return "";
     }
-  })();
+  }, [message.created_at]);
 
-  const date = (() => {
+  const date = useCallback(() => {
     try {
       return format(new Date(message.created_at), "dd/MM/yyyy", { locale: fr });
     } catch {
       return "";
     }
-  })();
+  }, [message.created_at]);
 
-  function handleSaveEdit() {
+  const handleSaveEdit = useCallback(() => {
     if (editContent.trim() && editContent !== message.content) {
       onEdit(message.id, editContent.trim());
     }
     setIsEditing(false);
-  }
+  }, [editContent, message.content, message.id, onEdit]);
 
-  function handleCancelEdit() {
+  const handleCancelEdit = useCallback(() => {
     setEditContent(message.content);
     setIsEditing(false);
-  }
+  }, [message.content]);
 
-  function toggleAudioPlayback() {
+  const toggleAudioPlayback = useCallback(() => {
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
@@ -97,7 +101,7 @@ export function ChatMessage({
     } else {
       audioRef.current.play().catch(() => setIsPlaying(false));
     }
-  }
+  }, [isPlaying]);
 
   const formatVoiceDuration = useCallback((seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -105,13 +109,13 @@ export function ChatMessage({
     return `${m}:${s.toString().padStart(2, "0")}`;
   }, []);
 
-  function handleReaction(emoji: string) {
+  const handleReaction = useCallback((emoji: string) => {
     onReact?.(message.id, emoji);
     setShowReactionPicker(false);
-  }
+  }, [message.id, onReact]);
 
   // Group reactions by emoji
-  const groupedReactions = (() => {
+  const groupedReactions = useMemo(() => {
     if (!message.reactions || message.reactions.length === 0) return [];
     const map = new Map<string, { count: number; users: string[]; reaction: MessageReaction }>();
     for (const r of message.reactions) {
@@ -124,10 +128,10 @@ export function ChatMessage({
       }
     }
     return Array.from(map.entries());
-  })();
+  }, [message.reactions]);
 
   // Render content with basic markdown
-  function renderContent(text: string) {
+  const renderContent = useCallback((text: string) => {
     // Bold
     let parts = text.split(/(\*\*.*?\*\*)/g);
     return parts.map((part, i) => {
@@ -154,13 +158,14 @@ export function ChatMessage({
         });
       });
     });
-  }
+  }, []);
 
   // Determine message type for rendering
   const isSticker = message.message_type === "sticker";
   const isVoice = message.message_type === "voice";
   const isGif = message.message_type === "gif";
   const isImage = message.message_type === "image" || (message.attachment_url && /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(message.attachment_url));
+  const isUrl = (text: string) => /^https?:\/\//.test(text.trim());
 
   return (
     <div
@@ -182,8 +187,8 @@ export function ChatMessage({
             <span className={`text-sm font-semibold ${isOwn ? "text-primary" : "text-foreground"}`}>
               {message.author_email ?? "Inconnu"}
             </span>
-            <span className="text-[10px] text-muted-foreground/50" title={date}>
-              {time}
+            <span className="text-[10px] text-muted-foreground/50" title={date()}>
+              {time()}
             </span>
             {message.is_pinned && (
               <Pin className="h-3 w-3 text-amber-500" fill="currentColor" />
@@ -275,7 +280,11 @@ export function ChatMessage({
         {message.reply_to && (
           <div className="mb-1 flex items-center gap-1.5 rounded-lg border-l-2 border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] text-muted-foreground/60">
             <Reply className="h-3 w-3 shrink-0 text-primary/50" />
-            <span className="truncate">Réponse à un message</span>
+            <span className="truncate">
+              {replySource
+                ? `${replySource.author_email?.split("@")[0] ?? "Quelqu'un"}: ${replySource.content.slice(0, 60)}${replySource.content.length > 60 ? "..." : ""}`
+                : "Réponse à un message"}
+            </span>
           </div>
         )}
 
@@ -312,12 +321,20 @@ export function ChatMessage({
         ) : isSticker ? (
           /* Sticker message */
           <div className="py-1">
-            <span className="text-5xl leading-none">{message.content}</span>
+            {isUrl(message.content) ? (
+              <img src={message.content} alt="Sticker" className="h-20 w-20 object-contain" loading="lazy" />
+            ) : (
+              <span className="text-5xl leading-none">{message.content}</span>
+            )}
           </div>
         ) : isGif ? (
           /* GIF message */
           <div className="py-1">
-            <span className="text-5xl leading-none">{message.content}</span>
+            {isUrl(message.content) ? (
+              <img src={message.content} alt="GIF" className="max-h-48 rounded-lg object-contain" loading="lazy" />
+            ) : (
+              <span className="text-5xl leading-none">{message.content}</span>
+            )}
           </div>
         ) : isVoice ? (
           /* Voice message with waveform animation */
@@ -363,7 +380,6 @@ export function ChatMessage({
             <audio
               ref={audioRef}
               src={message.voice_url || ""}
-              onEnded={() => setIsPlaying(false)}
               onTimeUpdate={() => {}}
               className="hidden"
             />
@@ -410,11 +426,11 @@ export function ChatMessage({
                 key={emoji}
                 onClick={() => handleReaction(emoji)}
                 className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-all hover:scale-105 ${
-                  data.users.includes(message.author_id)
+                  data.users.includes(currentUserId)
                     ? "border-primary/30 bg-primary/10 text-primary"
                     : "border-border/50 bg-card/40 text-muted-foreground hover:border-primary/20"
                 }`}
-                title={data.users.join(", ")}
+                title={data.users.map((u) => u.split("-")[0]).join(", ")}
               >
                 <span>{emoji}</span>
                 <span className="font-medium">{data.count}</span>

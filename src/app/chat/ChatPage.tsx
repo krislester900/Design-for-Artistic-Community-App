@@ -43,6 +43,7 @@ import { ChatHeader } from "./ChatHeader";
 import { ChatMessage as ChatMessageComponent } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { CreateChannelDialog } from "./CreateChannelDialog";
+import { getStaticPagePath } from "../lib/page-links";
 
 export function ChatPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -54,7 +55,6 @@ export function ChatPage() {
   const [showFriends, setShowFriends] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [members, setMembers] = useState<ChatChannelMember[]>([]);
-  const [showMembers, setShowMembers] = useState(false);
   const [pinnedCount, setPinnedCount] = useState(0);
   const [replyTo, setReplyTo] = useState<{ id: string; content: string } | null>(null);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
@@ -475,7 +475,7 @@ export function ChatPage() {
               Connecte-toi pour accéder aux salons de discussion et discuter avec la communauté Arteïa.
             </p>
             <a
-              href="/connexion.html"
+              href={getStaticPagePath("connexion")}
               className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
             >
               <LogIn className="h-4 w-4" />
@@ -518,9 +518,7 @@ export function ChatPage() {
                   channel={activeChannel}
                   members={members}
                   currentUserId={currentUserId}
-                  onShowMembers={() => setShowMembers(!showMembers)}
                   onLeaveChannel={handleLeave}
-                  showMembers={showMembers}
                   userPresence={userPresence}
                   pinnedCount={pinnedCount}
                   onSearch={handleSearch}
@@ -560,17 +558,22 @@ export function ChatPage() {
                         {displayMessages.map((msg, index) => {
                           const prevMsg = displayMessages[index - 1];
                           const showAuthor = !prevMsg || prevMsg.author_id !== msg.author_id;
+                          const replySource = msg.reply_to
+                            ? displayMessages.find((m) => m.id === msg.reply_to) ?? null
+                            : null;
                           return (
                             <ChatMessageComponent
                               key={msg.id}
                               message={msg}
                               isOwn={msg.author_id === currentUserId}
+                              currentUserId={currentUserId || ""}
                               onDelete={handleDelete}
                               onEdit={handleEdit}
                               onReply={handleReply}
                               onReact={handleReact}
                               onPin={handlePin}
                               showAuthor={showAuthor}
+                              replySource={replySource}
                             />
                           );
                         })}

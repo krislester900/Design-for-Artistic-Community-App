@@ -239,10 +239,13 @@ export function ChatInput({
               const input = document.createElement("input");
               input.type = "file";
               input.accept = "image/*";
+              input.style.display = "none";
               input.onchange = (e) => {
                 const file = (e.target as HTMLInputElement).files?.[0];
                 if (file) handleFileSelect(file);
+                document.body.removeChild(input);
               };
+              document.body.appendChild(input);
               input.click();
             }}
             className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
