@@ -32,14 +32,43 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   double _currentPosition = 0.0;
   bool _isLoading = false;
+  Duration? _totalDuration;
 
   @override
   void initState() {
     super.initState();
+    _setupAudioPlayer();
+  }
+
+  void _setupAudioPlayer() {
     _audioPlayer.onPositionChanged.listen((position) {
       if (mounted) {
         setState(() {
           _currentPosition = position.inSeconds.toDouble();
+        });
+      }
+    });
+
+    _audioPlayer.onDurationChanged.listen((duration) {
+      if (mounted) {
+        setState(() {
+          _totalDuration = duration;
+        });
+      }
+    });
+
+    _audioPlayer.onPlayerStateChanged.listen((state) {
+      if (mounted) {
+        setState(() {
+          _isLoading = state == PlayerState.playing;
+        });
+      }
+    });
+
+    _audioPlayer.onPlayerComplete.listen((_) {
+      if (mounted) {
+        setState(() {
+          _currentPosition = 0.0;
         });
       }
     });
@@ -52,8 +81,26 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
   }
 
   Future<void> _togglePlayPause() async {
-    if (widget.onPlayPause != null) {
-      widget.onPlayPause!();
+    if (widget.audioUrl == null) return;
+
+    try {
+      if (widget.isPlaying) {
+        await _audioPlayer.pause();
+      } else {
+        setState(() => _isLoading = true);
+        await _audioPlayer.play(UrlSource(widget.audioUrl!));
+        setState(() => _isLoading = false);
+      }
+      if (widget.onPlayPause != null) {
+        widget.onPlayPause!();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lecture: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -65,6 +112,8 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
 
   @override
   Widget build(BuildContext context) {
+    final displayDuration = widget.duration ?? _totalDuration ?? Duration.zero;
+
     return GestureDetector(
       onTap: widget.onTap,
       child: Container(
@@ -75,7 +124,7 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: widget.isPlaying 
-                ? AppTheme.primaryViolet.withOpacity(0.5) 
+                ? Colors.white.withOpacity(0.5) 
                 : Colors.grey.withOpacity(0.2),
           ),
           boxShadow: [
@@ -96,15 +145,13 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppTheme.primaryViolet, AppTheme.primaryTeal],
-                    ),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Center(
                     child: Text(
                       widget.authorAvatar ?? widget.authorName[0].toUpperCase(),
-                      style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 14, color: Colors.black, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
@@ -123,12 +170,12 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryViolet.withOpacity(0.2),
+                      color: Colors.white.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(
                       'En lecture',
-                      style: TextStyle(fontSize: 10, color: AppTheme.primaryViolet),
+                      style: TextStyle(fontSize: 10, color: Colors.white),
                     ),
                   ),
               ],
@@ -145,7 +192,7 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.psychology, size: 16, color: AppTheme.primaryTeal),
+                    const Icon(Icons.psychology, size: 16, color: Colors.white54),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -167,7 +214,7 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
             const SizedBox(height: 12),
             
             // Audio player controls (only if audio exists)
-            if (widget.audioUrl != null && widget.duration != null) ...[
+            if (widget.audioUrl != null) ...[
               Row(
                 children: [
                   // Play/Pause button
@@ -177,13 +224,11 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppTheme.primaryViolet, AppTheme.primaryTeal],
-                        ),
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(22),
                         boxShadow: [
                           BoxShadow(
-                            color: AppTheme.primaryViolet.withOpacity(0.4),
+                            color: Colors.white.withOpacity(0.3),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -195,12 +240,12 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: Colors.black,
                               ),
                             )
                           : Icon(
                               widget.isPlaying ? Icons.pause : Icons.play_arrow,
-                              color: Colors.white,
+                              color: Colors.black,
                               size: 24,
                             ),
                     ),
@@ -215,12 +260,12 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
-                            value: widget.duration!.inSeconds > 0
-                                ? _currentPosition / widget.duration!.inSeconds
+                            value: displayDuration.inSeconds > 0
+                                ? _currentPosition / displayDuration.inSeconds
                                 : 0.0,
                             backgroundColor: Colors.grey[800],
                             valueColor: AlwaysStoppedAnimation<Color>(
-                              widget.isPlaying ? AppTheme.primaryViolet : Colors.grey,
+                              widget.isPlaying ? Colors.white : Colors.grey,
                             ),
                             minHeight: 4,
                           ),
@@ -234,7 +279,7 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
                               style: TextStyle(fontSize: 10, color: Colors.grey[600]),
                             ),
                             Text(
-                              _formatDuration(widget.duration!),
+                              _formatDuration(displayDuration),
                               style: TextStyle(fontSize: 10, color: Colors.grey[600]),
                             ),
                           ],
@@ -249,7 +294,7 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
                   Icon(
                     Icons.graphic_eq,
                     size: 20,
-                    color: widget.isPlaying ? AppTheme.primaryViolet : Colors.grey[600],
+                    color: widget.isPlaying ? Colors.white : Colors.grey[600],
                   ),
                 ],
               ),
@@ -300,6 +345,14 @@ class _ThoughtBubbleAudioPlayerState extends State<ThoughtBubbleAudioPlayer> {
       if (mounted) {
         setState(() {
           _isPlaying = state == PlayerState.playing;
+        });
+      }
+    });
+    _audioPlayer.onPlayerComplete.listen((_) {
+      if (mounted) {
+        setState(() {
+          _currentPosition = 0.0;
+          _isPlaying = false;
         });
       }
     });
