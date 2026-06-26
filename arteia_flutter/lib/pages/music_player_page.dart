@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 import '../theme/category_themes.dart';
 
 class MusicPlayerPage extends StatefulWidget {
@@ -16,9 +17,90 @@ class MusicPlayerPage extends StatefulWidget {
 }
 
 class _MusicPlayerPageState extends State<MusicPlayerPage> {
+  late AudioPlayer _audioPlayer;
   bool _isPlaying = false;
   bool _isFavorite = false;
-  double _position = 0.28;
+  double _position = 0.0;
+  Duration _duration = Duration.zero;
+  Duration _currentPosition = Duration.zero;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _audioPlayer = AudioPlayer();
+    _setupPlayer();
+  }
+
+  Future<void> _setupPlayer() async {
+    try {
+      final audioUrl = widget.song['audio_url'] ?? widget.song['audioUrl'] ?? '';
+      if (audioUrl.isNotEmpty) {
+        await _audioPlayer.setUrl(audioUrl);
+      }
+      
+      _audioPlayer.durationStream.listen((duration) {
+        if (mounted) {
+          setState(() {
+            _duration = duration ?? Duration.zero;
+            _isLoading = false;
+          });
+        }
+      });
+      
+      _audioPlayer.positionStream.listen((position) {
+        if (mounted) {
+          setState(() {
+            _currentPosition = position;
+            _position = _duration.inMilliseconds > 0 
+                ? position.inMilliseconds / _duration.inMilliseconds 
+                : 0.0;
+          });
+        }
+      });
+      
+      _audioPlayer.playerStateStream.listen((state) {
+        if (mounted) {
+          setState(() => _isPlaying = state.playing);
+        }
+      });
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _togglePlay() async {
+    try {
+      if (_isPlaying) {
+        await _audioPlayer.pause();
+      } else {
+        await _audioPlayer.play();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lecture: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _seekTo(double value) async {
+    final position = Duration(milliseconds: (value * _duration.inMilliseconds).round());
+    await _audioPlayer.seek(position);
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,32 +173,35 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                 ],
               ),
               const SizedBox(height: 32),
-              SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  activeTrackColor: widget.theme.accentColor,
-                  inactiveTrackColor: Colors.white.withOpacity(0.14),
-                  thumbColor: Colors.white,
-                  overlayColor: widget.theme.accentColor.withOpacity(0.16),
-                  trackHeight: 4,
+              if (_isLoading)
+                const CircularProgressIndicator(color: Colors.white)
+              else
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: widget.theme.accentColor,
+                    inactiveTrackColor: Colors.white.withOpacity(0.14),
+                    thumbColor: Colors.white,
+                    overlayColor: widget.theme.accentColor.withOpacity(0.16),
+                    trackHeight: 4,
+                  ),
+                  child: Slider(
+                    min: 0,
+                    max: 1,
+                    value: _position,
+                    onChanged: _seekTo,
+                  ),
                 ),
-                child: Slider(
-                  min: 0,
-                  max: 1,
-                  value: _position,
-                  onChanged: (value) => setState(() => _position = value),
-                ),
-              ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      _elapsedLabel(duration),
+                      _formatDuration(_currentPosition),
                       style: TextStyle(color: Colors.grey[500], fontSize: 12),
                     ),
                     Text(
-                      duration,
+                      _formatDuration(_duration),
                       style: TextStyle(color: Colors.grey[500], fontSize: 12),
                     ),
                   ],
@@ -129,7 +214,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                   _control(Icons.skip_previous_rounded, 54, () {}),
                   const SizedBox(width: 22),
                   GestureDetector(
-                    onTap: () => setState(() => _isPlaying = !_isPlaying),
+                    onTap: _togglePlay,
                     child: Container(
                       width: 72,
                       height: 72,
@@ -213,17 +298,4 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     );
   }
 
-  String _elapsedLabel(String duration) {
-    final parts = duration.split(':');
-    if (parts.length != 2) return '1:00';
-
-    final minutes = int.tryParse(parts[0]) ?? 0;
-    final seconds = int.tryParse(parts[1]) ?? 0;
-    final totalSeconds = minutes * 60 + seconds;
-    final elapsedSeconds = (totalSeconds * _position).round();
-    final elapsedMinutes = elapsedSeconds ~/ 60;
-    final remainingSeconds = elapsedSeconds % 60;
-
-    return '$elapsedMinutes:${remainingSeconds.toString().padLeft(2, '0')}';
-  }
 }
