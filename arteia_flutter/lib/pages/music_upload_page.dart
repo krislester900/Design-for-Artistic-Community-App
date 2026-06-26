@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../services/supabase_service.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
@@ -20,6 +21,7 @@ class _MusicUploadPageState extends State<MusicUploadPage> {
   final _apiService = ApiService();
   final _supabase = SupabaseService();
   final _picker = ImagePicker();
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   File? _coverImage;
   String? _coverImageUrl;
@@ -27,6 +29,7 @@ class _MusicUploadPageState extends State<MusicUploadPage> {
   String? _audioUrl;
   bool _isUploading = false;
   bool _isSubmitting = false;
+  bool _isPlayingPreview = false;
 
   final List<Map<String, dynamic>> _genres = [
     {'slug': 'electronic', 'name': 'Électronique', 'icon': '🎛️'},
@@ -43,6 +46,7 @@ class _MusicUploadPageState extends State<MusicUploadPage> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -88,10 +92,21 @@ class _MusicUploadPageState extends State<MusicUploadPage> {
     if (_coverImage == null) return;
     setState(() => _isUploading = true);
     try {
-      // TODO: upload to Supabase Storage
-      setState(() => _isUploading = false);
+      final fileName = 'music_covers/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await _supabase.client.storage
+          .from('posts')
+          .upload(fileName, _coverImage!);
+      _coverImageUrl = _supabase.client.storage
+          .from('posts')
+          .getPublicUrl(fileName);
     } catch (e) {
-      setState(() => _isUploading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur upload cover: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
     }
   }
 
@@ -99,10 +114,43 @@ class _MusicUploadPageState extends State<MusicUploadPage> {
     if (_audioFile == null) return;
     setState(() => _isUploading = true);
     try {
-      // TODO: upload audio to Supabase Storage
-      setState(() => _isUploading = false);
+      final fileName = 'music_tracks/${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await _supabase.client.storage
+          .from('posts')
+          .upload(fileName, _audioFile!);
+      _audioUrl = _supabase.client.storage
+          .from('posts')
+          .getPublicUrl(fileName);
     } catch (e) {
-      setState(() => _isUploading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur upload audio: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  Future<void> _previewAudio() async {
+    if (_audioFile == null) return;
+    try {
+      if (_isPlayingPreview) {
+        await _audioPlayer.pause();
+        setState(() => _isPlayingPreview = false);
+      } else {
+        await _audioPlayer.play(DeviceFileSource(_audioFile!.path));
+        setState(() => _isPlayingPreview = true);
+        _audioPlayer.onPlayerComplete.listen((_) {
+          if (mounted) setState(() => _isPlayingPreview = false);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lecture: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -168,7 +216,7 @@ class _MusicUploadPageState extends State<MusicUploadPage> {
             onPressed: _isSubmitting ? null : _submitTrack,
             child: _isSubmitting
                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Publier', style: TextStyle(color: AppTheme.primaryViolet, fontWeight: FontWeight.bold)),
+                : const Text('Publier', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -221,10 +269,10 @@ class _MusicUploadPageState extends State<MusicUploadPage> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppTheme.primaryTeal.withOpacity(0.2),
+                        color: Colors.white.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.audio_file, color: AppTheme.primaryTeal, size: 32),
+                      child: const Icon(Icons.audio_file, color: Colors.white, size: 32),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -245,6 +293,11 @@ class _MusicUploadPageState extends State<MusicUploadPage> {
                         ],
                       ),
                     ),
+                    if (_audioFile != null)
+                      IconButton(
+                        icon: Icon(_isPlayingPreview ? Icons.pause : Icons.play_arrow, color: Colors.white),
+                        onPressed: _previewAudio,
+                      ),
                     Icon(Icons.upload_file, color: Colors.grey[600]),
                   ],
                 ),
