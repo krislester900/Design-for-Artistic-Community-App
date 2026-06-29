@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import '../services/supabase_service.dart';
 import '../services/api_service.dart';
 import '../services/quests_service.dart';
+import '../services/like_service.dart';
 import '../services/local_image_cache_service.dart';
 import '../theme/app_theme.dart';
 import 'universe_page.dart';
@@ -20,6 +21,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
   final ApiService _api = ApiService();
   final SupabaseService _supabase = SupabaseService();
   final QuestsService _questsService = QuestsService();
+  final LikeService _likeService = LikeService();
   LocalImageCacheService? _imageCache;
   final TextEditingController _commentController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -50,13 +52,9 @@ class _PostDetailPageState extends State<PostDetailPage> {
   }
 
   Future<void> _checkIfLiked() async {
-    final user = _supabase.currentUser;
-    if (user == null) return;
-
     final postId = widget.post['id'];
     if (postId == null) return;
-
-    final liked = await _api.isPostLiked(postId, user.id);
+    final liked = await _likeService.isLiked(postId.toString());
     if (mounted) setState(() => _isLiked = liked);
   }
 
@@ -66,7 +64,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
 
     try {
       final response = await _supabase.client
-          .from('comments')
+          .from('post_comments')
           .select('*, profiles!user_id(username, avatar_url)')
           .eq('post_id', postId)
           .order('created_at', ascending: false);
@@ -78,43 +76,22 @@ class _PostDetailPageState extends State<PostDetailPage> {
         });
       }
     } catch (e) {
-      print('🔴 Load comments error: $e');
-      if (mounted) setState(() => _isLoadingComments = false);
-    }
-  }
-
-  Future<void> _toggleLike() async {
-    final user = _supabase.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Connectez-vous pour liker')),
-      );
-      return;
-    }
-
-    final postId = widget.post['id'];
-    if (postId == null) return;
-
-    final wasLiked = _isLiked;
-    setState(() {
-      _isLiked = !_isLiked;
-      _likesCount += _isLiked ? 1 : -1;
-    });
-
-    try {
-      if (_isLiked) {
-        await _api.likePost(postId, user.id);
-        // Update quest progress
-        _questsService.updateQuestProgress(QuestType.like, 1);
-      } else {
-        await _api.unlikePost(postId, user.id);
+      // Fallback to old table
+      try {
+        final response = await _supabase.client
+            .from('comments')
+            .select('*, profiles!user_id(username, avatar_url)')
+            .eq('post_id', postId)
+            .order('created_at', ascending: false);
+        if (mounted) {
+          setState(() {
+            _comments = List<Map<String, dynamic>>.from(response);
+            _isLoadingComments = false;
+          });
+        }
+      } catch (e2) {
+        if (mounted) setState(() => _isLoadingComments = false);
       }
-    } catch (e) {
-      // Revert on error
-      setState(() {
-        _isLiked = wasLiked;
-        _likesCount += wasLiked ? 1 : -1;
-      });
     }
   }
 
@@ -136,7 +113,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
     setState(() => _isSendingComment = true);
 
     try {
-      await _supabase.client.from('comments').insert({
+      await _supabase.client.from('post_comments').insert({
         'post_id': postId,
         'user_id': user.id,
         'content': text,
@@ -144,14 +121,6 @@ class _PostDetailPageState extends State<PostDetailPage> {
 
       _commentController.clear();
       await _loadComments();
-
-      // Update comments count in post
-      await _supabase.client
-          .from('posts')
-          .update({'comments_count': _comments.length})
-          .eq('id', postId);
-
-      // Update quest progress
       _questsService.updateQuestProgress(QuestType.comment, 1);
 
       if (mounted) {
@@ -160,10 +129,21 @@ class _PostDetailPageState extends State<PostDetailPage> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
-        );
+      // Fallback old table
+      try {
+        await _supabase.client.from('comments').insert({
+          'post_id': postId,
+          'user_id': user.id,
+          'content': text,
+        });
+        _commentController.clear();
+        await _loadComments();
+      } catch (e2) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur: $e2'), backgroundColor: Colors.red),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _isSendingComment = false);
@@ -216,21 +196,17 @@ class _PostDetailPageState extends State<PostDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Post content
                   _buildPostContent(),
                   const SizedBox(height: 20),
-                  // Actions
                   _buildActions(),
                   const SizedBox(height: 24),
                   const Divider(),
                   const SizedBox(height: 16),
-                  // Comments section
                   _buildCommentsSection(),
                 ],
               ),
             ),
           ),
-          // Comment input at bottom
           _buildCommentInput(),
         ],
       ),
@@ -301,7 +277,6 @@ class _PostDetailPageState extends State<PostDetailPage> {
               future: _imageCache!.getImage(imageUrl),
               builder: (context, snapshot) {
                 if (snapshot.hasData && snapshot.data != null) {
-                  // Display cached image
                   return ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Image.memory(
@@ -311,7 +286,6 @@ class _PostDetailPageState extends State<PostDetailPage> {
                     ),
                   );
                 }
-                // Fallback to network image
                 return ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: Image.network(
@@ -344,14 +318,18 @@ class _PostDetailPageState extends State<PostDetailPage> {
   }
 
   Widget _buildActions() {
+    final postId = widget.post['id']?.toString() ?? '';
+    
     return Row(
       children: [
-        _ActionButton(
-          icon: _isLiked ? Icons.favorite : Icons.favorite_border,
-          label: '$_likesCount',
-          isActive: _isLiked,
-          onTap: _toggleLike,
-          activeColor: AppTheme.primaryPink,
+        LikeButton(
+          postId: postId,
+          initialCount: _likesCount,
+          initialLiked: _isLiked,
+          size: 22,
+          onChanged: () {
+            _questsService.updateQuestProgress(QuestType.like, 1);
+          },
         ),
         const SizedBox(width: 12),
         _ActionButton(
