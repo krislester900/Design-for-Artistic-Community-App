@@ -12,8 +12,14 @@ interface ChatMessage {
 interface RequestBody {
   messages: ChatMessage[];
   context?: {
-    contentType?: "visual" | "music" | "writing" | "comics" | "general";
+    contentType?: "visual" | "music" | "writing" | "comics" | "general" | "technique" | "style";
     userId?: string;
+  };
+  feedback?: {
+    conversationId?: number;
+    rating?: number;
+    isHelpful?: boolean;
+    text?: string;
   };
 }
 
@@ -79,13 +85,54 @@ serve(async (req) => {
     }
 
     const body: RequestBody = await req.json();
-    const { messages, context } = body;
+    const { messages, context, feedback } = body;
+
+    // Si c'est un feedback, le sauvegarder
+    if (feedback) {
+      try {
+        await supabase.from("ai_feedback").insert({
+          user_id: user.id,
+          conversation_id: feedback.conversationId,
+          rating: feedback.rating,
+          is_helpful: feedback.isHelpful,
+          feedback_text: feedback.text,
+        });
+      } catch (e) {
+        console.error("Failed to save feedback:", e);
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
 
     if (!messages || messages.length === 0) {
       return new Response(JSON.stringify({ error: "Messages requis" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
+    }
+
+    // RAG : Rechercher dans la base de connaissances
+    let knowledgeContext = "";
+    try {
+      const lastMessage = messages[messages.length - 1]?.content ?? "";
+      const category = context?.contentType ?? "general";
+      
+      // Recherche par mots-clés dans la base de connaissances
+      const { data: knowledge } = await supabase
+        .from("ai_knowledge_base")
+        .select("title, content, category")
+        .or(`category.eq.${category},category.eq.general,category.eq.technique`)
+        .limit(3);
+
+      if (knowledge && knowledge.length > 0) {
+        knowledgeContext = "\n\n--- BASE DE CONNAISSANCES ---\n";
+        for (const item of knowledge) {
+          knowledgeContext += `\n📚 ${item.title}:\n${item.content.substring(0, 500)}...\n`;
+        }
+      }
+    } catch (e) {
+      console.error("RAG search failed:", e);
     }
 
     // Construire le contexte spécifique au type de contenu
@@ -108,7 +155,7 @@ serve(async (req) => {
     }
 
     const fullMessages: ChatMessage[] = [
-      { role: "system", content: SYSTEM_PROMPT + contextPrompt },
+      { role: "system", content: SYSTEM_PROMPT + contextPrompt + knowledgeContext },
       ...messages,
     ];
 
@@ -142,17 +189,29 @@ serve(async (req) => {
     const data = await openaiResponse.json();
     const reply = data.choices?.[0]?.message?.content ?? "";
 
-    // Sauvegarder la conversation dans Supabase pour historique
+    // Sauvegarder la conversation dans Supabase pour historique + entraînement
     try {
-      await supabase.from("ai_conversations").insert({
+      const { data: conv } = await supabase.from("ai_conversations").insert({
         user_id: user.id,
         user_message: messages[messages.length - 1]?.content ?? "",
         assistant_reply: reply,
         context_type: context?.contentType ?? "general",
         tokens_used: data.usage?.total_tokens ?? 0,
-      });
+      }).select("id").single();
+
+      // Si la réponse est de bonne qualité, l'ajouter aux données d'entraînement
+      if (conv && reply.length > 50) {
+        await supabase.from("ai_training_data").insert({
+          user_id: user.id,
+          category: context?.contentType ?? "general",
+          question: messages[messages.length - 1]?.content ?? "",
+          answer: reply,
+          quality_score: 3,
+          is_approved: false,
+          token_count: data.usage?.total_tokens ?? 0,
+        });
+      }
     } catch (e) {
-      // Non bloquant
       console.error("Failed to save conversation:", e);
     }
 
