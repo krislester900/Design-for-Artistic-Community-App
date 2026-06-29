@@ -141,7 +141,7 @@ function createSubmission(params: {
 /**
  * Envoie une soumission approuvée directement dans Supabase
  */
-async function syncToSupabase(submission: SubmissionItem, data: any) {
+async function syncToSupabase(submission: SubmissionItem, data: Artist | Artwork | Discussion) {
   try {
     let result;
     if (submission.type === "artist") {

@@ -13,6 +13,7 @@ import '../pages/music_upload_page.dart';
 import '../pages/writing_page.dart';
 import '../pages/comics_upload_page.dart';
 import '../pages/auth_page.dart';
+import '../pages/ai_assistant_page.dart';
 import 'arteia_logo.dart';
 
 class AppDrawer extends StatelessWidget {
@@ -88,6 +89,10 @@ class AppDrawer extends StatelessWidget {
         _drawerItem(Icons.add_circle_outline, 'Publier', () {
           _showUploadDialog(context);
           onClose();
+        }),
+        _drawerItem(Icons.auto_awesome, 'Arteïa Muse ✨', () {
+          onClose();
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage()));
         }),
         const Divider(),
         _drawerItem(Icons.notifications_outlined, 'Notifications', () {

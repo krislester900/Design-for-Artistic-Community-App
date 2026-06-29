@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   signIn,
   signUp,
@@ -37,6 +37,13 @@ export default function MultiPageApp({ page }: MultiPageAppProps) {
   const [displayName, setDisplayName] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const messageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (messageTimerRef.current) clearTimeout(messageTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -59,8 +66,9 @@ export default function MultiPageApp({ page }: MultiPageAppProps) {
   }, []);
 
   const showMessage = (msg: string) => {
+    if (messageTimerRef.current) clearTimeout(messageTimerRef.current);
     setMessage(msg);
-    setTimeout(() => setMessage(""), 5000);
+    messageTimerRef.current = setTimeout(() => setMessage(""), 5000);
   };
 
   const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {

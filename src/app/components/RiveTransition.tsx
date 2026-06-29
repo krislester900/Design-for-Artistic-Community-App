@@ -20,7 +20,7 @@ export function RiveTransition({ onComplete, duration = 1500 }: RiveTransitionPr
 
   useEffect(() => {
     let mounted = true;
-    let riveInstance: any = null;
+    let riveInstance: { cleanup: () => void } | null = null;
 
     const loadRive = async () => {
       try {

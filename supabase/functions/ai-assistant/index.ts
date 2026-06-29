@@ -1,0 +1,224 @@
+// Supabase Edge Function: Arteïa AI Assistant
+// Sécurisé : la clé OpenAI n'est jamais exposée au client
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+interface RequestBody {
+  messages: ChatMessage[];
+  context?: {
+    contentType?: "visual" | "music" | "writing" | "comics" | "general";
+    userId?: string;
+  };
+}
+
+const SYSTEM_PROMPT = `Tu es "Arteïa Muse" ✨, l'assistant créatif officiel d'Arteïa, une plateforme artistique communautaire.
+
+Tu aides les artistes à :
+1. Générer des idées créatives (art visuel, musique, écriture, BD/manga)
+2. Donner des retours constructifs sur leurs œuvres
+3. Suggérer des techniques et styles artistiques
+4. Expliquer les fonctionnalités de l'application Arteïa
+5. Inspirer et motiver les créateurs
+
+Personnalité :
+- Créative et inspirante, tu parles avec des émojis artistiques 🎨🎵✍️
+- Encourageante mais honnête dans tes retours
+- Tu connais les catégories : visuel, musique, écriture, BD/manga
+- Tu peux suggérer des exercices créatifs
+- Tu parles français
+
+Fonctionnalités connues d'Arteïa :
+- Publication d'œuvres visuelles, musique, écriture, BD
+- Système de likes, commentaires, favoris
+- Messagerie et chat avec messages éphémères
+- Notifications en temps réel
+- Défis créatifs et quêtes
+- Bulles de pensée (messages vocaux)
+- Lecteur de musique intégré
+- Mode lecture immersive`;
+
+serve(async (req) => {
+  // CORS
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      },
+    });
+  }
+
+  try {
+    // Vérifier l'authentification
+    const authHeader = req.headers.get("Authorization")?.replace("Bearer ", "");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Non authentifié" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Vérifier l'utilisateur
+    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Utilisateur non trouvé" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const body: RequestBody = await req.json();
+    const { messages, context } = body;
+
+    if (!messages || messages.length === 0) {
+      return new Response(JSON.stringify({ error: "Messages requis" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Construire le contexte spécifique au type de contenu
+    let contextPrompt = "";
+    if (context?.contentType) {
+      switch (context.contentType) {
+        case "visual":
+          contextPrompt = "\nL'utilisateur travaille sur une œuvre visuelle. Propose des idées de composition, palette de couleurs, techniques.";
+          break;
+        case "music":
+          contextPrompt = "\nL'utilisateur crée de la musique. Suggère des progressions d'accords, ambiances, arrangements.";
+          break;
+        case "writing":
+          contextPrompt = "\nL'utilisateur écrit un texte. Aide pour le style, la structure narrative, les personnages.";
+          break;
+        case "comics":
+          contextPrompt = "\nL'utilisateur fait de la BD/manga. Conseil pour le storyboard, les planches, le lettering.";
+          break;
+      }
+    }
+
+    const fullMessages: ChatMessage[] = [
+      { role: "system", content: SYSTEM_PROMPT + contextPrompt },
+      ...messages,
+    ];
+
+    // Appeler OpenAI
+    const openaiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openaiKey) {
+      // Fallback: réponses locales si pas de clé OpenAI
+      return handleLocalResponse(messages, context);
+    }
+
+    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${openaiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: fullMessages,
+        max_tokens: 1024,
+        temperature: 0.8,
+      }),
+    });
+
+    if (!openaiResponse.ok) {
+      const errorText = await openaiResponse.text();
+      console.error("OpenAI error:", errorText);
+      return handleLocalResponse(messages, context);
+    }
+
+    const data = await openaiResponse.json();
+    const reply = data.choices?.[0]?.message?.content ?? "";
+
+    // Sauvegarder la conversation dans Supabase pour historique
+    try {
+      await supabase.from("ai_conversations").insert({
+        user_id: user.id,
+        user_message: messages[messages.length - 1]?.content ?? "",
+        assistant_reply: reply,
+        context_type: context?.contentType ?? "general",
+        tokens_used: data.usage?.total_tokens ?? 0,
+      });
+    } catch (e) {
+      // Non bloquant
+      console.error("Failed to save conversation:", e);
+    }
+
+    return new Response(JSON.stringify({ reply }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    console.error("Error:", error);
+    return new Response(JSON.stringify({ error: "Erreur interne" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+});
+
+// Fallback local sans OpenAI : réponses basées sur des templates
+function handleLocalResponse(messages: ChatMessage[], context?: any) {
+  const lastMessage = messages[messages.length - 1]?.content.toLowerCase() ?? "";
+  
+  let reply = "";
+
+  if (lastMessage.includes("bonjour") || lastMessage.includes("salut")) {
+    reply = "Bonjour créateur ! ✨ Comment puis-je t'inspirer aujourd'hui ? Que veux-tu créer ?";
+  } else if (lastMessage.includes("idée") || lastMessage.includes("inspire")) {
+    const ideas = [
+      "🎨 **Art visuel** : Essaie un autoportrait en utilisant uniquement des formes géométriques. Le minimalisme peut révéler l'essentiel !",
+      "🎵 **Musique** : Crée une boucle de 4 accords qui évoque un lever de soleil. Commence en mineur, termine en majeur.",
+      "✍️ **Écriture** : Écris un micro-poème de 6 mots sur le thème de la renaissance créative.",
+      "📚 **BD** : Dessine une planche muette où un personnage découvre un monde en noir et blanc qui prend vie couleur par couleur.",
+    ];
+    reply = "Voici quelques idées pour t'inspirer :\n\n" + ideas.join("\n\n");
+  } else if (lastMessage.includes("merci")) {
+    reply = "Avec plaisir ! 🎨 Continue de créer, l'art est un voyage sans fin. N'hésite pas si tu as besoin d'autres idées !";
+  } else if (lastMessage.includes("feedback") || lastMessage.includes("retour") || lastMessage.includes("avis")) {
+    reply = "Bien sûr ! Pour te donner un retour pertinent, pourrais-tu me décrire un peu ton œuvre ?\n\n"
+      + "🎨 **Pour une œuvre visuelle** : Parle-moi des couleurs, de la composition.\n"
+      + "🎵 **Pour de la musique** : Décris l'ambiance, le rythme.\n"
+      + "✍️ **Pour un texte** : Partage quelques phrases.\n"
+      + "📚 **Pour une BD** : Raconte-moi le concept.";
+  } else if (lastMessage.includes("fonctionnalité") || lastMessage.includes("comment")) {
+    reply = "🎯 **Fonctionnalités Arteïa :**\n\n"
+      + "📤 **Publier** : Œuvres visuelles, musique, écriture, BD\n"
+      + "❤️ **Interagir** : Likes, commentaires, favoris\n"
+      + "💬 **Chat** : Messages texte, vocaux, éphémères\n"
+      + "🎵 **Musique** : Lecteur intégré avec upload\n"
+      + "📖 **Lecture** : Mode immersif pour textes\n"
+      + "🏆 **Défis** : Quêtes créatives hebdomadaires\n\n"
+      + "Que souhaites-tu explorer ?";
+  } else if (lastMessage.includes("exercice") || lastMessage.includes("défi")) {
+    reply = "🔥 **Défi créatif du jour :**\n\n"
+      + "**« 10 minutes chrono »** ⏱️\n\n"
+      + "Prends un thème au hasard (nature, ville, rêve, émotion) et crée quelque chose en seulement 10 minutes.\n\n"
+      + "Pas de perfectionnisme ! L'objectif est de libérer ta créativité sans filtre. 🎨";
+  } else {
+    reply = "Je suis Arteïa Muse ✨, ton assistant créatif !\n\nJe peux :\n"
+      + "🎨 Générer des idées artistiques\n"
+      + "💡 Donner des retours sur tes créations\n"
+      + "📚 Suggérer des techniques et exercices\n"
+      + "🔍 T'expliquer les fonctionnalités de l'app\n\n"
+      + "De quoi as-tu besoin pour créer aujourd'hui ?";
+  }
+
+  return new Response(JSON.stringify({ reply }), {
+    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+  });
+}

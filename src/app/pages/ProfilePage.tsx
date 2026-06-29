@@ -38,7 +38,7 @@ export default function ProfilePage({ user: initialUser }: ProfilePageProps) {
       <div className="profile-header">
         <div className="avatar">
           {user.avatar_url ? (
-            <img src={user.avatar_url} alt="Avatar" />
+            <img src={user.avatar_url} alt={`Avatar de ${user.display_name}`} />
           ) : (
             <div className="avatar-placeholder">
               {user.display_name.charAt(0).toUpperCase()}

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { User, Upload, Save, LogOut, Heart, Bookmark, Settings } from "lucide-react";
 import { getCurrentSession, onAuthChange, signOut, type AuthUser } from "../services/auth";
 import { getFavorites } from "../services/favorites";
-import { ImageWithFallback } from "./ImageWithFallback";
+import { getStaticPagePath } from "../lib/page-links";
 
 export function ProfilePage() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -10,6 +10,13 @@ export function ProfilePage() {
   const [bio, setBio] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    };
+  }, []);
   const [favoriteCount, setFavoriteCount] = useState(0);
   const [activeTab, setActiveTab] = useState<"profile" | "favorites" | "settings">("profile");
 
@@ -36,7 +43,8 @@ export function ProfilePage() {
     await new Promise((r) => setTimeout(r, 800));
     setSaving(false);
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
   }
 
   async function handleLogout() {
@@ -54,7 +62,7 @@ export function ProfilePage() {
             Connecte-toi pour accéder à ton profil, gérer tes favoris et publier du contenu.
           </p>
           <a
-            href="/connexion.html"
+            href={getStaticPagePath("login")}
             className="mt-6 inline-block rounded-xl border border-primary/30 bg-primary px-6 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-primary-foreground"
           >
             Se connecter

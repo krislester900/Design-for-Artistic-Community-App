@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Upload, Check, Image, Music, Pen } from "lucide-react";
 import { categories, type CategorySlug } from "../data/community";
 import { submitArtwork, submitArtistProfile, submitDiscussion, saveUserProfile, getProfile, type SubmissionItem } from "./ProfileUploadService";
@@ -42,9 +42,18 @@ export function ArtworkUploadForm() {
   const [discussionCategory, setDiscussionCategory] = useState<string>("music");
   const [discussionTime, setDiscussionTime] = useState("Aujourd'hui");
 
+  const messageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (messageTimerRef.current) clearTimeout(messageTimerRef.current);
+    };
+  }, []);
+
   function showMessage(type: "success" | "error", text: string) {
+    if (messageTimerRef.current) clearTimeout(messageTimerRef.current);
     setMessage({ type, text });
-    setTimeout(() => setMessage(null), 4000);
+    messageTimerRef.current = setTimeout(() => setMessage(null), 4000);
   }
 
   function handleProfileSave() {

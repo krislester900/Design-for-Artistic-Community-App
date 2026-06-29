@@ -48,8 +48,8 @@ export function ImageWithFallback({
   const [imgSrc, setImgSrc] = useState(lazy ? '' : src);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
-  const imgRef = useRef<HTMLImageElement>(null);
-  const isVisible = useIntersectionObserver(imgRef);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const isVisible = useIntersectionObserver(wrapperRef);
 
   useEffect(() => {
     if (isVisible && lazy && !imgSrc) {
@@ -66,7 +66,7 @@ export function ImageWithFallback({
 
   return (
     <div
-      ref={imgRef as React.RefObject<HTMLDivElement>}
+      ref={wrapperRef}
       className={`relative overflow-hidden ${className}`}
       style={{ backgroundColor: error ? '#ddd' : 'transparent' }}
     >
