@@ -119,7 +119,7 @@ void main() {
 
       // Ideas
       final ideas = await assistant.sendMessage(message: 'idée');
-      expect(ideas, contains('Idées') || contains('idée'));
+      expect(ideas, anyOf(contains('Idées'), contains('idée')));
 
       // Features
       final features = await assistant.sendMessage(message: 'fonctionnalité');

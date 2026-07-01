@@ -4,6 +4,9 @@ import 'supabase_service.dart';
 class FollowService {
   final SupabaseService _supabase = SupabaseService();
   SupabaseClient get _client => _supabase.client;
+  static final FollowService _instance = FollowService._();
+  factory FollowService() => _instance;
+  FollowService._();
 
   /// Follow a user
   Future<bool> followUser(String followingId) async {

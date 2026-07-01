@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 import 'quests_service.dart';
 
@@ -115,9 +116,9 @@ class CommentService {
     try {
       final response = await _supabase.client
           .from('post_comments')
-          .select('id', count: CountOption.exact)
+          .select()
           .eq('post_id', postId);
-      return response.count ?? 0;
+      return (response as List).length;
     } catch (e) {
       return 0;
     }
