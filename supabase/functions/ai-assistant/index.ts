@@ -1,5 +1,6 @@
 // Supabase Edge Function: Arteïa AI Assistant
-// Sécurisé : la clé OpenAI n'est jamais exposée au client
+// 100% Open Source - Utilise Llama 3 via Groq (gratuit) ou Ollama (local)
+// Aucune dépendance à OpenAI
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -115,10 +116,8 @@ serve(async (req) => {
     // RAG : Rechercher dans la base de connaissances
     let knowledgeContext = "";
     try {
-      const lastMessage = messages[messages.length - 1]?.content ?? "";
       const category = context?.contentType ?? "general";
       
-      // Recherche par mots-clés dans la base de connaissances
       const { data: knowledge } = await supabase
         .from("ai_knowledge_base")
         .select("title, content, category")
@@ -159,68 +158,82 @@ serve(async (req) => {
       ...messages,
     ];
 
-    // Appeler OpenAI
-    const openaiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openaiKey) {
-      // Fallback: réponses locales si pas de clé OpenAI
-      return handleLocalResponse(messages, context);
-    }
-
-    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${openaiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: fullMessages,
-        max_tokens: 1024,
-        temperature: 0.8,
-      }),
-    });
-
-    if (!openaiResponse.ok) {
-      const errorText = await openaiResponse.text();
-      console.error("OpenAI error:", errorText);
-      return handleLocalResponse(messages, context);
-    }
-
-    const data = await openaiResponse.json();
-    const reply = data.choices?.[0]?.message?.content ?? "";
-
-    // Sauvegarder la conversation dans Supabase pour historique + entraînement
-    try {
-      const { data: conv } = await supabase.from("ai_conversations").insert({
-        user_id: user.id,
-        user_message: messages[messages.length - 1]?.content ?? "",
-        assistant_reply: reply,
-        context_type: context?.contentType ?? "general",
-        tokens_used: data.usage?.total_tokens ?? 0,
-      }).select("id").single();
-
-      // Si la réponse est de bonne qualité, l'ajouter aux données d'entraînement
-      if (conv && reply.length > 50) {
-        await supabase.from("ai_training_data").insert({
-          user_id: user.id,
-          category: context?.contentType ?? "general",
-          question: messages[messages.length - 1]?.content ?? "",
-          answer: reply,
-          quality_score: 3,
-          is_approved: false,
-          token_count: data.usage?.total_tokens ?? 0,
+    // ============================================================
+    // ÉTAPE 1 : Essayer Groq (Llama 3 - open source, gratuit)
+    // ============================================================
+    const groqKey = Deno.env.get("GROQ_API_KEY");
+    if (groqKey) {
+      try {
+        const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${groqKey}`,
+          },
+          body: JSON.stringify({
+            model: "llama3-70b-8192", // Llama 3 70B - open source
+            messages: fullMessages,
+            max_tokens: 1024,
+            temperature: 0.8,
+          }),
         });
+
+        if (groqResponse.ok) {
+          const data = await groqResponse.json();
+          const reply = data.choices?.[0]?.message?.content ?? "";
+          
+          if (reply) {
+            // Sauvegarder la conversation
+            await saveConversation(supabase, user.id, messages, reply, context, data.usage?.total_tokens ?? 0);
+            return new Response(JSON.stringify({ reply }), {
+              headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Groq error:", e);
+      }
+    }
+
+    // ============================================================
+    // ÉTAPE 2 : Essayer Ollama (local - open source)
+    // ============================================================
+    const ollamaUrl = Deno.env.get("OLLAMA_URL") ?? "http://localhost:11434";
+    try {
+      const ollamaResponse = await fetch(`${ollamaUrl}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "llama3.2:3b", // Petit modèle, rapide
+          messages: fullMessages,
+          stream: false,
+          options: {
+            temperature: 0.8,
+            num_predict: 1024,
+          },
+        }),
+      });
+
+      if (ollamaResponse.ok) {
+        const data = await ollamaResponse.json();
+        const reply = data.message?.content ?? "";
+        
+        if (reply) {
+          await saveConversation(supabase, user.id, messages, reply, context, 0);
+          return new Response(JSON.stringify({ reply }), {
+            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+          });
+        }
       }
     } catch (e) {
-      console.error("Failed to save conversation:", e);
+      console.error("Ollama error:", e);
     }
 
-    return new Response(JSON.stringify({ reply }), {
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
-    });
+    // ============================================================
+    // ÉTAPE 3 : Fallback - Réponses locales intelligentes
+    // ============================================================
+    return handleLocalResponse(messages, context);
+    
   } catch (error) {
     console.error("Error:", error);
     return new Response(JSON.stringify({ error: "Erreur interne" }), {
@@ -230,15 +243,42 @@ serve(async (req) => {
   }
 });
 
-// Fallback local sans OpenAI : réponses basées sur des templates
+// Sauvegarder la conversation dans Supabase
+async function saveConversation(supabase: any, userId: string, messages: ChatMessage[], reply: string, context: any, tokens: number) {
+  try {
+    const { data: conv } = await supabase.from("ai_conversations").insert({
+      user_id: userId,
+      user_message: messages[messages.length - 1]?.content ?? "",
+      assistant_reply: reply,
+      context_type: context?.contentType ?? "general",
+      tokens_used: tokens,
+    }).select("id").single();
+
+    if (conv && reply.length > 50) {
+      await supabase.from("ai_training_data").insert({
+        user_id: userId,
+        category: context?.contentType ?? "general",
+        question: messages[messages.length - 1]?.content ?? "",
+        answer: reply,
+        quality_score: 3,
+        is_approved: false,
+        token_count: tokens,
+      });
+    }
+  } catch (e) {
+    console.error("Failed to save conversation:", e);
+  }
+}
+
+// Fallback local : réponses intelligentes sans API
 function handleLocalResponse(messages: ChatMessage[], context?: any) {
   const lastMessage = messages[messages.length - 1]?.content.toLowerCase() ?? "";
   
   let reply = "";
 
-  if (lastMessage.includes("bonjour") || lastMessage.includes("salut")) {
-    reply = "Bonjour créateur ! ✨ Comment puis-je t'inspirer aujourd'hui ? Que veux-tu créer ?";
-  } else if (lastMessage.includes("idée") || lastMessage.includes("inspire")) {
+  if (lastMessage.includes("bonjour") || lastMessage.includes("salut") || lastMessage.includes("coucou")) {
+    reply = "Bonjour créateur ! ✨ Je suis Arteïa Muse, ton assistant artistique open source. Comment puis-je t'inspirer aujourd'hui ?";
+  } else if (lastMessage.includes("idée") || lastMessage.includes("inspire") || lastMessage.includes("propose")) {
     const ideas = [
       "🎨 **Art visuel** : Essaie un autoportrait en utilisant uniquement des formes géométriques. Le minimalisme peut révéler l'essentiel !",
       "🎵 **Musique** : Crée une boucle de 4 accords qui évoque un lever de soleil. Commence en mineur, termine en majeur.",
@@ -254,7 +294,7 @@ function handleLocalResponse(messages: ChatMessage[], context?: any) {
       + "🎵 **Pour de la musique** : Décris l'ambiance, le rythme.\n"
       + "✍️ **Pour un texte** : Partage quelques phrases.\n"
       + "📚 **Pour une BD** : Raconte-moi le concept.";
-  } else if (lastMessage.includes("fonctionnalité") || lastMessage.includes("comment")) {
+  } else if (lastMessage.includes("fonctionnalité") || lastMessage.includes("comment faire") || lastMessage.includes("aide")) {
     reply = "🎯 **Fonctionnalités Arteïa :**\n\n"
       + "📤 **Publier** : Œuvres visuelles, musique, écriture, BD\n"
       + "❤️ **Interagir** : Likes, commentaires, favoris\n"
@@ -263,13 +303,21 @@ function handleLocalResponse(messages: ChatMessage[], context?: any) {
       + "📖 **Lecture** : Mode immersif pour textes\n"
       + "🏆 **Défis** : Quêtes créatives hebdomadaires\n\n"
       + "Que souhaites-tu explorer ?";
-  } else if (lastMessage.includes("exercice") || lastMessage.includes("défi")) {
+  } else if (lastMessage.includes("exercice") || lastMessage.includes("défi") || lastMessage.includes("challenge")) {
     reply = "🔥 **Défi créatif du jour :**\n\n"
       + "**« 10 minutes chrono »** ⏱️\n\n"
       + "Prends un thème au hasard (nature, ville, rêve, émotion) et crée quelque chose en seulement 10 minutes.\n\n"
       + "Pas de perfectionnisme ! L'objectif est de libérer ta créativité sans filtre. 🎨";
+  } else if (lastMessage.includes("qui es-tu") || lastMessage.includes("tu fais")) {
+    reply = "Je suis **Arteïa Muse** ✨, l'assistant créatif open source d'Arteïa !\n\n"
+      + "Je fonctionne avec des modèles open source (Llama 3, Mistral) et une base de connaissances artistiques.\n\n"
+      + "Je peux :\n"
+      + "🎨 Générer des idées artistiques\n"
+      + "💡 Donner des retours sur tes créations\n"
+      + "📚 Suggérer des techniques et exercices\n"
+      + "🔍 T'expliquer les fonctionnalités de l'app";
   } else {
-    reply = "Je suis Arteïa Muse ✨, ton assistant créatif !\n\nJe peux :\n"
+    reply = "Je suis Arteïa Muse ✨, ton assistant créatif open source !\n\nJe peux :\n"
       + "🎨 Générer des idées artistiques\n"
       + "💡 Donner des retours sur tes créations\n"
       + "📚 Suggérer des techniques et exercices\n"
