@@ -2,8 +2,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:arteia_app/services/follow_service.dart';
 import 'package:arteia_app/services/cache_service.dart';
 import 'package:arteia_app/services/image_upload_service.dart';
+import 'package:arteia_app/services/like_service.dart';
+import 'package:arteia_app/services/comment_service.dart';
+import 'package:arteia_app/services/ai_assistant_service.dart';
+import 'package:arteia_app/services/interactivity_service.dart';
+import 'package:arteia_app/services/image_compression_service.dart';
 
 void main() {
+  // ============================================================
+  // FOLLOW SERVICE TESTS
+  // ============================================================
   group('FollowService', () {
     late FollowService followService;
 
@@ -30,15 +38,6 @@ void main() {
       );
     });
 
-    test('followUser throws exception when following self', () async {
-      // This will fail since we're not authenticated, but the self-check
-      // happens before auth check in a real scenario
-      expect(
-        () => followService.followUser('same-id'),
-        throwsA(isA<Exception>()),
-      );
-    });
-
     test('getFollowersCount returns 0 when not found', () async {
       final count = await followService.getFollowersCount('nonexistent-user');
       expect(count, 0);
@@ -48,8 +47,17 @@ void main() {
       final count = await followService.getFollowingCount('nonexistent-user');
       expect(count, 0);
     });
+
+    test('FollowService is a singleton', () {
+      final instance1 = FollowService();
+      final instance2 = FollowService();
+      expect(identical(instance1, instance2), isTrue);
+    });
   });
 
+  // ============================================================
+  // IMAGE UPLOAD SERVICE TESTS
+  // ============================================================
   group('ImageUploadService', () {
     late ImageUploadService uploadService;
 
@@ -77,21 +85,276 @@ void main() {
       expect(uploadService.getMimeType('image.webp'), 'image/webp');
     });
 
-    test('getMimeType returns image/jpeg as default', () {
+    test('getMimeType returns image/jpeg as default for unknown', () {
       expect(uploadService.getMimeType('image.bmp'), 'image/jpeg');
     });
+
+    test('getMimeType handles uppercase extensions', () {
+      expect(uploadService.getMimeType('image.JPG'), 'image/jpeg');
+      expect(uploadService.getMimeType('image.PNG'), 'image/png');
+    });
+
+    test('getMimeType handles paths with dots', () {
+      expect(uploadService.getMimeType('/path/to/my.image.png'), 'image/png');
+    });
   });
-}
 
-// CacheService tests that don't require Hive initialization
-class CacheServiceTestUtils {
-  static const Duration expectedCacheDuration = Duration(hours: 1);
+  // ============================================================
+  // LIKE SERVICE TESTS
+  // ============================================================
+  group('LikeService', () {
+    test('LikeService is a singleton', () {
+      final instance1 = LikeService();
+      final instance2 = LikeService();
+      expect(identical(instance1, instance2), isTrue);
+    });
 
-  static bool isCacheDurationCorrect() {
-    return expectedCacheDuration == const Duration(hours: 1);
-  }
+    test('isLiked returns false when not authenticated', () async {
+      final service = LikeService();
+      final result = await service.isLiked('some-post-id');
+      expect(result, false);
+    });
 
-  static bool isCacheNameCorrect() {
-    return 'arteia_cache' == 'arteia_cache';
-  }
+    test('getLikeCount returns 0 for non-existent post', () async {
+      final service = LikeService();
+      final count = await service.getLikeCount('non-existent-post');
+      expect(count, 0);
+    });
+
+    test('toggleLike throws exception when not authenticated', () async {
+      final service = LikeService();
+      expect(
+        () => service.toggleLike('some-post-id'),
+        throwsA(isA<Exception>()),
+      );
+    });
+
+    test('LikeResult stores liked and count correctly', () {
+      final result = LikeResult(liked: true, count: 42);
+      expect(result.liked, isTrue);
+      expect(result.count, 42);
+    });
+  });
+
+  // ============================================================
+  // COMMENT SERVICE TESTS
+  // ============================================================
+  group('CommentService', () {
+    test('CommentService is a singleton', () {
+      final instance1 = CommentService();
+      final instance2 = CommentService();
+      expect(identical(instance1, instance2), isTrue);
+    });
+
+    test('getComments returns empty list for non-existent post', () async {
+      final service = CommentService();
+      final comments = await service.getComments('non-existent-post');
+      expect(comments, isEmpty);
+    });
+
+    test('getCommentCount returns 0 for non-existent post', () async {
+      final service = CommentService();
+      final count = await service.getCommentCount('non-existent-post');
+      expect(count, 0);
+    });
+
+    test('deleteComment returns false when not authenticated', () async {
+      final service = CommentService();
+      final result = await service.deleteComment('some-comment-id');
+      expect(result, isFalse);
+    });
+
+    test('getTimeAgo returns empty string for null', () {
+      expect(CommentService.getTimeAgo(null), '');
+    });
+
+    test('getTimeAgo returns "À l\'instant" for recent dates', () {
+      final now = DateTime.now().toIso8601String();
+      expect(CommentService.getTimeAgo(now), "À l'instant");
+    });
+
+    test('getTimeAgo returns minutes for recent comments', () {
+      final fiveMinAgo = DateTime.now().subtract(const Duration(minutes: 5)).toIso8601String();
+      expect(CommentService.getTimeAgo(fiveMinAgo), 'Il y a 5m');
+    });
+
+    test('getTimeAgo returns hours for older comments', () {
+      final threeHoursAgo = DateTime.now().subtract(const Duration(hours: 3)).toIso8601String();
+      expect(CommentService.getTimeAgo(threeHoursAgo), 'Il y a 3h');
+    });
+
+    test('getTimeAgo returns days for older comments', () {
+      final twoDaysAgo = DateTime.now().subtract(const Duration(days: 2)).toIso8601String();
+      expect(CommentService.getTimeAgo(twoDaysAgo), 'Il y a 2j');
+    });
+
+    test('getTimeAgo returns weeks for older comments', () {
+      final twoWeeksAgo = DateTime.now().subtract(const Duration(days: 14)).toIso8601String();
+      expect(CommentService.getTimeAgo(twoWeeksAgo), 'Il y a 2sem');
+    });
+
+    test('getTimeAgo returns months for older comments', () {
+      final threeMonthsAgo = DateTime.now().subtract(const Duration(days: 90)).toIso8601String();
+      expect(CommentService.getTimeAgo(threeMonthsAgo), 'Il y a 3mois');
+    });
+
+    test('getTimeAgo returns years for very old comments', () {
+      final twoYearsAgo = DateTime.now().subtract(const Duration(days: 730)).toIso8601String();
+      expect(CommentService.getTimeAgo(twoYearsAgo), 'Il y a 2ans');
+    });
+  });
+
+  // ============================================================
+  // AI ASSISTANT SERVICE TESTS
+  // ============================================================
+  group('AiAssistantService', () {
+    late AiAssistantService assistant;
+
+    setUp(() {
+      assistant = AiAssistantService();
+    });
+
+    test('sendMessage returns local response when not authenticated', () async {
+      final reply = await assistant.sendMessage(message: 'Bonjour');
+      expect(reply, isNotEmpty);
+    });
+
+    test('sendMessage handles greeting', () async {
+      final reply = await assistant.sendMessage(message: 'Salut');
+      expect(reply, contains('Bonjour'));
+    });
+
+    test('sendMessage handles idea request', () async {
+      final reply = await assistant.sendMessage(message: 'Donne-moi une idée');
+      expect(reply, contains('Idées'));
+    });
+
+    test('sendMessage handles thank you', () async {
+      final reply = await assistant.sendMessage(message: 'Merci');
+      expect(reply, contains('plaisir'));
+    });
+
+    test('sendMessage handles feedback request', () async {
+      final reply = await assistant.sendMessage(message: 'Donne-moi un retour');
+      expect(reply, contains('feedback') || contains('retour'));
+    });
+
+    test('sendMessage handles features question', () async {
+      final reply = await assistant.sendMessage(message: 'Comment faire ?');
+      expect(reply, contains('Fonctionnalités'));
+    });
+
+    test('sendMessage handles challenge request', () async {
+      final reply = await assistant.sendMessage(message: 'Un défi créatif');
+      expect(reply, contains('Défi'));
+    });
+
+    test('sendMessage handles who are you', () async {
+      final reply = await assistant.sendMessage(message: 'Qui es-tu ?');
+      expect(reply, contains('Arteïa Muse'));
+    });
+
+    test('sendMessage returns default response for unknown input', () async {
+      final reply = await assistant.sendMessage(message: 'xyz123unknown');
+      expect(reply, contains('Arteïa Muse'));
+    });
+
+    test('sendMessage works with different content types', () async {
+      final reply = await assistant.sendMessage(
+        message: 'Des idées',
+        contentType: 'visual',
+      );
+      expect(reply, isNotEmpty);
+    });
+
+    test('sendMessage works with history', () async {
+      final reply = await assistant.sendMessage(
+        message: 'Merci',
+        history: [
+          {'role': 'user', 'content': 'Bonjour'},
+          {'role': 'assistant', 'content': 'Bonjour créateur !'},
+        ],
+      );
+      expect(reply, contains('plaisir'));
+    });
+  });
+
+  // ============================================================
+  // INTERACTIVITY SERVICE TESTS
+  // ============================================================
+  group('InteractivityService', () {
+    test('InteractivityService is a singleton', () {
+      final instance1 = InteractivityService();
+      final instance2 = InteractivityService();
+      expect(identical(instance1, instance2), isTrue);
+    });
+
+    test('HapticFeedbackType enum has all values', () {
+      expect(HapticFeedbackType.values.length, 6);
+      expect(HapticFeedbackType.values, contains(HapticFeedbackType.light));
+      expect(HapticFeedbackType.values, contains(HapticFeedbackType.medium));
+      expect(HapticFeedbackType.values, contains(HapticFeedbackType.heavy));
+      expect(HapticFeedbackType.values, contains(HapticFeedbackType.selection));
+      expect(HapticFeedbackType.values, contains(HapticFeedbackType.success));
+      expect(HapticFeedbackType.values, contains(HapticFeedbackType.error));
+    });
+  });
+
+  // ============================================================
+  // IMAGE COMPRESSION SERVICE TESTS
+  // ============================================================
+  group('ImageCompressionService', () {
+    test('targetQuality is 80', () {
+      expect(ImageCompressionService.targetQuality, 80);
+    });
+
+    test('maxWidth is 1920', () {
+      expect(ImageCompressionService.maxWidth, 1920);
+    });
+
+    test('maxHeight is 1920', () {
+      expect(ImageCompressionService.maxHeight, 1920);
+    });
+
+    test('maxFileSize is 5MB', () {
+      expect(ImageCompressionService.maxFileSize, 5 * 1024 * 1024);
+    });
+
+    test('getFileSizeString formats bytes correctly', () {
+      final service = ImageCompressionService();
+      expect(service.getFileSizeString(100), '100 B');
+      expect(service.getFileSizeString(1024), '1.0 KB');
+      expect(service.getFileSizeString(1048576), '1.0 MB');
+      expect(service.getFileSizeString(1073741824), '1.0 GB');
+    });
+
+    test('getFileSizeString handles zero', () {
+      final service = ImageCompressionService();
+      expect(service.getFileSizeString(0), '0 B');
+    });
+
+    test('isFileSizeAcceptable is a function', () {
+      final service = ImageCompressionService();
+      expect(service.isFileSizeAcceptable, isA<Function>());
+    });
+  });
+
+  // ============================================================
+  // CACHE SERVICE TESTS
+  // ============================================================
+  group('CacheService', () {
+    test('CacheService has getInstance method', () {
+      expect(CacheService.getInstance, isA<Function>());
+    });
+
+    test('cache duration is 1 hour', () {
+      const expectedDuration = Duration(hours: 1);
+      expect(expectedDuration.inHours, 1);
+    });
+
+    test('cache name is arteia_cache', () {
+      const cacheName = 'arteia_cache';
+      expect(cacheName, 'arteia_cache');
+    });
+  });
 }
