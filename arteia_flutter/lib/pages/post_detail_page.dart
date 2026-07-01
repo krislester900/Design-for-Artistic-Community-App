@@ -4,6 +4,7 @@ import '../services/supabase_service.dart';
 import '../services/api_service.dart';
 import '../services/quests_service.dart';
 import '../services/like_service.dart';
+import '../services/comment_service.dart';
 import '../services/local_image_cache_service.dart';
 import '../theme/app_theme.dart';
 import 'universe_page.dart';
@@ -22,6 +23,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
   final SupabaseService _supabase = SupabaseService();
   final QuestsService _questsService = QuestsService();
   final LikeService _likeService = LikeService();
+  final CommentService _commentService = CommentService();
   LocalImageCacheService? _imageCache;
   final TextEditingController _commentController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -62,36 +64,12 @@ class _PostDetailPageState extends State<PostDetailPage> {
     final postId = widget.post['id'];
     if (postId == null) return;
 
-    try {
-      final response = await _supabase.client
-          .from('post_comments')
-          .select('*, profiles!user_id(username, avatar_url)')
-          .eq('post_id', postId)
-          .order('created_at', ascending: false);
-
-      if (mounted) {
-        setState(() {
-          _comments = List<Map<String, dynamic>>.from(response);
-          _isLoadingComments = false;
-        });
-      }
-    } catch (e) {
-      // Fallback to old table
-      try {
-        final response = await _supabase.client
-            .from('comments')
-            .select('*, profiles!user_id(username, avatar_url)')
-            .eq('post_id', postId)
-            .order('created_at', ascending: false);
-        if (mounted) {
-          setState(() {
-            _comments = List<Map<String, dynamic>>.from(response);
-            _isLoadingComments = false;
-          });
-        }
-      } catch (e2) {
-        if (mounted) setState(() => _isLoadingComments = false);
-      }
+    final comments = await _commentService.getComments(postId.toString());
+    if (mounted) {
+      setState(() {
+        _comments = comments;
+        _isLoadingComments = false;
+      });
     }
   }
 
@@ -113,37 +91,26 @@ class _PostDetailPageState extends State<PostDetailPage> {
     setState(() => _isSendingComment = true);
 
     try {
-      await _supabase.client.from('post_comments').insert({
-        'post_id': postId,
-        'user_id': user.id,
-        'content': text,
-      });
+      final result = await _commentService.addComment(
+        postId: postId.toString(),
+        userId: user.id,
+        content: text,
+      );
 
-      _commentController.clear();
-      await _loadComments();
-      _questsService.updateQuestProgress(QuestType.comment, 1);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Commentaire ajouté!'), backgroundColor: Colors.green),
-        );
-      }
-    } catch (e) {
-      // Fallback old table
-      try {
-        await _supabase.client.from('comments').insert({
-          'post_id': postId,
-          'user_id': user.id,
-          'content': text,
-        });
+      if (result != null) {
         _commentController.clear();
         await _loadComments();
-      } catch (e2) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erreur: $e2'), backgroundColor: Colors.red),
+            const SnackBar(content: Text('Commentaire ajouté!'), backgroundColor: Colors.green),
           );
         }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
       }
     } finally {
       if (mounted) setState(() => _isSendingComment = false);
@@ -381,7 +348,13 @@ class _PostDetailPageState extends State<PostDetailPage> {
             ),
           )
         else
-          ..._comments.map((comment) => _CommentTile(comment: comment)),
+          ..._comments.map((comment) => CommentTile(
+            comment: comment,
+            isOwner: _supabase.currentUser?.id == comment['user_id'],
+            onDelete: _supabase.currentUser?.id == comment['user_id']
+                ? () => _deleteComment(comment['id'].toString())
+                : null,
+          )),
       ],
     );
   }
@@ -435,6 +408,16 @@ class _PostDetailPageState extends State<PostDetailPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _deleteComment(String commentId) async {
+    final success = await _commentService.deleteComment(commentId);
+    if (success && mounted) {
+      await _loadComments();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Commentaire supprimé'), backgroundColor: Colors.orange),
+      );
+    }
   }
 
   @override
@@ -493,84 +476,4 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-class _CommentTile extends StatelessWidget {
-  final Map<String, dynamic> comment;
-  const _CommentTile({required this.comment});
-
-  String _getTimeAgo(String? createdAt) {
-    if (createdAt == null) return '';
-    try {
-      final date = DateTime.parse(createdAt);
-      final diff = DateTime.now().difference(date);
-      if (diff.inMinutes < 1) return 'À l\'instant';
-      if (diff.inMinutes < 60) return 'Il y a ${diff.inMinutes}m';
-      if (diff.inHours < 24) return 'Il y a ${diff.inHours}h';
-      if (diff.inDays < 7) return 'Il y a ${diff.inDays}j';
-      return 'Il y a ${diff.inDays ~/ 7}sem';
-    } catch (e) {
-      return createdAt;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final profile = comment['profiles'] as Map<String, dynamic>?;
-    final username = profile?['username'] ?? 'Anonyme';
-    final avatarUrl = profile?['avatar_url'];
-    final content = comment['content'] ?? '';
-    final time = _getTimeAgo(comment['created_at']);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.cardDarkLight,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 32, height: 32,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [AppTheme.primaryViolet, AppTheme.primaryTeal]),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: avatarUrl != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(avatarUrl, fit: BoxFit.cover),
-                  )
-                : const Icon(Icons.person, color: Colors.white, size: 16),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      username,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      time,
-                      style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  content,
-                  style: TextStyle(fontSize: 13, color: Colors.grey[300], height: 1.4),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+// CommentTile is now imported from comment_service.dart
