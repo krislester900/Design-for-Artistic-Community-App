@@ -1,54 +1,52 @@
-# Guide d'installation de la base de données Artéïa
+# 🗄️ Configuration SQL de la base de données Arteïa
 
-## Ordre d'exécution des scripts SQL
+## Ordre d'exécution DANS Supabase SQL Editor
 
-⚠️ **Important**: Exécutez les scripts dans l'ordre suivant dans l'éditeur SQL de Supabase.
+Exécuter les fichiers **DANS CET ORDRE** :
 
-### Étape 1: Schema de base (OBLIGATOIRE)
+### 1️⃣ Créer les tables de l'assistant IA
+📄 **`database/schema-ai-assistant.sql`**
+→ Crée `ai_conversations` avec RLS
+
+### 2️⃣ Créer les tables d'entraînement
+📄 **`database/schema-ai-training.sql`**
+→ Crée `ai_knowledge_base`, `ai_training_data`, `ai_feedback`, `ai_performance_metrics`, `ai_system_prompts`
+
+### 3️⃣ Créer l'ontologie artistique
+📄 **`database/schema-ontology.sql`**
+→ Crée `ontology_concepts`, `ontology_relations`, `ontology_taxonomy`
+
+### 4️⃣ Créer les tables likes/commentaires (optionnel)
+📄 **`database/schema-likes-comments.sql`**
+→ Crée `post_likes`, `post_comments`, fonctions RPC
+
+### 5️⃣ Remplir les données (seeder)
+📄 **`database/seed-all.sql`**
+→ Insère :
+   - 11 articles de connaissances
+   - 20 catégories taxonomiques
+   - 21 concepts ontologiques
+   - Les relations entre concepts
+   - Les prompts système versionnés
+
+---
+
+## 🔗 Liens vers les fichiers sur GitHub
+
+| Fichier | Lien |
+|---------|------|
+| Schéma IA assistant | [schema-ai-assistant.sql](https://github.com/krislester900/Design-for-Artistic-Community-App/blob/main/database/schema-ai-assistant.sql) |
+| Schéma entraînement | [schema-ai-training.sql](https://github.com/krislester900/Design-for-Artistic-Community-App/blob/main/database/schema-ai-training.sql) |
+| Schéma ontologie | [schema-ontology.sql](https://github.com/krislester900/Design-for-Artistic-Community-App/blob/main/database/schema-ontology.sql) |
+| Schéma likes/comments | [schema-likes-comments.sql](https://github.com/krislester900/Design-for-Artistic-Community-App/blob/main/database/schema-likes-comments.sql) |
+| **Seed complet (données)** | [seed-all.sql](https://github.com/krislester900/Design-for-Artistic-Community-App/blob/main/database/seed-all.sql) |
+
+---
+
+## ⚡ Exécution rapide (copier-coller)
+
 ```sql
--- Exécuter: database/schema.sql
--- Contient: tables de base, RLS policies, triggers
+-- 1. Créer les tables
 ```
 
-### Étape 2: Schema de contenu (OBLIGATOIRE)
-```sql
--- Exécuter: database/schema-content.sql
--- Contient: tables posts, likes, comments, notifications, follows
--- C'est CE script qui crée la table "posts" qui manque!
-```
-
-### Étape 3: Fonctionnalités avancées (RECOMMANDÉ)
-```sql
--- Exécuter: database/schema-v3-features.sql
--- Contient: upload d'images, compression, favoris, realtime
-```
-
-### Étape 4: Messagerie (SI BESOIN)
-```sql
--- Exécuter: database/schema-messaging.sql
--- Contient: système de chat Discord-like
-```
-
-## Vérification rapide
-
-Après exécution, vérifiez que ces tables existent:
-- ✅ profiles
-- ✅ categories  
-- ✅ posts (créée par schema-content.sql)
-- ✅ likes
-- ✅ comments
-- ✅ notifications
-- ✅ follows
-- ✅ artwork_favorites
-- ✅ artwork_bookmarks
-
-## Erreur "relation does not exist"
-
-Si vous voyez `ERROR: 42P01: relation "public.posts" does not exist`:
-1. Vérifiez que vous avez exécuté `schema-content.sql`
-2. La table `posts` est créée dans ce fichier (ligne 31-44)
-3. Exécutez-le avant `schema-v3-features.sql`
-
-## Script SQL combiné (ALTERNATIVE)
-
-Si vous préférez un seul fichier, utilisez `database/schema-complete.sql` qui contient tout dans le bon ordre.
+Puis copier le contenu de chaque fichier dans l'ordre dans Supabase SQL Editor.

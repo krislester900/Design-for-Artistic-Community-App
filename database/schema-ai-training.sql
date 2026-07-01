@@ -10,17 +10,11 @@ CREATE TABLE IF NOT EXISTS ai_knowledge_base (
   content TEXT NOT NULL,
   tags TEXT[] DEFAULT '{}',
   source TEXT DEFAULT 'expert',
-  embedding vector(1536), -- Pour pgvector (OpenAI embeddings)
   usage_count INTEGER DEFAULT 0,
   helpful_count INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
--- Index vectoriel pour recherche sémantique
-CREATE INDEX idx_knowledge_embedding ON ai_knowledge_base 
-  USING ivfflat (embedding vector_cosine_ops)
-  WITH (lists = 100);
 
 -- Index sur catégorie
 CREATE INDEX idx_knowledge_category ON ai_knowledge_base(category);

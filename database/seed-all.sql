@@ -1,6 +1,6 @@
 -- ============================================================
 -- SEED COMPLET : Connaissances + Ontologie + Configuration
--- À exécuter DANS L'ORDRE après les schémas
+-- À exécuter APRÈS les schémas
 -- ============================================================
 
 -- 1. BASE DE CONNAISSANCES (11 articles experts)
@@ -213,10 +213,7 @@ FROM ontology_concepts s, ontology_concepts t
 WHERE (s.slug = 'theorie-couleurs' AND t.slug = 'cercle-chromatique')
 ON CONFLICT DO NOTHING;
 
--- 5. ACTIVER pgvector si pas déjà fait
-CREATE EXTENSION IF NOT EXISTS vector;
-
--- 6. Configurer les prompts système versionnés
+-- 5. Configurer les prompts système versionnés
 INSERT INTO ai_system_prompts (version, category, prompt_text, is_active) VALUES
 ('1.0', 'general',
 'Tu es "Arteïa Muse" ✨, assistant créatif d''Arteïa. Réponds en français avec des émojis artistiques. Inspire, conseille et motive les créateurs.', true),
@@ -226,7 +223,7 @@ INSERT INTO ai_system_prompts (version, category, prompt_text, is_active) VALUES
 'Tu aides un musicien. Suggère des progressions d''accords, ambiances, arrangements. Connais la théorie musicale.', true)
 ON CONFLICT DO NOTHING;
 
--- 7. Afficher le résumé
+-- 6. Afficher le résumé
 SELECT '✅ Seed terminé !' as result;
 SELECT COUNT(*) || ' articles de connaissances' as knowledge FROM ai_knowledge_base;
 SELECT COUNT(*) || ' concepts ontologiques' as concepts FROM ontology_concepts;

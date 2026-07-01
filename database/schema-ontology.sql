@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS ontology_concepts (
   )),
   icon TEXT DEFAULT '📚',
   difficulty TEXT CHECK (difficulty IN ('debutant', 'intermediaire', 'avance', 'expert')),
-  embedding vector(1536),  -- Pour recherche sémantique
   metadata JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
