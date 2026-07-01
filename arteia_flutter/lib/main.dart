@@ -6,6 +6,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'utils/app_constants.dart';
 import 'services/supabase_service.dart';
 import 'services/theme_service.dart';
+import 'services/app_state.dart';
 import 'theme/app_theme.dart';
 import 'screens/loading_screen.dart';
 import 'widgets/app_drawer.dart';
@@ -89,6 +90,12 @@ class _LoadingScreenWrapperState extends State<LoadingScreenWrapper> {
   void initState() {
     super.initState();
     _checkInitialization();
+    _startRealtimeNotifications();
+  }
+  
+  void _startRealtimeNotifications() {
+    final appState = AppState();
+    appState.startListening();
   }
 
   Future<void> _checkInitialization() async {
