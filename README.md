@@ -64,15 +64,70 @@ Elle permet de :
 
 Important : un compte connecté doit aussi être promu en rôle `admin` dans Supabase.
 
+## Fonctionnalités
+
+### Priorité 2 - Fonctionnalités sociales
+- **Likes** : système de likes avec compteur animé sur les posts
+- **Commentaires** : ajout et affichage de commentaires sur les publications
+- **Favoris** : sauvegarde d'œuvres dans une liste personnalisée
+- **Follow/Unfollow** : abonnement à des artistes
+- **Notifications temps réel** : alertes instantanées pour likes, commentaires, follows
+
+### Priorité 3 - Améliorations UX
+- **Mode lecture** : lecteur de contenu immersif
+- **Upload d'images** : publication d'œuvres avec compression automatique
+- **Cache local Hive** : fonctionnement hors-ligne avec cache des posts/catégories
+- **Optimisation images** : compression et cache pour performances optimales
+- **IA Assistant** : assistant artistique intégré (Groq/Ollama/fallback local)
+
+## Architecture Flutter
+
+### Services
+- `lib/services/like_service.dart` : gestion des likes
+- `lib/services/comment_service.dart` : gestion des commentaires
+- `lib/services/favorites_service.dart` : gestion des favoris
+- `lib/services/follow_service.dart` : gestion des abonnements
+- `lib/services/realtime_notifications_service.dart` : notifications temps réel
+- `lib/services/cache_service.dart` : cache Hive offline
+- `lib/services/image_compression_service.dart` : optimisation images
+- `lib/services/ai_assistant_service.dart` : IA assistant
+
+### Pages
+- `lib/pages/post_detail_page.dart` : détail d'un post avec likes/commentaires
+- `lib/pages/favorites_page.dart` : page des favoris
+- `lib/pages/notifications_page_enhanced.dart` : notifications temps réel
+- `lib/pages/ai_assistant_page.dart` : assistant IA
+- `lib/pages/reading_mode_page.dart` : mode lecture immersif
+
+### Tests
+- `test/services_test.dart` : tests unitaires des services
+- `test/features_integration_test.dart` : tests d'intégration
+- `test/widget_test.dart` : tests des widgets
+- `test/image_compression_test.dart` : tests de compression
+
+Lancer les tests :
+```sh
+cd arteia_flutter
+flutter test
+```
+
 ## Fichiers utiles
 - `database/schema.sql` : schéma + policies Supabase
+- `database/schema-likes-comments.sql` : tables likes/commentaires
+- `database/schema-ai-assistant.sql` : tables IA assistant
+- `database/seed-all.sql` : données initiales
 - `database/README.md` : guide de configuration Supabase
-- `src/app/services/community.ts` : récupération des données
-- `src/app/hooks/useCommunityData.ts` : chargement côté interface
-- `src/app/lib/supabase.ts` : client Supabase
-- `src/app/admin/AdminApp.tsx` : interface admin
+- `arteia_flutter/lib/services/api_service.dart` : récupération des données
+- `arteia_flutter/lib/services/supabase_service.dart` : client Supabase
+- `arteia_flutter/lib/main.dart` : initialisation Hive + notifications temps réel
 
 ## Vérification rapide
 Le bandeau en haut de l'application indique la source de données utilisée :
 - `Mock local`
 - `Supabase`
+
+## État du projet
+- ✅ Tests unitaires et d'intégration (73 tests passent)
+- ✅ Cache Hive offline fonctionnel
+- ✅ Notifications temps réel activées
+- ✅ Toutes les fonctionnalités Priorité 2 et 3 implémentées
