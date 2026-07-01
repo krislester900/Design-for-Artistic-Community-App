@@ -12,13 +12,11 @@ class CommentService {
   /// Récupérer les commentaires d'un post
   Future<List<Map<String, dynamic>>> getComments(String postId) async {
     try {
-      final postIdInt = int.tryParse(postId) ?? 0;
-
       // Essayer d'abord la nouvelle table post_comments
       final response = await _supabase.client
           .from('post_comments')
           .select('*, profiles!user_id(username, avatar_url)')
-          .eq('post_id', postIdInt)
+          .eq('post_id', postId)
           .order('created_at', ascending: false);
 
       return List<Map<String, dynamic>>.from(response);
@@ -28,7 +26,7 @@ class CommentService {
         final response = await _supabase.client
             .from('comments')
             .select('*, profiles!user_id(username, avatar_url)')
-            .eq('post_id', postIdInt)
+            .eq('post_id', postId)
             .order('created_at', ascending: false);
 
         return List<Map<String, dynamic>>.from(response);
@@ -47,12 +45,10 @@ class CommentService {
     String? parentId,
   }) async {
     try {
-      final postIdInt = int.tryParse(postId) ?? 0;
-
       final response = await _supabase.client
           .from('post_comments')
           .insert({
-            'post_id': postIdInt,
+            'post_id': postId,
             'user_id': userId,
             'content': content,
             if (parentId != null) 'parent_id': parentId,
@@ -61,7 +57,7 @@ class CommentService {
           .single();
 
       // Mettre à jour le compteur
-      await _supabase.client.rpc('increment_comments', params: {'post_id': postIdInt});
+      await _supabase.client.rpc('increment_comments', params: {'post_id': postId});
 
       // Quête
       _quests.updateQuestProgress(QuestType.comment, 1);
@@ -73,7 +69,7 @@ class CommentService {
         final response = await _supabase.client
             .from('comments')
             .insert({
-              'post_id': postIdInt,
+              'post_id': postId,
               'user_id': userId,
               'content': content,
             })
@@ -117,13 +113,10 @@ class CommentService {
   /// Obtenir le nombre de commentaires
   Future<int> getCommentCount(String postId) async {
     try {
-      final postIdInt = int.tryParse(postId) ?? 0;
-      if (postIdInt == 0) return 0;
-
       final response = await _supabase.client
           .from('post_comments')
           .select('id', count: CountOption.exact)
-          .eq('post_id', postIdInt);
+          .eq('post_id', postId);
       return response.count ?? 0;
     } catch (e) {
       return 0;

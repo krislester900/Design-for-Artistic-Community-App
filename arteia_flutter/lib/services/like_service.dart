@@ -14,15 +14,12 @@ class LikeService {
     final user = _supabase.currentUser;
     if (user == null) throw Exception('Connecte-toi pour liker !');
 
-    final postIdInt = int.tryParse(postId) ?? 0;
-    if (postIdInt == 0) throw Exception('ID de post invalide');
-
     // Vérifier si déjà liké
     final existing = await _supabase.client
         .from('post_likes')
         .select('id')
         .eq('user_id', user.id)
-        .eq('post_id', postIdInt)
+        .eq('post_id', postId)
         .maybeSingle();
 
     if (existing != null) {
@@ -33,7 +30,7 @@ class LikeService {
           .eq('id', existing['id']);
 
       // Décrémenter le compteur
-      await _supabase.client.rpc('decrement_likes', params: {'post_id': postIdInt});
+      await _supabase.client.rpc('decrement_likes', params: {'post_id': postId});
       
       final count = await getLikeCount(postId);
       return LikeResult(liked: false, count: count);
@@ -41,11 +38,11 @@ class LikeService {
       // Like
       await _supabase.client.from('post_likes').insert({
         'user_id': user.id,
-        'post_id': postIdInt,
+        'post_id': postId,
       });
 
       // Incrémenter le compteur
-      await _supabase.client.rpc('increment_likes', params: {'post_id': postIdInt});
+      await _supabase.client.rpc('increment_likes', params: {'post_id': postId});
 
       // Haptique
       _haptic.triggerHaptic(HapticFeedbackType.success);
@@ -60,14 +57,11 @@ class LikeService {
     final user = _supabase.currentUser;
     if (user == null) return false;
 
-    final postIdInt = int.tryParse(postId) ?? 0;
-    if (postIdInt == 0) return false;
-
     final existing = await _supabase.client
         .from('post_likes')
         .select('id')
         .eq('user_id', user.id)
-        .eq('post_id', postIdInt)
+        .eq('post_id', postId)
         .maybeSingle();
 
     return existing != null;
@@ -76,13 +70,10 @@ class LikeService {
   /// Obtenir le nombre de likes
   Future<int> getLikeCount(String postId) async {
     try {
-      final postIdInt = int.tryParse(postId) ?? 0;
-      if (postIdInt == 0) return 0;
-
       final response = await _supabase.client
           .from('post_likes')
           .select('id', count: CountOption.exact)
-          .eq('post_id', postIdInt);
+          .eq('post_id', postId);
       return response.count ?? 0;
     } catch (e) {
       return 0;
@@ -91,13 +82,10 @@ class LikeService {
 
   /// Obtenir les likes users pour un post
   Future<List<Map<String, dynamic>>> getPostLikes(String postId) async {
-    final postIdInt = int.tryParse(postId) ?? 0;
-    if (postIdInt == 0) return [];
-
     final response = await _supabase.client
         .from('post_likes')
         .select('user_id, profiles!inner(username, avatar_url)')
-        .eq('post_id', postIdInt)
+        .eq('post_id', postId)
         .order('created_at', ascending: false)
         .limit(10);
 

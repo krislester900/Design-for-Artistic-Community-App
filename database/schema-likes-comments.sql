@@ -6,7 +6,7 @@
 CREATE TABLE IF NOT EXISTS post_likes (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  post_id BIGINT REFERENCES public.posts(id) ON DELETE CASCADE NOT NULL,
+  post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, post_id)
 );
@@ -31,7 +31,7 @@ CREATE POLICY "Users can delete own likes"
 CREATE TABLE IF NOT EXISTS post_comments (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  post_id BIGINT REFERENCES public.posts(id) ON DELETE CASCADE NOT NULL,
+  post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE NOT NULL,
   content TEXT NOT NULL CHECK (char_length(content) > 0 AND char_length(content) <= 1000),
   parent_id BIGINT REFERENCES post_comments(id) ON DELETE CASCADE, -- Pour les réponses
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -60,7 +60,7 @@ CREATE POLICY "Users can delete own comments"
   USING (auth.uid() = user_id);
 
 -- 3. FONCTIONS RPC pour incrémenter/décrémenter les compteurs
-CREATE OR REPLACE FUNCTION increment_likes(post_id BIGINT)
+CREATE OR REPLACE FUNCTION increment_likes(post_id UUID)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -72,7 +72,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION decrement_likes(post_id BIGINT)
+CREATE OR REPLACE FUNCTION decrement_likes(post_id UUID)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -84,7 +84,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION increment_comments(post_id BIGINT)
+CREATE OR REPLACE FUNCTION increment_comments(post_id UUID)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -96,7 +96,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION decrement_comments(post_id BIGINT)
+CREATE OR REPLACE FUNCTION decrement_comments(post_id UUID)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
