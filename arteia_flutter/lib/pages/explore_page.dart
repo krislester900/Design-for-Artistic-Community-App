@@ -144,15 +144,17 @@ class _PostCard extends StatelessWidget {
                 children: [
                   Text(post['title'], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(post['profiles']?['username'] ?? 'Anonyme', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
-                      const Spacer(),
-                      Icon(Icons.favorite, size: 12, color: Colors.grey[600]),
-                      const SizedBox(width: 3),
-                      Text('${post['likes_count'] ?? 0}', style: TextStyle(fontSize: 10, color: Colors.grey[600])),
-                    ],
-                  ),
+                   Row(
+                     children: [
+                       Icon(Icons.favorite, size: 12, color: Colors.grey[600]),
+                       const SizedBox(width: 3),
+                       Text('${post['likes_count'] ?? 0}', style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+                       const SizedBox(width: 12),
+                       Icon(Icons.comment_outlined, size: 12, color: Colors.grey[600]),
+                       const SizedBox(width: 3),
+                       Text('${post['comments_count'] ?? 0}', style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+                     ],
+                   ),
                 ],
               ),
             ),
