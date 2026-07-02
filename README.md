@@ -126,8 +126,20 @@ Le bandeau en haut de l'application indique la source de données utilisée :
 - `Mock local`
 - `Supabase`
 
+## Architecture avancée
+
+### Services avancés
+- `lib/services/pagination_service.dart` : pagination + lazy loading pour la scalabilité
+- `lib/services/auth_advanced_service.dart` : OAuth (Google/Apple/GitHub) + 2FA
+- `lib/services/push_notifications_service.dart` : Firebase Cloud Messaging
+- `lib/services/analytics_service.dart` : tracking d'événements et analytics
+
 ## État du projet
 - ✅ Tests unitaires et d'intégration (73 tests passent)
 - ✅ Cache Hive offline fonctionnel
 - ✅ Notifications temps réel activées
+- ✅ Pagination + Lazy loading implémentés
+- ✅ OAuth + 2FA implémentés
+- ✅ Push notifications (FCM) implémentées
+- ✅ Analytics service implémenté
 - ✅ Toutes les fonctionnalités Priorité 2 et 3 implémentées

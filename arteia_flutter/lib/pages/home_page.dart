@@ -6,6 +6,7 @@ import '../services/quests_service.dart';
 import '../services/cache_service.dart';
 import '../services/local_image_cache_service.dart';
 import '../services/interactivity_service.dart';
+import '../services/pagination_service.dart';
 import '../widgets/music_player_widget.dart';
 import 'post_detail_page.dart';
 
@@ -27,16 +28,42 @@ class _HomePageState extends State<HomePage> {
   bool _isLoading = true;
   final Set<String> _likedPostIds = {};
   bool _isOffline = false;
+  PaginatedController<Map<String, dynamic>>? _postsController;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _initServices();
     _loadData();
+    _scrollController.addListener(_onScroll);
   }
 
   Future<void> _initServices() async {
     _imageCache = await LocalImageCacheService.getInstance();
+    _postsController = PaginatedController<Map<String, dynamic>>(
+      (page, pageSize) => _fetchPostsPage(page, pageSize),
+    );
+  }
+
+  Future<PaginatedResponse<Map<String, dynamic>>> _fetchPostsPage(int page, int pageSize) async {
+    try {
+      final allPosts = await _api.getPosts();
+      final totalCount = allPosts.length;
+      final start = page * pageSize;
+      final end = start + pageSize;
+      final paginatedItems = allPosts.sublist(start, end > totalCount ? totalCount : end);
+      final hasMore = end < totalCount;
+      
+      return (
+        items: paginatedItems,
+        hasMore: hasMore,
+        nextPage: hasMore ? page + 1 : null,
+        totalCount: totalCount,
+      );
+    } catch (e) {
+      return (items: <Map<String, dynamic>>[], hasMore: false, nextPage: null, totalCount: 0);
+    }
   }
 
   Future<void> _checkLikedPosts() async {
@@ -77,17 +104,17 @@ class _HomePageState extends State<HomePage> {
         });
       }
 
-      // Then try to fetch fresh data
+      // Then try to fetch fresh data with pagination
       try {
         final results = await Future.wait([
           _api.getCategories(),
-          _api.getPosts(),
+          _postsController?.loadInitial() ?? Future.value(),
         ]);
 
-        if (mounted) {
+        if (mounted && _postsController != null) {
           setState(() {
             _categories = results[0];
-            _posts = results[1];
+            _posts = _postsController!.items.toList();
             _isLoading = false;
             _isOffline = false;
           });
@@ -117,6 +144,12 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      _postsController?.loadMore();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -136,6 +169,7 @@ class _HomePageState extends State<HomePage> {
         child: Stack(
           children: [
             SingleChildScrollView(
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,7 +237,41 @@ class _HomePageState extends State<HomePage> {
                   if (_posts.isNotEmpty) ...[
                     const Text('Publications récentes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black)),
                     const SizedBox(height: 12),
-                    ..._posts.take(5).map((post) => _PostCard(post)),
+                    AnimatedBuilder(
+                      animation: _postsController ?? _api,
+                      builder: (context, child) {
+                        final posts = _postsController?.items.toList() ?? _posts;
+                        return ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: posts.length + (_postsController?.hasMore ?? false ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == posts.length) {
+                              return const Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: Center(
+                                  child: CircularProgressIndicator(color: Colors.black),
+                                ),
+                              );
+                            }
+                            final post = posts[index];
+                            return PostCard(
+                              post: post,
+                              onTap: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => PostDetailPage(postId: post['id']),
+                                  ),
+                                );
+                                // Refresh liked status when returning
+                                await _checkLikedPosts();
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
                   ],
                   
                   // Player musical (si un post musique est présent)
@@ -454,5 +522,12 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _postsController?.dispose();
+    super.dispose();
   }
 }
