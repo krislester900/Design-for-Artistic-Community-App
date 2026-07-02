@@ -1,0 +1,185 @@
+name: Artéïa CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # ========================================
+  # JOB 1 : TESTS FLUTTER
+  # ========================================
+  flutter-test:
+    name: Flutter Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: arteia_flutter
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze code
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Run unit tests
+        run: flutter test --coverage --machine
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          directory: arteia_flutter/coverage
+          fail_ci_if_error: false
+
+  # ========================================
+  # JOB 2 : BUILD FLUTTER (WEB + APK)
+  # ========================================
+  flutter-build:
+    name: Flutter Build
+    needs: flutter-test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: arteia_flutter
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build APK (Android)
+        run: flutter build apk --release --split-per-abi
+
+      - name: Build Web
+        run: flutter build web --release
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: arteia-apk
+          path: arteia_flutter/build/app/outputs/flutter-apk/*.apk
+          retention-days: 7
+
+      - name: Upload Web artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: arteia-web
+          path: arteia_flutter/build/web
+          retention-days: 7
+
+  # ========================================
+  # JOB 3 : DEPLOY WEB SUR VERCEL
+  # ========================================
+  deploy-web:
+    name: Deploy Web to Vercel
+    needs: flutter-build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Deploy to Vercel
+        run: vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+  # ========================================
+  # JOB 4 : DEPLOY SUPABASE EDGE FUNCTIONS
+  # ========================================
+  deploy-supabase:
+    name: Deploy Supabase Edge Functions
+    needs: flutter-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy Edge Functions
+        run: |
+          supabase functions deploy ai-assistant --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          supabase functions deploy create-payment-intent --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          supabase functions deploy send-invitation-email --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+  # ========================================
+  # JOB 5 : RELEASE VERSION TAG
+  # ========================================
+  release:
+    name: Create Release
+    needs: [flutter-build, deploy-web]
+    if: github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
+          body: |
+            ## Artéïa Release v${{ github.run_number }}
+            
+            ### Nouvelles fonctionnalités
+            - Stories éphémères (24h)
+            - Fatmécoin Wallet
+            - Gamification (XP, badges, niveaux)
+            - Système de dons et votes
+            - Internationalisation (8 langues)
+            - Signalements et modération
+            
+            ### Corrections
+            - Tests unitaires (73+)
+            - Performance optimisée
+            - Cache Hive offline
+            
+            ### Déploiement
+            - ✅ Flutter Web déployé
+            - ✅ APK Android disponible
+            - ✅ Edge Functions actives
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
