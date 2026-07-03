@@ -249,7 +249,7 @@ class GamificationService {
           .select('id', count: CountOption.exact)
           .gt('xp', xp);
 
-      return count.length + 1;
+      return (count as List).length + 1;
     } catch (e) {
       print('🔴 getUserRank error: $e');
       return 0;

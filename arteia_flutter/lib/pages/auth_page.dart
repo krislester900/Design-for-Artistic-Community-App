@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/auth_advanced_service.dart';
 
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
@@ -18,6 +19,8 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
+  
+  final AuthAdvancedService _authService = AuthAdvancedService();
 
   @override
   void initState() {
@@ -49,37 +52,84 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
 
   Future<void> _submit() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez remplir tous les champs'), backgroundColor: AppTheme.primaryPink),
-      );
+      _showSnackBar('Veuillez remplir tous les champs');
       return;
     }
 
     if (!_isLogin && _nameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez entrer votre nom'), backgroundColor: AppTheme.primaryPink),
-      );
+      _showSnackBar('Veuillez entrer votre nom');
       return;
     }
 
     setState(() => _isLoading = true);
 
-    // Simulation d'authentification (à remplacer par Supabase Auth)
-    await Future.delayed(const Duration(seconds: 2));
+    Map<String, dynamic> result;
+    if (_isLogin) {
+      result = await _authService.signInWithEmail(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+    } else {
+      result = await _authService.signUpWithEmail(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        username: _nameController.text.trim(),
+      );
+    }
 
     setState(() => _isLoading = false);
 
-    // Pour la démo, on retourne true
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isLogin ? 'Connexion réussie !' : 'Inscription réussie !'),
-          backgroundColor: AppTheme.primaryTeal,
-        ),
-      );
-      // Retour à la page précédente
-      Navigator.pop(context);
+      if (result['success'] == true) {
+        _showSnackBar(_isLogin ? 'Connexion réussie !' : 'Inscription réussie !');
+        Navigator.pop(context, true);
+      } else {
+        _showSnackBar(result['error']?.toString() ?? 'Erreur inconnue');
+      }
     }
+  }
+
+  Future<void> _signInWithProvider(String provider) async {
+    setState(() => _isLoading = true);
+
+    Map<String, dynamic> result;
+    switch (provider) {
+      case 'google':
+        result = await _authService.signInWithGoogle();
+        break;
+      case 'apple':
+        result = await _authService.signInWithApple();
+        break;
+      case 'github':
+        result = await _authService.signInWithGitHub();
+        break;
+      case 'discord':
+        result = await _authService.signInWithDiscord();
+        break;
+      default:
+        result = {'success': false, 'error': 'Provider inconnu'};
+    }
+
+    setState(() => _isLoading = false);
+
+    if (mounted) {
+      if (result['success'] == true) {
+        _showSnackBar('Connexion réussie !');
+        Navigator.pop(context, true);
+      } else {
+        _showSnackBar(result['error']?.toString() ?? 'Erreur de connexion');
+      }
+    }
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppTheme.primaryPink,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -94,7 +144,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 60),
+                const SizedBox(height: 40),
                 // Logo
                 Container(
                   width: 80,
@@ -134,7 +184,55 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 48),
+                const SizedBox(height: 32),
+
+                // Social login buttons
+                _SocialButton(
+                  icon: Icons.g_mobiledata,
+                  label: 'Continuer avec Google',
+                  color: Colors.white,
+                  bgColor: const Color(0xFFDB4437),
+                  onPressed: _isLoading ? null : () => _signInWithProvider('google'),
+                ),
+                const SizedBox(height: 12),
+                _SocialButton(
+                  icon: Icons.apple,
+                  label: 'Continuer avec Apple',
+                  color: Colors.white,
+                  bgColor: Colors.black,
+                  onPressed: _isLoading ? null : () => _signInWithProvider('apple'),
+                ),
+                const SizedBox(height: 12),
+                _SocialButton(
+                  icon: Icons.code,
+                  label: 'Continuer avec GitHub',
+                  color: Colors.white,
+                  bgColor: const Color(0xFF333333),
+                  onPressed: _isLoading ? null : () => _signInWithProvider('github'),
+                ),
+                const SizedBox(height: 12),
+                _SocialButton(
+                  icon: Icons.headset_mic,
+                  label: 'Continuer avec Discord',
+                  color: Colors.white,
+                  bgColor: const Color(0xFF5865F2),
+                  onPressed: _isLoading ? null : () => _signInWithProvider('discord'),
+                ),
+
+                const SizedBox(height: 24),
+                // Divider
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.grey[700])),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('ou', style: TextStyle(color: Colors.grey[500])),
+                    ),
+                    Expanded(child: Divider(color: Colors.grey[700])),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
                 // Name field (only for signup)
                 if (!_isLogin) ...[
                   TextField(
@@ -252,9 +350,49 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                     ),
                   ),
                 ),
+                const SizedBox(height: 24),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SocialButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color bgColor;
+  final VoidCallback? onPressed;
+
+  const _SocialButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.bgColor,
+    this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, color: color, size: 24),
+        label: Text(
+          label,
+          style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.w500),
+        ),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: bgColor,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          side: BorderSide.none,
         ),
       ),
     );

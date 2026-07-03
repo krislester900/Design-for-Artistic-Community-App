@@ -19,7 +19,7 @@ class StoryService {
           .from('stories')
           .select('*, user:profiles!user_id(id, username, avatar_url, level)')
           .gt('expires_at', DateTime.now().toIso8601String())
-          .is_('deleted_at', null)
+          .filter('deleted_at', 'is', null)
           .order('created_at', ascending: false);
 
       // Grouper par utilisateur
@@ -214,7 +214,7 @@ class StoryService {
           .from('stories')
           .select('id')
           .gt('expires_at', DateTime.now().toIso8601String())
-          .is_('deleted_at', null);
+          .filter('deleted_at', 'is', null);
 
       final stories = response as List;
       if (stories.isEmpty) return false;

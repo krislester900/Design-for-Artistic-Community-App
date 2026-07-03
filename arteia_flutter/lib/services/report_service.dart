@@ -82,7 +82,7 @@ class ReportService {
           .limit(50);
 
       if (status != null) {
-        query = query.eq('status', status);
+        query = query.filter('status', 'eq', status);
       }
 
       final response = await query;

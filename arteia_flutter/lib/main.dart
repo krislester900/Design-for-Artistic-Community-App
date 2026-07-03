@@ -17,17 +17,14 @@ import 'pages/search_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/universe_page.dart';
 import 'pages/notifications_page_enhanced.dart';
-import 'pages/music_page.dart';
 import 'pages/auth_page.dart';
 import 'pages/chat_page.dart';
-import 'pages/inbox_page.dart';
 import 'pages/favorites_page.dart';
 import 'pages/artwork_upload_page.dart';
 import 'pages/music_upload_page.dart';
 import 'pages/writing_page.dart';
 import 'pages/comics_upload_page.dart';
 import 'pages/quests_page.dart';
-import 'pages/theme_customizer_page.dart';
 import 'widgets/page_transition.dart';
 import 'widgets/arteia_logo.dart';
 
@@ -46,7 +43,7 @@ void main() async {
   
   await Supabase.initialize(
     url: SupabaseConfig.supabaseUrl,
-    anonKey: SupabaseConfig.supabaseAnonKey,
+    publishableKey: SupabaseConfig.supabaseAnonKey,
   );
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,

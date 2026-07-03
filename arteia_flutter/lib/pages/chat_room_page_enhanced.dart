@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../services/chat_service_enhanced.dart';
 import '../services/voice_recorder_service.dart';
@@ -45,7 +46,7 @@ class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
   }
 
   Future<void> _checkMicPermission() async {
-    if (!kIsWeb) {
+    if (!kIsWeb && !Platform.isAndroid && !Platform.isIOS) {
       await _voiceRecorder.hasPermission();
     }
   }

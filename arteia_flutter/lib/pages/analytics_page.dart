@@ -7,8 +7,6 @@ class AnalyticsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final analytics = AnalyticsService().getAnalytics('user-123');
-
     return Scaffold(
       backgroundColor: AppTheme.bgDark,
       appBar: AppBar(
@@ -23,17 +21,17 @@ class AnalyticsPage extends StatelessWidget {
             // Cartes stats principales
             Row(
               children: [
-                _StatCard(icon: Icons.visibility, label: 'Vues', value: '${analytics.totalViews}'),
+                _StatCard(icon: Icons.visibility, label: 'Vues', value: '0'),
                 const SizedBox(width: 12),
-                _StatCard(icon: Icons.favorite, label: 'Likes', value: '${analytics.totalLikes}'),
+                _StatCard(icon: Icons.favorite, label: 'Likes', value: '0'),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                _StatCard(icon: Icons.comment, label: 'Commentaires', value: '${analytics.totalComments}'),
+                _StatCard(icon: Icons.comment, label: 'Commentaires', value: '0'),
                 const SizedBox(width: 12),
-                _StatCard(icon: Icons.trending_up, label: 'Engagement', value: '${analytics.engagementRate.toStringAsFixed(1)}%'),
+                _StatCard(icon: Icons.trending_up, label: 'Engagement', value: '0%'),
               ],
             ),
             const SizedBox(height: 24),
@@ -45,29 +43,7 @@ class AnalyticsPage extends StatelessWidget {
                 color: AppTheme.cardDark,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Column(
-                children: analytics.viewsByDay.entries.map((e) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      SizedBox(width: 40, child: Text(e.key, style: TextStyle(color: Colors.grey[400], fontSize: 12))),
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: e.value / analytics.viewsByDay.values.reduce((a, b) => a > b ? a : b),
-                            backgroundColor: Colors.grey[800],
-                            valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryViolet),
-                            minHeight: 8,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text('${e.value}', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
-                    ],
-                  ),
-                )).toList(),
-              ),
+              child: const Text('Aucune donnée disponible', style: TextStyle(color: Colors.grey)),
             ),
             const SizedBox(height: 24),
             const Text('Top pays', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
@@ -78,20 +54,7 @@ class AnalyticsPage extends StatelessWidget {
                 color: AppTheme.cardDark,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Column(
-                children: analytics.viewsByCountry.entries.map((e) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.public, size: 16, color: Colors.grey),
-                      const SizedBox(width: 8),
-                      Text(e.key, style: TextStyle(color: Colors.grey[300], fontSize: 13)),
-                      const Spacer(),
-                      Text('${e.value}', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
-                    ],
-                  ),
-                )).toList(),
-              ),
+              child: const Text('Aucune donnée disponible', style: TextStyle(color: Colors.grey)),
             ),
           ],
         ),

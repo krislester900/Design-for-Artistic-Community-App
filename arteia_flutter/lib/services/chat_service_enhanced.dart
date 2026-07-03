@@ -39,6 +39,35 @@ class ChatServiceEnhanced {
     }
   }
 
+  // Envoyer un message (pour compatibilité)
+  Future<void> sendMessage(String channelId, {
+    required String content,
+    String? audioUrl,
+    int? audioDuration,
+    bool isEphemeral = false,
+    Duration? ephemeralDuration,
+  }) async {
+    try {
+      final expiresAt = isEphemeral && ephemeralDuration != null 
+          ? DateTime.now().add(ephemeralDuration) 
+          : null;
+      
+      await _client.from('messages').insert({
+        'channel_id': channelId,
+        'sender_id': _client.auth.currentUser?.id,
+        'content': content,
+        'message_type': audioUrl != null ? 'audio' : 'text',
+        'audio_url': audioUrl,
+        'audio_duration': audioDuration,
+        'is_ephemeral': isEphemeral,
+        'expires_at': expiresAt?.toIso8601String(),
+      });
+    } catch (e) {
+      print('Erreur sendMessage: $e');
+      rethrow;
+    }
+  }
+
   // Récupérer les messages actifs (non supprimés, non expirés)
   Future<List<Map<String, dynamic>>> getActiveMessages(String channelId) async {
     try {

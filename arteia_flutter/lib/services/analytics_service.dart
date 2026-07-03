@@ -161,6 +161,49 @@ class AnalyticsService {
     });
   }
 
+  // ==================== ANALYTICS DATA ====================
+
+  /// Obtenir les statistiques d'un utilisateur
+  Future<Map<String, dynamic>> getUserAnalytics(String userId) async {
+    try {
+      final views = await _client
+          .from('analytics_events')
+          .select()
+          .filter('user_id', 'eq', userId)
+          .filter('event_name', 'eq', 'post_view');
+      
+      final likes = await _client
+          .from('analytics_events')
+          .select()
+          .filter('user_id', 'eq', userId)
+          .filter('event_name', 'eq', 'post_like');
+      
+      final comments = await _client
+          .from('analytics_events')
+          .select()
+          .filter('user_id', 'eq', userId)
+          .filter('event_name', 'eq', 'post_comment');
+
+      return {
+        'totalViews': (views as List).length,
+        'totalLikes': (likes as List).length,
+        'totalComments': (comments as List).length,
+        'engagementRate': 0.0,
+        'viewsByDay': <String, int>{},
+        'viewsByCountry': <String, int>{},
+      };
+    } catch (e) {
+      return {
+        'totalViews': 0,
+        'totalLikes': 0,
+        'totalComments': 0,
+        'engagementRate': 0.0,
+        'viewsByDay': <String, int>{},
+        'viewsByCountry': <String, int>{},
+      };
+    }
+  }
+
   // ==================== USER PROPERTIES ====================
 
   /// Mettre à jour les propriétés utilisateur

@@ -237,39 +237,25 @@ class _HomePageState extends State<HomePage> {
                   if (_posts.isNotEmpty) ...[
                     const Text('Publications récentes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black)),
                     const SizedBox(height: 12),
-                    AnimatedBuilder(
-                      animation: _postsController ?? _api,
-                      builder: (context, child) {
-                        final posts = _postsController?.items.toList() ?? _posts;
-                        return ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: posts.length + (_postsController?.hasMore ?? false ? 1 : 0),
-                          itemBuilder: (context, index) {
-                            if (index == posts.length) {
-                              return const Padding(
-                                padding: EdgeInsets.all(16.0),
-                                child: Center(
-                                  child: CircularProgressIndicator(color: Colors.black),
-                                ),
-                              );
-                            }
-                            final post = posts[index];
-                            return PostCard(
-                              post: post,
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _posts.length,
+                      itemBuilder: (context, index) {
+                            final post = _posts[index];
+                            return _PostCard(
+                              postData: post,
                               onTap: () async {
                                 await Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => PostDetailPage(postId: post['id']),
+                                    builder: (_) => PostDetailPage(post: post),
                                   ),
                                 );
                                 // Refresh liked status when returning
                                 await _checkLikedPosts();
                               },
                             );
-                          },
-                        );
                       },
                     ),
                   ],
@@ -371,20 +357,13 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Widget _PostCard(Map<String, dynamic> post) {
-    final imageUrl = post['image_url'] as String?;
-    final isLiked = _likedPostIds.contains(post['id']);
-    final likesCount = post['likes_count'] ?? 0;
+  Widget _PostCard({required Map<String, dynamic> postData, VoidCallback? onTap}) {
+    final imageUrl = postData['image_url'] as String?;
+    final isLiked = _likedPostIds.contains(postData['id']);
+    final likesCount = postData['likes_count'] ?? 0;
 
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => PostDetailPage(post: post),
-          ),
-        );
-      },
+      onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
@@ -459,7 +438,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                     child: Center(
                       child: Text(
-                        post['profiles']?['avatar_url'] ?? '👤',
+                        postData['profiles']?['avatar_url'] ?? '👤',
                         style: const TextStyle(fontSize: 18),
                       ),
                     ),
@@ -470,14 +449,14 @@ class _HomePageState extends State<HomePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          post['title'] ?? 'Sans titre',
+                          postData['title'] ?? 'Sans titre',
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          post['profiles']?['username'] ?? 'Anonyme',
+                          postData['profiles']?['username'] ?? 'Anonyme',
                           style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                         ),
                       ],
@@ -486,7 +465,7 @@ class _HomePageState extends State<HomePage> {
                   AnimatedButton(
                     onPressed: () {
                       _interactivity.triggerHaptic(HapticFeedbackType.light);
-                      _toggleLike(post['id']);
+                      _toggleLike(postData['id']);
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

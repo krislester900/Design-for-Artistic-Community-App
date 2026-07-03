@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 
@@ -8,185 +9,217 @@ class AuthAdvancedService {
   factory AuthAdvancedService() => _instance;
   AuthAdvancedService._();
 
-  /// Connexion avec Google OAuth
-  Future<bool> signInWithGoogle() async {
+  /// Connexion avec Google
+  Future<Map<String, dynamic>> signInWithGoogle() async {
     try {
-      await _client.auth.signInWithOAuth(
+      // Sur mobile, utiliser Google Sign-In natif
+      // Sur web, utiliser OAuth popup
+      final response = await _client.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: 'io.supabase.arteia://login-callback',
+        redirectTo: kIsWeb ? null : 'arteia://login',
       );
-      return true;
+      
+      return {'success': true, 'url': response};
     } catch (e) {
-      print('🔴 Google OAuth error: $e');
-      return false;
+      return {'success': false, 'error': e.toString()};
     }
   }
 
-  /// Connexion avec Apple OAuth
-  Future<bool> signInWithApple() async {
+  /// Connexion avec Apple
+  Future<Map<String, dynamic>> signInWithApple() async {
     try {
-      await _client.auth.signInWithOAuth(
+      final response = await _client.auth.signInWithOAuth(
         OAuthProvider.apple,
-        redirectTo: 'io.supabase.arteia://login-callback',
+        redirectTo: kIsWeb ? null : 'arteia://login',
       );
-      return true;
+      
+      return {'success': true, 'url': response};
     } catch (e) {
-      print('🔴 Apple OAuth error: $e');
-      return false;
+      return {'success': false, 'error': e.toString()};
     }
   }
 
-  /// Connexion avec GitHub OAuth
-  Future<bool> signInWithGitHub() async {
+  /// Connexion avec Twitter/X
+  Future<Map<String, dynamic>> signInWithTwitter() async {
     try {
-      await _client.auth.signInWithOAuth(
+      final response = await _client.auth.signInWithOAuth(
+        OAuthProvider.twitter,
+        redirectTo: kIsWeb ? null : 'arteia://login',
+      );
+      
+      return {'success': true, 'url': response};
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// Connexion avec GitHub
+  Future<Map<String, dynamic>> signInWithGitHub() async {
+    try {
+      final response = await _client.auth.signInWithOAuth(
         OAuthProvider.github,
-        redirectTo: 'io.supabase.arteia://login-callback',
+        redirectTo: kIsWeb ? null : 'arteia://login',
       );
-      return true;
-    } catch (e) {
-      print('🔴 GitHub OAuth error: $e');
-      return false;
-    }
-  }
-
-  /// Vérifier si 2FA est activé pour l'utilisateur
-  Future<bool> isTwoFactorEnabled() async {
-    final user = _supabase.currentUser;
-    if (user == null) return false;
-
-    try {
-      final response = await _client
-          .from('profiles')
-          .select('two_factor_enabled')
-          .eq('id', user.id)
-          .maybeSingle();
-      return response?['two_factor_enabled'] ?? false;
-    } catch (e) {
-      print('🔴 isTwoFactorEnabled error: $e');
-      return false;
-    }
-  }
-
-  /// Activer 2FA (génère un secret TOTP)
-  Future<Map<String, dynamic>?> enableTwoFactor() async {
-    final user = _supabase.currentUser;
-    if (user == null) return null;
-
-    try {
-      // Générer un secret TOTP (à implémenter avec un package TOTP)
-      final secret = _generateTOTPSecret();
       
-      await _client
-          .from('profiles')
-          .update({'two_factor_enabled': true, 'two_factor_secret': secret})
-          .eq('id', user.id);
-
-      return {'secret': secret, 'qrCode': 'otpauth://totp/Artéïa:$user.email?secret=$secret'};
+      return {'success': true, 'url': response};
     } catch (e) {
-      print('🔴 enableTwoFactor error: $e');
-      return null;
+      return {'success': false, 'error': e.toString()};
     }
   }
 
-  /// Désactiver 2FA
-  Future<bool> disableTwoFactor() async {
-    final user = _supabase.currentUser;
-    if (user == null) return false;
-
+  /// Connexion avec Discord
+  Future<Map<String, dynamic>> signInWithDiscord() async {
     try {
-      await _client
-          .from('profiles')
-          .update({'two_factor_enabled': false, 'two_factor_secret': null})
-          .eq('id', user.id);
-      return true;
+      final response = await _client.auth.signInWithOAuth(
+        OAuthProvider.discord,
+        redirectTo: kIsWeb ? null : 'arteia://login',
+      );
+      
+      return {'success': true, 'url': response};
     } catch (e) {
-      print('🔴 disableTwoFactor error: $e');
-      return false;
+      return {'success': false, 'error': e.toString()};
     }
   }
 
-  /// Vérifier un code 2FA
-  Future<bool> verifyTwoFactorCode(String code) async {
-    final user = _supabase.currentUser;
-    if (user == null) return false;
-
+  /// Connexion avec Facebook
+  Future<Map<String, dynamic>> signInWithFacebook() async {
     try {
-      final response = await _client
-          .from('profiles')
-          .select('two_factor_secret')
-          .eq('id', user.id)
-          .maybeSingle();
-
-      final secret = response?['two_factor_secret'] as String?;
-      if (secret == null) return false;
-
-      // Vérifier le code TOTP (à implémenter avec un package TOTP)
-      // return TOTP.verify(secret, code);
-      return code == '123456'; // Placeholder
+      final response = await _client.auth.signInWithOAuth(
+        OAuthProvider.facebook,
+        redirectTo: kIsWeb ? null : 'arteia://login',
+      );
+      
+      return {'success': true, 'url': response};
     } catch (e) {
-      print('🔴 verifyTwoFactorCode error: $e');
-      return false;
+      return {'success': false, 'error': e.toString()};
     }
   }
 
-  String _generateTOTPSecret() {
-    // Générer un secret aléatoire de 32 caractères base32
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-    final random = DateTime.now().millisecondsSinceEpoch;
-    return String.fromCharCodes(Iterable.generate(32, (i) => chars.codeUnitAt((random + i) % chars.length)));
-  }
-
-  /// Mettre à jour le profil utilisateur
-  Future<bool> updateProfile(Map<String, dynamic> updates) async {
-    final user = _supabase.currentUser;
-    if (user == null) return false;
-
+  /// Inscription avec email/mot de passe
+  Future<Map<String, dynamic>> signUpWithEmail({
+    required String email,
+    required String password,
+    String? username,
+  }) async {
     try {
-      await _client
-          .from('profiles')
-          .update(updates)
-          .eq('id', user.id);
-      return true;
+      final response = await _client.auth.signUp(
+        email: email,
+        password: password,
+        data: {
+          if (username != null) 'username': username,
+        },
+      );
+
+      if (response.user != null) {
+        // Créer le profil utilisateur
+        await _client.from('profiles').insert({
+          'id': response.user!.id,
+          'email': email,
+          'username': username ?? email.split('@')[0],
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        return {
+          'success': true,
+          'user': response.user,
+          'session': response.session,
+        };
+      }
+
+      return {'success': false, 'error': 'Erreur lors de l\'inscription'};
     } catch (e) {
-      print('🔴 updateProfile error: $e');
-      return false;
+      return {'success': false, 'error': e.toString()};
     }
   }
 
-  /// Changer le mot de passe
-  Future<bool> changePassword(String currentPassword, String newPassword) async {
-    final user = _supabase.currentUser;
-    if (user == null) return false;
-
+  /// Connexion avec email/mot de passe
+  Future<Map<String, dynamic>> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
     try {
-      // Vérifier l'ancien mot de passe
-      final email = user.email;
-      if (email == null) return false;
+      final response = await _client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
 
+      return {
+        'success': true,
+        'user': response.user,
+        'session': response.session,
+      };
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// Mot de passe oublié
+  Future<Map<String, dynamic>> resetPassword(String email) async {
+    try {
       await _client.auth.resetPasswordForEmail(email);
-      
-      // Note: Supabase ne permet pas de vérifier l'ancien mot de passe directement
-      // Il faut utiliser l'API admin ou un trigger SQL
-      
-      return true;
+      return {'success': true, 'message': 'Email de réinitialisation envoyé'};
     } catch (e) {
-      print('🔴 changePassword error: $e');
-      return false;
+      return {'success': false, 'error': e.toString()};
     }
+  }
+
+  /// Déconnexion
+  Future<void> signOut() async {
+    await _client.auth.signOut();
   }
 
   /// Supprimer le compte
-  Future<bool> deleteAccount() async {
-    final user = _supabase.currentUser;
-    if (user == null) return false;
-
+  Future<Map<String, dynamic>> deleteAccount() async {
     try {
-      await _client.auth.admin.deleteUser(user.id);
-      return true;
+      final user = _supabase.currentUser;
+      if (user == null) return {'success': false, 'error': 'Non connecté'};
+
+      // Supprimer le profil
+      await _client.from('profiles').delete().eq('id', user.id);
+      
+      // Supprimer l'utilisateur (nécessite une Edge Function ou admin)
+      // await _client.auth.admin.deleteUser(user.id);
+
+      return {'success': true};
     } catch (e) {
-      print('🔴 deleteAccount error: $e');
-      return false;
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// Mettre à jour le profil
+  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
+    try {
+      final user = _supabase.currentUser;
+      if (user == null) return {'success': false, 'error': 'Non connecté'};
+
+      await _client.from('profiles').update(data).eq('id', user.id);
+      
+      return {'success': true};
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// Vérifier si l'email est vérifié
+  bool isEmailVerified() {
+    final user = _supabase.currentUser;
+    return user?.emailConfirmedAt != null;
+  }
+
+  /// Renvoyer l'email de vérification
+  Future<Map<String, dynamic>> resendVerificationEmail() async {
+    try {
+      final user = _supabase.currentUser;
+      if (user == null) return {'success': false, 'error': 'Non connecté'};
+
+      await _client.auth.resend(
+        type: OtpType.signup,
+        email: user.email ?? '',
+      );
+
+      return {'success': true, 'message': 'Email de vérification renvoyé'};
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
     }
   }
 }

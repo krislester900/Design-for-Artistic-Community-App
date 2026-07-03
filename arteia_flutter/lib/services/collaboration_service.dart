@@ -3,7 +3,7 @@ import 'supabase_service.dart';
 
 class CollaborationService {
   final SupabaseService _supabase = SupabaseService();
-  SupabaseClient get _client => _supabase.client;
+  SupabaseClient get _client => Supabase.instance.client;
   static final CollaborationService _instance = CollaborationService._();
   factory CollaborationService() => _instance;
   CollaborationService._();

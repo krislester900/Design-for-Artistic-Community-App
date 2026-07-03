@@ -165,10 +165,10 @@ class VoteService {
       final count = await _client
           .from('votes')
           .select('id', count: CountOption.exact)
-          .eq('competition_id', competitionId)
-          .eq('voter_id', user.id);
+          .filter('competition_id', 'eq', competitionId)
+          .filter('voter_id', 'eq', user.id);
 
-      final usedVotes = count.length;
+      final usedVotes = (count as List).length;
       
       return maxVotes - usedVotes;
     } catch (e) {
