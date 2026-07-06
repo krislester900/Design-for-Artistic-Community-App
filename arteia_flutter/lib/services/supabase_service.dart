@@ -30,7 +30,7 @@ class SupabaseService {
         debugPrint('🔴 $label: Expected List, got ${response.runtimeType}');
         return [];
       }
-      return List<Map<String, dynamic>>.from(response as List);
+      return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('🔴 $label exception: $e');
       return [];
@@ -91,27 +91,27 @@ class SupabaseService {
 
   // ✅ Artistes - pas de as dynamic
   Future<List<Map<String, dynamic>>> getArtists({String? categorySlug, int limit = 20, int offset = 0}) async {
-    var query = client.from('artists').select().order('created_at', ascending: false).range(offset, offset + limit - 1);
+    dynamic query = client.from('artists').select().order('created_at', ascending: false).range(offset, offset + limit - 1);
     if (categorySlug != null && categorySlug.isNotEmpty) {
-      query = query.eq('category_slug', categorySlug);
+      query = (query as dynamic).eq('category_slug', categorySlug);
     }
     return _runListQuery(query, 'GET artists');
   }
 
   // ✅ Œuvres - pas de as dynamic
   Future<List<Map<String, dynamic>>> getArtworks({String? categorySlug, int limit = 20, int offset = 0}) async {
-    var query = client.from('artworks').select().order('created_at', ascending: false).range(offset, offset + limit - 1);
+    dynamic query = client.from('artworks').select().order('created_at', ascending: false).range(offset, offset + limit - 1);
     if (categorySlug != null && categorySlug.isNotEmpty) {
-      query = query.eq('category_slug', categorySlug);
+      query = (query as dynamic).eq('category_slug', categorySlug);
     }
     return _runListQuery(query, 'GET artworks');
   }
 
   // ✅ Forum - pas de as dynamic
   Future<List<Map<String, dynamic>>> getForumDiscussions({String? categorySlug, int limit = 20, int offset = 0}) async {
-    var query = client.from('forum_discussions').select().order('created_at', ascending: false).range(offset, offset + limit - 1);
+    dynamic query = client.from('forum_discussions').select().order('created_at', ascending: false).range(offset, offset + limit - 1);
     if (categorySlug != null && categorySlug.isNotEmpty) {
-      query = query.eq('category_slug', categorySlug);
+      query = (query as dynamic).eq('category_slug', categorySlug);
     }
     return _runListQuery(query, 'GET forum_discussions');
   }
@@ -122,9 +122,9 @@ class SupabaseService {
 
   // ✅ Trend tags - pas de as dynamic
   Future<List<Map<String, dynamic>>> getTrendTags({String? categorySlug}) async {
-    var query = client.from('trend_tags').select().order('sort_order');
+    dynamic query = client.from('trend_tags').select().order('sort_order');
     if (categorySlug != null && categorySlug.isNotEmpty) {
-      query = query.eq('category_slug', categorySlug);
+      query = (query as dynamic).eq('category_slug', categorySlug);
     }
     return _runListQuery(query, 'GET trend_tags');
   }
