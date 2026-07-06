@@ -52,6 +52,7 @@ export default defineConfig({
         database: path.resolve(__dirname, 'database.html'),
         profil: path.resolve(__dirname, 'profil.html'),
         admin: path.resolve(__dirname, 'admin.html'),
+        training: path.resolve(__dirname, 'training.html'),
       },
       output: {
         manualChunks(id) {

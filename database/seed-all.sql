@@ -223,7 +223,19 @@ INSERT INTO ai_system_prompts (version, category, prompt_text, is_active) VALUES
 'Tu aides un musicien. Suggère des progressions d''accords, ambiances, arrangements. Connais la théorie musicale.', true)
 ON CONFLICT DO NOTHING;
 
--- 6. Afficher le résumé
+-- 6. SOURCES WEB POUR APPRENTISSAGE QUOTIDIEN
+INSERT INTO ai_web_sources (name, url, category, language) VALUES
+('Colossal', 'https://www.thisiscolossal.com/feed/', 'visual', 'en'),
+('Creative Boom', 'https://www.creativeboom.com/feed/', 'visual', 'en'),
+('Booooooom', 'https://booooooom.com/feed/', 'visual', 'en'),
+('Lines and Colors', 'https://linesandcolors.com/feed/', 'technique', 'en'),
+('Open Culture Art', 'https://www.openculture.com/category/art/feed', 'general', 'en'),
+('Poetry Magazine', 'https://www.poetryfoundation.org/feeds/poetrymagazine', 'writing', 'en'),
+('Guitar World', 'https://www.guitarworld.com/feed', 'music', 'en'),
+('ARTnews', 'https://www.artnews.com/feed/', 'visual', 'en')
+ON CONFLICT (url) DO NOTHING;
+
+-- 7. Afficher le résumé
 SELECT '✅ Seed terminé !' as result;
 SELECT COUNT(*) || ' articles de connaissances' as knowledge FROM ai_knowledge_base;
 SELECT COUNT(*) || ' concepts ontologiques' as concepts FROM ontology_concepts;

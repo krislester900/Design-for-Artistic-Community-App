@@ -3,9 +3,14 @@
 ## Architecture d'amélioration continue
 
 ```
+Sites web / RSS ──▶ daily-learner (quotidien) ──▶ Base de connaissances
+  (Colossal,           Edge Function + Groq          (ai_knowledge_base)
+   Creative Boom,      résumé automatique)               │
+   Poetry Mag, ...)                                       │
+                                                          ▼
 Connaissances expertes ──▶ Base de connaissances ──▶ RAG (context injection)
                               (ai_knowledge_base)        │
-                                                         ▼
+                                                          ▼
 Utilisateurs ──▶ Conversations ──▶ Training Data ──▶ Fine-tuning (futur)
                 (ai_conversations)  (ai_training_data)
                       │
@@ -25,17 +30,40 @@ Chaque conversation est automatiquement sauvegardée :
 - `ai_training_data` → paires Q/R marquées pour entraînement
 - `ai_feedback` → notes et avis utilisateurs
 
-### 2. Seed de connaissances (manuel)
+### 2. Apprentissage web quotidien (automatique)
+
+Une Edge Function `daily-learner` s'exécute chaque jour à 6h (via GitHub Actions) :
+
+1. Sélectionne aléatoirement **2 flux RSS** parmi 8 sources artistiques
+2. Parse les 3 derniers articles de chaque flux
+3. Envoie le contenu à **Groq (Llama 3)** pour résumer en fiche de connaissance
+4. Vérifie les doublons par titre
+5. Insère les nouveaux articles dans `ai_knowledge_base` avec la source `web:rss:*`
+6. Met à jour `ai_web_sources` (date dernier fetch, stats)
+
+Sources RSS incluses : Colossal, Creative Boom, Booooooom, Lines and Colors, Open Culture Art, Poetry Magazine, Guitar World, ARTnews.
+
 ```bash
-# 1. Activer pgvector sur Supabase
-# Dans SQL Editor :
+# Déployer la fonction
+supabase functions deploy daily-learner --no-verify-jwt
+
+# Définir le secret CRON (partagé avec GitHub Actions)
+supabase secrets set CRON_SECRET=votre_secret_ici
+```
+
+### 3. Seed de connaissances (manuel)
+```bash
+# 1. Exécuter le schéma web sources
+# Copier database/schema-web-sources.sql dans SQL Editor
+
+# 2. Activer pgvector sur Supabase
 CREATE EXTENSION IF NOT EXISTS vector;
 
-# 2. Insérer les connaissances expertes
+# 3. Insérer les connaissances expertes
 # Copier le contenu de seed-knowledge.ts dans les seeds
 ```
 
-### 3. Amélioration continue
+### 4. Amélioration continue
 
 #### A. Apprentissage supervisé (via feedback)
 ```sql
@@ -70,7 +98,7 @@ HAVING COUNT(*) > 3
 ORDER BY freq DESC;
 ```
 
-### 4. Ajouter des connaissances
+### 5. Ajouter des connaissances
 
 ```sql
 -- Insérer un nouvel article dans la base de connaissances
@@ -83,7 +111,7 @@ VALUES (
 );
 ```
 
-### 5. Métriques de performance
+### 6. Métriques de performance
 ```sql
 -- Dashboard de performance
 SELECT * FROM ai_daily_performance LIMIT 7;
@@ -96,19 +124,26 @@ SELECT * FROM ai_daily_performance LIMIT 7;
 - ✅ Feedback utilisateur
 - ✅ Collecte des Q/R dans training_data
 
-### Phase 2 : Knowledge Base (cette semaine)
+### Phase 2 : Apprentissage web automatique ✅
+- [x] Edge Function `daily-learner` avec 8 flux RSS
+- [x] Résumé via Groq (Llama 3) en fiches de connaissance
+- [x] GitHub Actions cron quotidien (6h UTC)
+- [x] Détection des doublons
+- [x] Table `ai_web_sources` pour tracking
+
+### Phase 3 : Knowledge Base (cette semaine)
 - [x] Ajouter contenu expert (11 articles déjà présents)
 - [ ] Ajouter tutoriels artistiques
 - [ ] Ajouter FAQ Arteïa
 - [ ] Ajouter techniques avancées
 
-### Phase 3 : Fine-tuning (quand assez de données)
+### Phase 4 : Fine-tuning (quand assez de données)
 - [ ] ~1000+ paires Q/R de qualité (rating ≥ 4)
 - [ ] Exporter au format JSONL pour OpenAI
 - [ ] Fine-tuner un modèle custom
 - [ ] Déployer le modèle fine-tuné
 
-### Phase 4 : Auto-apprentissage
+### Phase 5 : Auto-apprentissage avancé
 - [ ] Système de recommandation de contenu
 - [ ] Détection des tendances artistiques
 - [ ] Suggestions proactives
@@ -144,3 +179,27 @@ supabase secrets set OPENAI_API_KEY=sk-...
 
 # 4. Exécuter les migrations SQL
 # Copier schema-ai-training.sql dans SQL Editor
+
+## 🚀 Déploiement du daily-learner
+
+```bash
+# 1. Déployer la fonction
+supabase functions deploy daily-learner --no-verify-jwt
+
+# 2. Définir le CRON_SECRET (même valeur que dans GitHub Secrets)
+supabase secrets set CRON_SECRET=mon-secret-super-secret
+
+# 3. Ajouter GROQ_API_KEY si pas déjà fait
+supabase secrets set GROQ_API_KEY=gsk_...
+
+# 4. Exécuter le schéma des sources web
+# Copier database/schema-web-sources.sql dans SQL Editor
+
+# 5. Seed les sources RSS
+# Copier la section "SOURCES WEB" de database/seed-all.sql dans SQL Editor
+
+# 6. Configurer GitHub Secrets
+# Dans Settings > Secrets and variables > Actions :
+# - SUPABASE_EDGE_FUNCTIONS_URL: https://votre-projet.supabase.co/functions/v1
+# - CRON_SECRET: mon-secret-super-secret
+```

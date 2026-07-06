@@ -116,11 +116,75 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
   # ========================================
-  # JOB 4 : DEPLOY SUPABASE EDGE FUNCTIONS
+  # JOB 4 : MIGRATIONS SQL SUPABASE
+  # ========================================
+  migrate-supabase:
+    name: Run SQL Migrations
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link Supabase project
+        run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Apply database schemas (ordre chronologique)
+        run: |
+          # Ordre d'exécution explicite pour éviter les conflits de dépendances
+          SCHEMAS=(
+            "database/schema-safe.sql"
+            "database/schema.sql"
+            "database/schema-v2.sql"
+            "database/schema-v3-features.sql"
+            "database/schema-content.sql"
+            "database/schema-likes-comments.sql"
+            "database/schema-messaging.sql"
+            "database/schema-messaging-update.sql"
+            "database/schema-ai-assistant.sql"
+            "database/schema-ai-training.sql"
+            "database/schema-manga-styles.sql"
+            "database/schema-manga-training.sql"
+            "database/schema-web-sources.sql"
+            "database/schema-pinterest-sources.sql"
+            "database/schema-ontology.sql"
+            "database/schema-stories.sql"
+            "database/schema-fatmecoin.sql"
+            "database/schema-donations-votes.sql"
+            "database/schema-i18n-moderation.sql"
+            "database/schema-collaborations.sql"
+            "database/schema-music-studio.sql"
+            "database/schema-migration-safe.sql"
+            "database/schema-add-missing-tables.sql"
+          )
+          for f in "${SCHEMAS[@]}"; do
+            if [ -f "$f" ]; then
+              echo "→ $f"
+              supabase db execute --file "$f" || echo "⚠️ Échec sur $f (peut-être déjà appliqué)"
+            else
+              echo "⚠️ $f non trouvé, ignoré"
+            fi
+          done
+
+      - name: Seed data (connaissances, ontologie, styles manga)
+        run: |
+          supabase db execute --file "database/seed-all.sql" || echo "⚠️ Seed déjà appliqué"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+  # ========================================
+  # JOB 5 : DEPLOY SUPABASE EDGE FUNCTIONS
   # ========================================
   deploy-supabase:
     name: Deploy Supabase Edge Functions
-    needs: flutter-test
+    needs: migrate-supabase
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
@@ -135,18 +199,40 @@ jobs:
 
       - name: Deploy Edge Functions
         run: |
+          # Assistant IA
           supabase functions deploy ai-assistant --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+
+          # Apprentissage automatique
+          supabase functions deploy daily-learner --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          supabase functions deploy pinterest-collector --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+
+          # Génération & entraînement manga
+          supabase functions deploy manga-trainer --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          supabase functions deploy manga-generator --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+
+          # Paiements & invitations
           supabase functions deploy create-payment-intent --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
           supabase functions deploy send-invitation-email --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Set Edge Function secrets
+        run: |
+          supabase secrets set --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} \
+            GROQ_API_KEY=${{ secrets.GROQ_API_KEY }} \
+            REPLICATE_API_KEY=${{ secrets.REPLICATE_API_KEY }} \
+            CRON_SECRET=${{ secrets.CRON_SECRET }} \
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
   # ========================================
-  # JOB 5 : RELEASE VERSION TAG
+  # JOB 7 : RELEASE VERSION TAG
   # ========================================
   release:
     name: Create Release
-    needs: [flutter-build, deploy-web]
+    needs: [flutter-build, deploy-web, deploy-supabase]
     if: github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release')
     runs-on: ubuntu-latest
 

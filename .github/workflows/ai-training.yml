@@ -1,0 +1,70 @@
+name: Entraînement IA Arteïa Muse
+description: Déclenche manuellement les entraînements IA (daily learner, manga LoRA)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Type d''entraînement'
+        required: true
+        default: 'daily-learner'
+        type: choice
+        options:
+          - daily-learner
+          - manga-lora
+          - assistant-export
+          - all
+      style_slug:
+        description: 'Slug du style manga (pour manga-lora uniquement)'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  trigger-training:
+    name: Lancer l'entraînement
+    runs-on: ubuntu-latest
+    steps:
+      - name: Daily Learner — Apprentissage web RSS
+        if: inputs.target == 'daily-learner' || inputs.target == 'all'
+        run: |
+          echo "🚀 Lancement du daily-learner..."
+          curl -s -X POST "${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}/daily-learner" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json"
+          echo "✅ Daily learner terminé"
+
+      - name: Pinterest Collector — Collecte d'images
+        if: inputs.target == 'daily-learner' || inputs.target == 'all'
+        run: |
+          echo "🚀 Lancement du pinterest-collector..."
+          curl -s -X POST "${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}/pinterest-collector" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json"
+          echo "✅ Collecte Pinterest terminée"
+
+      - name: Manga LoRA — Entraînement
+        if: inputs.target == 'manga-lora' || inputs.target == 'all'
+        run: |
+          SLUG="${{ inputs.style_slug }}"
+          if [ -z "$SLUG" ]; then
+            echo "⚠️ Aucun style_slug fourni, entraînement non lancé."
+            echo "Utilise style_slug pour cibler un style spécifique (ex: tite-kubo)"
+            exit 0
+          fi
+          echo "🚀 Entraînement LoRA pour $SLUG..."
+          curl -s -X POST "${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}/manga-trainer" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"action\":\"start_training\",\"style_slug\":\"$SLUG\"}"
+          echo "✅ Entraînement LoRA lancé"
+
+      - name: Assistant — Export des données pour fine-tuning
+        if: inputs.target == 'assistant-export' || inputs.target == 'all'
+        run: |
+          echo "📊 Export des données d'entraînement..."
+          curl -s -X POST "${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}/ai-assistant" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"export_training_data","format":"jsonl"}'
+          echo "✅ Export terminé"

@@ -24,6 +24,34 @@ interface RequestBody {
   };
 }
 
+const REPLICATE_KEY = Deno.env.get("REPLICATE_API_KEY") ?? "";
+const STYLES: Record<string, { slug: string; model: string; version: string; prompt: string; neg: string }> = {
+  "kubo": { slug: "tite-kubo", model: "stability-ai/sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", prompt: "bleach manga style by tite kubo, sharp bold ink lines, {prompt}, dynamic pose, dramatic composition", neg: "photorealistic, 3d, western comic" },
+  "oda": { slug: "eiichiro-oda", model: "stability-ai/sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", prompt: "one piece manga style by eiichiro oda, extremely expressive, {prompt}, bold outlines, shonen", neg: "realistic proportions, dark gritty" },
+  "miura": { slug: "kentaro-miura", model: "stability-ai/sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", prompt: "berserk manga style by kentaro miura, incredibly detailed cross-hatching, dark medieval fantasy, {prompt}, heavy ink work", neg: "bright colors, cartoon, simple lines, chibi" },
+  "kishimoto": { slug: "masashi-kishimoto", model: "stability-ai/sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", prompt: "naruto manga style by masashi kishimoto, dynamic ninja action, {prompt}, hand signs, strong expressions", neg: "realistic, muted colors" },
+  "toriyama": { slug: "akira-toriyama", model: "stability-ai/sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", prompt: "dragon ball manga style by akira toriyama, clean bold lines, {prompt}, vibrant colors, energy aura", neg: "realistic, horror, soft shading" },
+  "togashi": { slug: "yoshihiro-togashi", model: "stability-ai/sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", prompt: "hunter x hunter manga style by yoshihiro togashi, unique design, {prompt}, expressive, detailed textures", neg: "simple art, mecha, romantic" },
+  "junji ito": { slug: "junji-ito", model: "stability-ai/sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", prompt: "junji ito manga art style, meticulous detail, unsettling horror, {prompt}, intricate patterns", neg: "happy, bright colors, cartoon, cute" },
+  "clamp": { slug: "clamp", model: "stability-ai/sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", prompt: "clamp manga art style, elegant character design, long flowing limbs, {prompt}, delicate linework, shojo", neg: "rough sketch, thick messy lines, action shonen" },
+};
+
+const IMAGE_KEYWORDS = ["dessine", "génère", "crée", "illustre", "imagine", "représente", "draw", "generate", "create", "manga de", "image de", "illustration"];
+
+function detectImageRequest(text: string): { isImage: boolean; prompt: string; styleSlug: string } {
+  const lower = text.toLowerCase();
+  const hasKeyword = IMAGE_KEYWORDS.some((k) => lower.includes(k));
+  if (!hasKeyword) return { isImage: false, prompt: "", styleSlug: "" };
+
+  let detectedStyle = "";
+  for (const [key, style] of Object.entries(STYLES)) {
+    if (lower.includes(key)) { detectedStyle = style.slug; break; }
+  }
+
+  const cleaned = text.replace(/dessine-moi|dessine|génère|crée|illustre|imagine|représente|s'il te plaît|stp|please/gi, "").trim();
+  return { isImage: true, prompt: cleaned || text, styleSlug: detectedStyle };
+}
+
 const SYSTEM_PROMPT = `Tu es "Arteïa Muse" ✨, l'assistant créatif officiel d'Arteïa, une plateforme artistique communautaire.
 
 Tu aides les artistes à :
@@ -32,6 +60,7 @@ Tu aides les artistes à :
 3. Suggérer des techniques et styles artistiques
 4. Expliquer les fonctionnalités de l'application Arteïa
 5. Inspirer et motiver les créateurs
+6. GÉNÉRER DES IMAGES — quand un utilisateur te demande de dessiner quelque chose (ex: "dessine Guts style Berserk"), utilise la fonction de génération d'images intégrée. Tu peux générer en style Kubo, Oda, Miura, Kishimoto, Toriyama, Togashi, Junji Ito, CLAMP.
 
 Personnalité :
 - Créative et inspirante, tu parles avec des émojis artistiques 🎨🎵✍️
@@ -39,6 +68,7 @@ Personnalité :
 - Tu connais les catégories : visuel, musique, écriture, BD/manga
 - Tu peux suggérer des exercices créatifs
 - Tu parles français
+- Tu GÉNÈRES DES IMAGES SUR DEMANDE — si on te demande de dessiner, tu réponds avec l'image générée !
 
 Fonctionnalités connues d'Arteïa :
 - Publication d'œuvres visuelles, musique, écriture, BD
@@ -48,7 +78,8 @@ Fonctionnalités connues d'Arteïa :
 - Défis créatifs et quêtes
 - Bulles de pensée (messages vocaux)
 - Lecteur de musique intégré
-- Mode lecture immersive`;
+- Mode lecture immersive
+- GÉNÉRATEUR D'IMAGES IA — styles manga : Bleach, One Piece, Berserk, Naruto, Dragon Ball, Hunter x Hunter, Junji Ito, CLAMP`;
 
 serve(async (req) => {
   // CORS
@@ -150,6 +181,56 @@ serve(async (req) => {
         case "comics":
           contextPrompt = "\nL'utilisateur fait de la BD/manga. Conseil pour le storyboard, les planches, le lettering.";
           break;
+      }
+    }
+
+    // Vérifier si l'utilisateur demande une image
+    const lastMsg = messages[messages.length - 1]?.content ?? "";
+    const imgReq = detectImageRequest(lastMsg);
+    if (imgReq.isImage && REPLICATE_KEY) {
+      try {
+        const styleEntry = imgReq.styleSlug ? Object.values(STYLES).find((s) => s.slug === imgReq.styleSlug) : null;
+        const style = styleEntry ?? STYLES["miura"];
+        const finalPrompt = style.prompt.replace("{prompt}", imgReq.prompt);
+
+        const replicateRes = await fetch(
+          `https://api.replicate.com/v1/models/${style.model}/predictions`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${REPLICATE_KEY}` },
+            body: JSON.stringify({
+              version: style.version,
+              input: { prompt: finalPrompt, negative_prompt: style.neg, num_inference_steps: 30, guidance_scale: 7, scheduler: "DPMSolverMultistep", num_outputs: 1 },
+            }),
+          }
+        );
+
+        if (replicateRes.ok) {
+          const pred = await replicateRes.json();
+          for (let i = 0; i < 30; i++) {
+            await new Promise((r) => setTimeout(r, 2000));
+            const statusRes = await fetch(`https://api.replicate.com/v1/predictions/${pred.id}`, {
+              headers: { Authorization: `Bearer ${REPLICATE_KEY}` },
+            });
+            if (!statusRes.ok) break;
+            const data = await statusRes.json();
+            if (data.status === "succeeded" && data.output?.[0]) {
+              await supabase.from("ai_conversations").insert({
+                user_id: user.id,
+                user_message: lastMsg,
+                assistant_reply: `Voici ton illustration !`,
+                context_type: "visual",
+              }).catch(() => {});
+              return new Response(JSON.stringify({
+                reply: `Voici ton illustration ${imgReq.styleSlug ? "en style " + imgReq.styleSlug.replace("-", " ") : ""} ! 🎨\n\n${imgReq.prompt}`,
+                image_url: data.output[0],
+              }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+            }
+            if (data.status === "failed") break;
+          }
+        }
+      } catch (e) {
+        console.error("Image generation error:", e);
       }
     }
 

@@ -90,3 +90,23 @@
 .animate-badge-pulse {
   animation: badge-pulse 2s ease-in-out infinite;
 }
+
+/* Welcome bird */
+@keyframes bird-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes bird-fly-away {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  30% { transform: translateY(-30px) scale(1.1); opacity: 1; }
+  100% { transform: translateY(-120px) scale(0.3); opacity: 0; }
+}
+@keyframes wing-flap {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-20deg); }
+}
+@keyframes bird-wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-8deg); }
+  75% { transform: rotate(8deg); }
+}

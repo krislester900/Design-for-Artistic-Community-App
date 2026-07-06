@@ -1,0 +1,41 @@
+name: Apprentissage quotidien Arteïa Muse
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      run_manga_training:
+        description: 'Lancer aussi l''entraînement manga LoRA'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  daily-learn:
+    name: Apprentissage web (RSS → connaissances)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apprentissage web
+        run: |
+          curl -s -X POST "${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}/daily-learner" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json"
+
+      - name: Collecte Pinterest
+        run: |
+          curl -s -X POST "${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}/pinterest-collector" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json"
+
+  manga-training:
+    name: Entraînement manga LoRA automatique
+    if: github.event_name == 'workflow_dispatch' && inputs.run_manga_training == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Vérifier les styles prêts à entraîner
+        run: |
+          curl -s -X POST "${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}/manga-trainer" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"auto_train_ready"}'
