@@ -31,7 +31,7 @@ class _MusicPageState extends State<MusicPage>
   void initState() {
     super.initState();
     _theme = CategoryThemes.music;
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _scrollController.addListener(() {
       setState(() => _scrollOffset = _scrollController.offset);
     });
@@ -128,6 +128,7 @@ class _MusicPageState extends State<MusicPage>
                               _horizontalSongs(_songs.skip(4).take(8).toList()),
                               _horizontalSongs(_songs.skip(8).take(8).toList()),
                               _genrePanel(),
+                              const MusicStudioPage(),
                             ],
                           ),
                         ),
@@ -282,11 +283,15 @@ class _MusicPageState extends State<MusicPage>
       indicatorWeight: 3,
       tabAlignment: TabAlignment.start,
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      tabs: const [
-        Tab(text: 'Nouveautés'),
-        Tab(text: 'Vidéos'),
-        Tab(text: 'Artistes'),
-        Tab(text: 'Genres'),
+      tabs: [
+        const Tab(text: 'Nouveautés'),
+        const Tab(text: 'Vidéos'),
+        const Tab(text: 'Artistes'),
+        const Tab(text: 'Genres'),
+        Tab(
+          text: 'Créer ma musique',
+          icon: const Icon(Icons.mic_rounded, size: 18),
+        ),
       ],
     );
   }
