@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
@@ -10,98 +11,119 @@ class LikeService {
   factory LikeService() => _instance;
   LikeService._();
 
-  /// Toggle like sur un post
   Future<LikeResult> toggleLike(String postId) async {
     final user = _supabase.currentUser;
     if (user == null) throw Exception('Connecte-toi pour liker !');
 
-    // Vérifier si déjà liké
-    final existing = await _supabase.client
-        .from('post_likes')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('post_id', postId)
-        .maybeSingle();
-
-    if (existing != null) {
-      // Unlike
-      await _supabase.client
+    try {
+      final existing = await _supabase.client
           .from('post_likes')
-          .delete()
-          .eq('id', existing['id']);
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('post_id', postId)
+          .maybeSingle();
 
-      // Décrémenter le compteur
-      await _supabase.client.rpc('decrement_likes', params: {'post_id': postId});
-      
-      final count = await getLikeCount(postId);
-      return LikeResult(liked: false, count: count);
-    } else {
-      // Like
-      await _supabase.client.from('post_likes').insert({
-        'user_id': user.id,
-        'post_id': postId,
-      });
+      if (existing != null) {
+        await _supabase.client
+            .from('post_likes')
+            .delete()
+            .eq('id', existing['id']);
 
-      // Incrémenter le compteur
-      await _supabase.client.rpc('increment_likes', params: {'post_id': postId});
+        try {
+          await _supabase.client.rpc('decrement_likes', params: {'post_id': postId});
+        } catch (e) {
+          debugPrint('⚠️ decrement_likes RPC failed: $e');
+        }
 
-      // Haptique
-      _haptic.triggerHaptic(HapticFeedbackType.success);
+        final count = await getLikeCount(postId);
+        return LikeResult(liked: false, count: count);
+      } else {
+        await _supabase.client.from('post_likes').insert({
+          'user_id': user.id,
+          'post_id': postId,
+        });
 
-      final count = await getLikeCount(postId);
-      return LikeResult(liked: true, count: count);
+        try {
+          await _supabase.client.rpc('increment_likes', params: {'post_id': postId});
+        } catch (e) {
+          debugPrint('⚠️ increment_likes RPC failed: $e');
+        }
+
+        try {
+          _haptic.triggerHaptic(HapticFeedbackType.success);
+        } catch (e) {
+          debugPrint('⚠️ Haptic feedback failed: $e');
+        }
+
+        final count = await getLikeCount(postId);
+        return LikeResult(liked: true, count: count);
+      }
+    } catch (e) {
+      debugPrint('❌ toggleLike error: $e');
+      rethrow;
     }
   }
 
-  /// Vérifier si l'utilisateur a liké
   Future<bool> isLiked(String postId) async {
     final user = _supabase.currentUser;
     if (user == null) return false;
 
-    final existing = await _supabase.client
-        .from('post_likes')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('post_id', postId)
-        .maybeSingle();
-
-    return existing != null;
+    try {
+      final existing = await _supabase.client
+          .from('post_likes')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('post_id', postId)
+          .maybeSingle();
+      return existing != null;
+    } catch (e) {
+      debugPrint('❌ isLiked error: $e');
+      return false;
+    }
   }
 
-  /// Obtenir le nombre de likes
   Future<int> getLikeCount(String postId) async {
     try {
       final response = await _supabase.client
           .from('post_likes')
           .select()
           .eq('post_id', postId);
-      return (response as List).length;
+      if (response is List) return response.length;
+      return 0;
     } catch (e) {
+      debugPrint('❌ getLikeCount error: $e');
       return 0;
     }
   }
 
-  /// Obtenir les likes users pour un post
   Future<List<Map<String, dynamic>>> getPostLikes(String postId) async {
-    final response = await _supabase.client
-        .from('post_likes')
-        .select('user_id, profiles!inner(username, avatar_url)')
-        .eq('post_id', postId)
-        .order('created_at', ascending: false)
-        .limit(10);
+    try {
+      final response = await _supabase.client
+          .from('post_likes')
+          .select('user_id, profiles!inner(username, avatar_url)')
+          .eq('post_id', postId)
+          .order('created_at', ascending: false)
+          .limit(10);
 
-    return (response as List).cast<Map<String, dynamic>>();
+      if (response is List) {
+        return List<Map<String, dynamic>>.from(
+          response.map((item) => Map<String, dynamic>.from(item as Map)),
+        );
+      }
+      return [];
+    } catch (e) {
+      debugPrint('❌ getPostLikes error: $e');
+      return [];
+    }
   }
 }
 
 class LikeResult {
   final bool liked;
   final int count;
-
   LikeResult({required this.liked, required this.count});
 }
 
-/// Widget LikeButton réutilisable
 class LikeButton extends StatefulWidget {
   final String postId;
   final int initialCount;
@@ -129,6 +151,7 @@ class _LikeButtonState extends State<LikeButton> with SingleTickerProviderStateM
   late Animation<double> _scaleAnim;
   late Animation<double> _bounceAnim;
   bool _isAnimating = false;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -159,12 +182,16 @@ class _LikeButtonState extends State<LikeButton> with SingleTickerProviderStateM
   }
 
   Future<void> _handleLike() async {
-    if (_isAnimating) return;
+    if (_isAnimating || _isLoading) return;
     _isAnimating = true;
+
+    final previousLiked = _isLiked;
+    final previousCount = _likeCount;
 
     setState(() {
       _isLiked = !_isLiked;
       _likeCount += _isLiked ? 1 : -1;
+      _isLoading = true;
     });
 
     _animController.forward(from: 0.0);
@@ -172,20 +199,21 @@ class _LikeButtonState extends State<LikeButton> with SingleTickerProviderStateM
     try {
       final service = LikeService();
       final result = await service.toggleLike(widget.postId);
-      
+
       if (mounted) {
         setState(() {
           _isLiked = result.liked;
           _likeCount = result.count;
+          _isLoading = false;
         });
         widget.onChanged?.call();
       }
     } catch (e) {
-      // Rollback
       if (mounted) {
         setState(() {
-          _isLiked = !_isLiked;
-          _likeCount += _isLiked ? 1 : -1;
+          _isLiked = previousLiked;
+          _likeCount = previousCount;
+          _isLoading = false;
         });
       }
     } finally {
@@ -196,49 +224,52 @@ class _LikeButtonState extends State<LikeButton> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: _handleLike,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedBuilder(
-            animation: _bounceAnim,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: _isLiked ? (1.0 + _bounceAnim.value * 0.3) : 1.0,
-                child: AnimatedBuilder(
-                  animation: _scaleAnim,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _animController.isAnimating ? _scaleAnim.value : 1.0,
-                      child: Icon(
-                        _isLiked ? Icons.favorite : Icons.favorite_border,
-                        color: _isLiked ? Colors.red : Colors.grey,
-                        size: widget.size,
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 4),
-          AnimatedBuilder(
-            animation: _bounceAnim,
-            builder: (context, child) {
-              return Transform.translate(
-                offset: Offset(0, -_bounceAnim.value * 8),
-                child: Text(
-                  _formatCount(_likeCount),
-                  style: TextStyle(
-                    color: _isLiked ? Colors.red : Colors.grey,
-                    fontSize: widget.size * 0.6,
-                    fontWeight: _isLiked ? FontWeight.w600 : FontWeight.normal,
+      onTap: _isLoading ? null : _handleLike,
+      child: Opacity(
+        opacity: _isLoading ? 0.6 : 1.0,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedBuilder(
+              animation: _bounceAnim,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _isLiked ? (1.0 + _bounceAnim.value * 0.3) : 1.0,
+                  child: AnimatedBuilder(
+                    animation: _scaleAnim,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _animController.isAnimating ? _scaleAnim.value : 1.0,
+                        child: Icon(
+                          _isLiked ? Icons.favorite : Icons.favorite_border,
+                          color: _isLiked ? Colors.red : Colors.grey,
+                          size: widget.size,
+                        ),
+                      );
+                    },
                   ),
-                ),
-              );
-            },
-          ),
-        ],
+                );
+              },
+            ),
+            const SizedBox(width: 4),
+            AnimatedBuilder(
+              animation: _bounceAnim,
+              builder: (context, child) {
+                return Transform.translate(
+                  offset: Offset(0, -_bounceAnim.value * 8),
+                  child: Text(
+                    _formatCount(_likeCount),
+                    style: TextStyle(
+                      color: _isLiked ? Colors.red : Colors.grey,
+                      fontSize: widget.size * 0.6,
+                      fontWeight: _isLiked ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
