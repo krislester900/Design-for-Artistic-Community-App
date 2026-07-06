@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useCommunityDataQuery } from "../hooks/useCommunityDataQuery";
 import { useAppStore } from "../store/useAppStore";
 import { getCategoryLabel, isCategoryMatch } from "../data/community";
@@ -7,17 +6,11 @@ import { Palette, Heart, MessageCircle, Users } from "lucide-react";
 import { WelcomeBird } from "./WelcomeBird";
 
 export function MobileHome() {
-  const [isDataLoading, setIsDataLoading] = useState(true);
   const { data, isLoading } = useCommunityDataQuery();
   const selectedCategory = useAppStore((state) => state.selectedCategory);
   const setSelectedCategory = useAppStore((state) => state.setSelectedCategory);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setIsDataLoading(false), 800);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (isLoading || isDataLoading) {
+  if (isLoading) {
     return (
       <div className="mobile-home relative w-full h-full flex items-center justify-center">
         <WelcomeBird />

@@ -55,15 +55,7 @@ export async function getCommunityData(): Promise<{
   }
 
   try {
-    const [
-      categoriesResult,
-      artistsResult,
-      artworksResult,
-      discussionsResult,
-      trendsResult,
-      eventsResult,
-      statsResult,
-    ] = await Promise.all([
+    const queries = [
       supabase
         .from("categories")
         .select(
@@ -99,9 +91,23 @@ export async function getCommunityData(): Promise<{
         .from("community_stats")
         .select("number_label, label")
         .order("sort_order", { ascending: true }),
-    ]);
+    ];
 
-    const results = [
+    const results = await Promise.allSettled(queries);
+
+    for (const r of results) {
+      if (r.status === "rejected") {
+        console.warn("Supabase query rejected:", r.reason);
+      } else if (r.value.error) {
+        console.warn("Supabase query error:", r.value.error);
+      }
+    }
+
+    const fulfilled = results.map((r) =>
+      r.status === "fulfilled" ? r.value : { data: null, error: null }
+    );
+
+    const [
       categoriesResult,
       artistsResult,
       artworksResult,
@@ -109,12 +115,7 @@ export async function getCommunityData(): Promise<{
       trendsResult,
       eventsResult,
       statsResult,
-    ];
-    const firstError = results.find((result) => result.error)?.error;
-
-    if (firstError) {
-      throw firstError;
-    }
+    ] = fulfilled;
 
     return {
       source: "supabase",

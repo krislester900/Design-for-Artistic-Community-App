@@ -42,13 +42,12 @@ export function MobileApp() {
 
   return (
     <div className="mobile-app h-full w-full relative overflow-hidden">
-      {drawerOpen && (
-        <MobileDrawer
-          currentView={currentView}
-          onNavigate={handleNavigate}
-          onClose={() => setDrawerOpen(false)}
-        />
-      )}
+      <MobileDrawer
+        isOpen={drawerOpen}
+        activeTab={currentView}
+        onNavigate={handleNavigate}
+        onClose={() => setDrawerOpen(false)}
+      />
       <div className="mobile-view h-full w-full">
         {renderView()}
       </div>

@@ -13,9 +13,19 @@ interface CommunityDataState {
   refetch: () => Promise<void>;
 }
 
+const emptyData: CommunityData = {
+  categories: [],
+  artists: [],
+  artworks: [],
+  discussions: [],
+  trends: [],
+  events: [],
+  communityStats: [],
+};
+
 export function useCommunityData(): CommunityDataState {
   const [state, setState] = useState<CommunityDataState>({
-    data: mockCommunityData,
+    data: emptyData,
     source: 'mock',
     isLoading: true,
     refetch: async () => {},
@@ -38,7 +48,7 @@ export function useCommunityData(): CommunityDataState {
     } catch {
       setState((current) => ({
         ...current,
-        data: mockCommunityData,
+        data: emptyData,
         source: 'mock',
         isLoading: false,
       }));
@@ -46,36 +56,8 @@ export function useCommunityData(): CommunityDataState {
   }, []);
 
   useEffect(() => {
-    let isMounted = true;
-
-    getCommunityData().then((result) => {
-      if (!isMounted) {
-        return;
-      }
-
-      setState((current) => ({
-        ...current,
-        data: result.data,
-        source: result.source,
-        isLoading: false,
-      }));
-    }).catch(() => {
-      if (!isMounted) {
-        return;
-      }
-
-      setState((current) => ({
-        ...current,
-        data: mockCommunityData,
-        source: 'mock',
-        isLoading: false,
-      }));
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    loadCommunityData();
+  }, [loadCommunityData]);
 
   return {
     ...state,

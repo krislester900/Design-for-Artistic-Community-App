@@ -46,6 +46,9 @@ dependency_overrides:
   fluttertoast: ^8.2.8
   uuid: ^4.5.1
   mime: ^2.0.0
+  record_platform_interface: 1.6.0
+  record_web: 1.1.9
+  record: 5.2.1
 
 dev_dependencies:
   flutter_test:

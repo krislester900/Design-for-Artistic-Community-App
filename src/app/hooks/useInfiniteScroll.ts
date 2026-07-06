@@ -12,6 +12,8 @@ export function useInfiniteScroll(
 ) {
   const { threshold = 0, rootMargin = "200px" } = options;
   const [loading, setLoading] = useState(false);
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
   const observerRef = useRef<IntersectionObserver | null>(null);
   const sentinelRef = useCallback(
     (node: HTMLElement | null) => {
@@ -22,7 +24,7 @@ export function useInfiniteScroll(
 
       observerRef.current = new IntersectionObserver(
         async (entries) => {
-          if (entries[0].isIntersecting && !loading && hasMore) {
+          if (entries[0].isIntersecting && !loadingRef.current && hasMore) {
             setLoading(true);
             await onLoadMore();
             setLoading(false);
@@ -33,7 +35,7 @@ export function useInfiniteScroll(
 
       observerRef.current.observe(node);
     },
-    [hasMore, loading, onLoadMore, threshold, rootMargin]
+    [hasMore, onLoadMore, threshold, rootMargin]
   );
 
   useEffect(() => {

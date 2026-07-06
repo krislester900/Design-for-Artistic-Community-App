@@ -5,92 +5,92 @@ const STICKER_CATEGORIES = [
   {
     name: "Artiste",
     stickers: [
-      { id: "art-1", name: "Pinceau", url: "🖌️", category: "art" },
-      { id: "art-2", name: "Palette", url: "🎨", category: "art" },
-      { id: "art-3", name: "Caméra", url: "📷", category: "art" },
-      { id: "art-4", name: "Film", url: "🎬", category: "art" },
-      { id: "art-5", name: "Micro", url: "🎤", category: "art" },
-      { id: "art-6", name: "Notes", url: "🎵", category: "art" },
-      { id: "art-7", name: "Studio", url: "🎧", category: "art" },
-      { id: "art-8", name: "Crayon", url: "✏️", category: "art" },
-      { id: "art-9", name: "Livres", url: "📚", category: "art" },
-      { id: "art-10", name: "Étoile", url: "⭐", category: "art" },
-      { id: "art-11", name: "Magique", url: "✨", category: "art" },
-      { id: "art-12", name: "Inspiré", url: "💡", category: "art" },
+      { id: "art-1", name: "Pinceau", emoji: "🖌️", category: "art" },
+      { id: "art-2", name: "Palette", emoji: "🎨", category: "art" },
+      { id: "art-3", name: "Caméra", emoji: "📷", category: "art" },
+      { id: "art-4", name: "Film", emoji: "🎬", category: "art" },
+      { id: "art-5", name: "Micro", emoji: "🎤", category: "art" },
+      { id: "art-6", name: "Notes", emoji: "🎵", category: "art" },
+      { id: "art-7", name: "Studio", emoji: "🎧", category: "art" },
+      { id: "art-8", name: "Crayon", emoji: "✏️", category: "art" },
+      { id: "art-9", name: "Livres", emoji: "📚", category: "art" },
+      { id: "art-10", name: "Étoile", emoji: "⭐", category: "art" },
+      { id: "art-11", name: "Magique", emoji: "✨", category: "art" },
+      { id: "art-12", name: "Inspiré", emoji: "💡", category: "art" },
     ],
   },
   {
     name: "Émotions",
     stickers: [
-      { id: "emo-1", name: "Amour", url: "😍", category: "emotion" },
-      { id: "emo-2", name: "Feu", url: "🔥", category: "emotion" },
-      { id: "emo-3", name: "Clap", url: "👏", category: "emotion" },
-      { id: "emo-4", name: "Rire", url: "😂", category: "emotion" },
-      { id: "emo-5", name: "Cool", url: "😎", category: "emotion" },
-      { id: "emo-6", name: "Wow", url: "🤯", category: "emotion" },
-      { id: "emo-7", name: "Triste", url: "😢", category: "emotion" },
-      { id: "emo-8", name: "Colère", url: "😡", category: "emotion" },
-      { id: "emo-9", name: "Peur", url: "😱", category: "emotion" },
-      { id: "emo-10", name: "Dormir", url: "😴", category: "emotion" },
-      { id: "emo-11", name: "Malade", url: "🤒", category: "emotion" },
-      { id: "emo-12", name: "Amoureux", url: "🥰", category: "emotion" },
+      { id: "emo-1", name: "Amour", emoji: "😍", category: "emotion" },
+      { id: "emo-2", name: "Feu", emoji: "🔥", category: "emotion" },
+      { id: "emo-3", name: "Clap", emoji: "👏", category: "emotion" },
+      { id: "emo-4", name: "Rire", emoji: "😂", category: "emotion" },
+      { id: "emo-5", name: "Cool", emoji: "😎", category: "emotion" },
+      { id: "emo-6", name: "Wow", emoji: "🤯", category: "emotion" },
+      { id: "emo-7", name: "Triste", emoji: "😢", category: "emotion" },
+      { id: "emo-8", name: "Colère", emoji: "😡", category: "emotion" },
+      { id: "emo-9", name: "Peur", emoji: "😱", category: "emotion" },
+      { id: "emo-10", name: "Dormir", emoji: "😴", category: "emotion" },
+      { id: "emo-11", name: "Malade", emoji: "🤒", category: "emotion" },
+      { id: "emo-12", name: "Amoureux", emoji: "🥰", category: "emotion" },
     ],
   },
   {
     name: "Gestes",
     stickers: [
-      { id: "gest-1", name: "Pouce haut", url: "👍", category: "gesture" },
-      { id: "gest-2", name: "Pouce bas", url: "👎", category: "gesture" },
-      { id: "gest-3", name: "Victoire", url: "✌️", category: "gesture" },
-      { id: "gest-4", name: "Rock", url: "🤘", category: "gesture" },
-      { id: "gest-5", name: "Corps", url: "💪", category: "gesture" },
-      { id: "gest-6", name: "Prayer", url: "🙏", category: "gesture" },
-      { id: "gest-7", name: "Salut", url: "👋", category: "gesture" },
-      { id: "gest-8", name: "Main", url: "🖐️", category: "gesture" },
-      { id: "gest-9", name: "Ok", url: "👌", category: "gesture" },
-      { id: "gest-10", name: "Coeur", url: "🫶", category: "gesture" },
-      { id: "gest-11", name: "Pointage", url: "👉", category: "gesture" },
-      { id: "gest-12", name: "Paix", url: "☮️", category: "gesture" },
+      { id: "gest-1", name: "Pouce haut", emoji: "👍", category: "gesture" },
+      { id: "gest-2", name: "Pouce bas", emoji: "👎", category: "gesture" },
+      { id: "gest-3", name: "Victoire", emoji: "✌️", category: "gesture" },
+      { id: "gest-4", name: "Rock", emoji: "🤘", category: "gesture" },
+      { id: "gest-5", name: "Corps", emoji: "💪", category: "gesture" },
+      { id: "gest-6", name: "Prayer", emoji: "🙏", category: "gesture" },
+      { id: "gest-7", name: "Salut", emoji: "👋", category: "gesture" },
+      { id: "gest-8", name: "Main", emoji: "🖐️", category: "gesture" },
+      { id: "gest-9", name: "Ok", emoji: "👌", category: "gesture" },
+      { id: "gest-10", name: "Coeur", emoji: "🫶", category: "gesture" },
+      { id: "gest-11", name: "Pointage", emoji: "👉", category: "gesture" },
+      { id: "gest-12", name: "Paix", emoji: "☮️", category: "gesture" },
     ],
   },
   {
     name: "Objets",
     stickers: [
-      { id: "obj-1", name: "Cadeau", url: "🎁", category: "object" },
-      { id: "obj-2", name: "Diamant", url: "💎", category: "object" },
-      { id: "obj-3", name: "Couronne", url: "👑", category: "object" },
-      { id: "obj-4", name: "Épée", url: "⚔️", category: "object" },
-      { id: "obj-5", name: "Bouclier", url: "🛡️", category: "object" },
-      { id: "obj-6", name: "Trophée", url: "🏆", category: "object" },
-      { id: "obj-7", name: "Médaille", url: "🥇", category: "object" },
-      { id: "obj-8", name: "Bombe", url: "💣", category: "object" },
-      { id: "obj-9", name: "Fusée", url: "🚀", category: "object" },
-      { id: "obj-10", name: "Arc-en-ciel", url: "🌈", category: "object" },
-      { id: "obj-11", name: "Foudre", url: "⚡", category: "object" },
-      { id: "obj-12", name: "Snowflake", url: "❄️", category: "object" },
+      { id: "obj-1", name: "Cadeau", emoji: "🎁", category: "object" },
+      { id: "obj-2", name: "Diamant", emoji: "💎", category: "object" },
+      { id: "obj-3", name: "Couronne", emoji: "👑", category: "object" },
+      { id: "obj-4", name: "Épée", emoji: "⚔️", category: "object" },
+      { id: "obj-5", name: "Bouclier", emoji: "🛡️", category: "object" },
+      { id: "obj-6", name: "Trophée", emoji: "🏆", category: "object" },
+      { id: "obj-7", name: "Médaille", emoji: "🥇", category: "object" },
+      { id: "obj-8", name: "Bombe", emoji: "💣", category: "object" },
+      { id: "obj-9", name: "Fusée", emoji: "🚀", category: "object" },
+      { id: "obj-10", name: "Arc-en-ciel", emoji: "🌈", category: "object" },
+      { id: "obj-11", name: "Foudre", emoji: "⚡", category: "object" },
+      { id: "obj-12", name: "Snowflake", emoji: "❄️", category: "object" },
     ],
   },
   {
     name: "Nature",
     stickers: [
-      { id: "nat-1", name: "Soleil", url: "☀️", category: "nature" },
-      { id: "nat-2", name: "Lune", url: "🌙", category: "nature" },
-      { id: "nat-3", name: "Étoile filante", url: "🌠", category: "nature" },
-      { id: "nat-4", name: "Fleur", url: "🌸", category: "nature" },
-      { id: "nat-5", name: "Rose", url: "🌹", category: "nature" },
-      { id: "nat-6", name: "Tournesol", url: "🌻", category: "nature" },
-      { id: "nat-7", name: "Arbre", url: "🌳", category: "nature" },
-      { id: "nat-8", name: "Feuille", url: "🍃", category: "nature" },
-      { id: "nat-9", name: "Pluie", url: "🌧️", category: "nature" },
-      { id: "nat-10", name: "Neige", url: "🌨️", category: "nature" },
-      { id: "nat-11", name: "Océan", url: "🌊", category: "nature" },
-      { id: "nat-12", name: "Papillon", url: "🦋", category: "nature" },
+      { id: "nat-1", name: "Soleil", emoji: "☀️", category: "nature" },
+      { id: "nat-2", name: "Lune", emoji: "🌙", category: "nature" },
+      { id: "nat-3", name: "Étoile filante", emoji: "🌠", category: "nature" },
+      { id: "nat-4", name: "Fleur", emoji: "🌸", category: "nature" },
+      { id: "nat-5", name: "Rose", emoji: "🌹", category: "nature" },
+      { id: "nat-6", name: "Tournesol", emoji: "🌻", category: "nature" },
+      { id: "nat-7", name: "Arbre", emoji: "🌳", category: "nature" },
+      { id: "nat-8", name: "Feuille", emoji: "🍃", category: "nature" },
+      { id: "nat-9", name: "Pluie", emoji: "🌧️", category: "nature" },
+      { id: "nat-10", name: "Neige", emoji: "🌨️", category: "nature" },
+      { id: "nat-11", name: "Océan", emoji: "🌊", category: "nature" },
+      { id: "nat-12", name: "Papillon", emoji: "🦋", category: "nature" },
     ],
   },
 ];
 
 type StickerPickerProps = {
-  onSelect: (stickerId: string, stickerUrl: string) => void;
+  onSelect: (stickerId: string, stickerEmoji: string) => void;
   onClose: () => void;
 };
 
@@ -155,11 +155,11 @@ export function StickerPicker({ onSelect, onClose }: StickerPickerProps) {
         {activeStickers.map((sticker) => (
           <button
             key={sticker.id}
-            onClick={() => { onSelect(sticker.id, sticker.url); onClose(); }}
+            onClick={() => { onSelect(sticker.id, sticker.emoji); onClose(); }}
             className="flex h-14 w-14 items-center justify-center rounded-xl text-3xl hover:bg-primary/10 transition-all hover:scale-110"
             title={sticker.name}
           >
-            {sticker.url}
+            {sticker.emoji}
           </button>
         ))}
       </div>

@@ -20,28 +20,22 @@ export function RiveTransition({ onComplete, duration = 1500 }: RiveTransitionPr
 
   useEffect(() => {
     let mounted = true;
-    let riveInstance: { cleanup: () => void } | null = null;
+    let riveCleanup: (() => void) | null = null;
 
     const loadRive = async () => {
       try {
-        // Dynamic import of rive-wasm loader from @rive-app/react-canvas
-        const riveModule = await import("@rive-app/react-canvas");
-        const rive = (riveModule as any).useRive || riveModule.default || riveModule;
-        
+        const { Rive } = await import("@rive-app/react-canvas");
+
         const canvas = canvasRef.current;
         if (!canvas || !mounted) return;
 
-        // Try different approaches to load Rive
-        const { Rive } = await import("@rive-app/react-canvas");
-        
-        // @ts-ignore - Rive static method
-        if (Rive && typeof Rive.new === "function") {
-          // @ts-ignore
-          riveInstance = Rive.new({
+        if (typeof Rive === "function") {
+          const instance = new Rive({
             src: "/animations/cloudy-walk.riv",
             canvas,
             autoplay: true,
           });
+          riveCleanup = () => instance.cleanup?.();
         }
       } catch (err) {
         console.warn("Rive animation could not be loaded:", err);
@@ -55,18 +49,14 @@ export function RiveTransition({ onComplete, duration = 1500 }: RiveTransitionPr
       if (mounted) {
         setVisible(false);
         onComplete?.();
-        if (riveInstance && typeof riveInstance.cleanup === "function") {
-          riveInstance.cleanup();
-        }
+        riveCleanup?.();
       }
     }, duration);
 
     return () => {
       mounted = false;
       clearTimeout(timer);
-      if (riveInstance && typeof riveInstance.cleanup === "function") {
-        riveInstance.cleanup();
-      }
+      riveCleanup?.();
     };
   }, [onComplete, duration]);
 
