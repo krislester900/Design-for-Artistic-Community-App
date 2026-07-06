@@ -31,24 +31,6 @@ dependencies:
   permission_handler: ^11.0.0
 
 dependency_overrides:
-  app_links: 6.1.0
-  lottie: ^3.2.0
-  shimmer: ^3.0.0
-  rive: ^0.13.20
-  flutter_native_splash: ^2.4.4
-  http: ^1.6.0
-  path_provider: ^2.1.5
-  image_picker: ^1.1.2
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
-  intl: ^0.19.0
-  timeago: ^3.7.0
-  fluttertoast: ^8.2.8
-  uuid: ^4.5.1
-  mime: ^2.0.0
-  record_platform_interface: 1.6.0
-  record_web: 1.1.9
-  record: 5.2.1
 
 dev_dependencies:
   flutter_test:
