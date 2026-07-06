@@ -1,117 +1,142 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:path/path.dart' as p;
-import 'package:uuid/uuid.dart';
-import 'supabase_service.dart';
-import 'image_compression_service.dart';
+
+class ImageUploadException implements Exception {
+  final String message;
+  final dynamic originalError;
+  ImageUploadException(this.message, [this.originalError]);
+  @override
+  String toString() => 'ImageUploadException: $message';
+}
+
+class ImageValidationException extends ImageUploadException {
+  ImageValidationException(String message, [dynamic error]) : super(message, error);
+}
 
 class ImageUploadService {
-  final SupabaseService _supabase = SupabaseService();
-  final ImageCompressionService _compression = ImageCompressionService();
-  final Uuid _uuid = const Uuid();
+  static const int maxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+  static const List<String> allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  static final ImageUploadService _instance = ImageUploadService._();
+  factory ImageUploadService() => _instance;
+  ImageUploadService._();
 
-  SupabaseClient get _client => _supabase.client;
+  late final SupabaseClient _supabase = Supabase.instance.client;
 
-  /// Upload an image to Supabase Storage and return the public URL
-  Future<Map<String, dynamic>> uploadArtworkImage(File imageFile, {bool compress = true}) async {
-    final user = _supabase.currentUser;
-    if (user == null) throw Exception('Session requise pour uploader une image.');
-
-    // Compress the image if requested
-    File processedFile = imageFile;
-    if (compress) {
-      processedFile = await _compression.compressImage(imageFile);
+  Future<void> _validateImage(File imageFile) async {
+    if (!await imageFile.exists()) {
+      throw ImageValidationException('Image file does not exist');
     }
 
-    // Generate a unique file name
-    final fileExt = p.extension(imageFile.path).toLowerCase();
-    final fileName = '${_uuid.v4()}$fileExt';
-    final filePath = '${user.id}/$fileName';
-
-    // Get file size
-    final fileSize = await processedFile.length();
-
-    // Upload to Supabase Storage (newer SDK returns String path on success)
-    final response = await _client.storage
-        .from('artworks')
-        .upload(filePath, processedFile, fileOptions: const FileOptions(
-          cacheControl: '3600',
-          upsert: false,
-        ));
-
-    // The upload returns the path string on success, throws on failure
-    if (response.isEmpty) {
-      throw Exception('Erreur upload: response was empty');
+    final fileSize = await imageFile.length();
+    if (fileSize > maxFileSizeBytes) {
+      throw ImageValidationException(
+        'Image too large: ${(fileSize / 1024 / 1024).toStringAsFixed(2)}MB (max 10MB)',
+      );
     }
 
-    // Get public URL
-    final publicUrl = _client.storage.from('artworks').getPublicUrl(filePath);
+    if (fileSize < 1024) {
+      throw ImageValidationException('Image file too small');
+    }
 
-    // Generate thumbnail URL (same image for now, can be optimized)
-    final thumbnailUrl = publicUrl;
-
-    return {
-      'image_url': publicUrl,
-      'image_thumbnail_url': thumbnailUrl,
-      'file_size': fileSize,
-      'file_path': filePath,
-    };
+    final extension = imageFile.path.split('.').last.toLowerCase();
+    const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+    if (!allowedExtensions.contains(extension)) {
+      throw ImageValidationException(
+        'Invalid file type: $extension. Allowed: ${allowedExtensions.join(", ")}',
+      );
+    }
   }
 
-  /// Delete an image from storage
-  Future<void> deleteImage(String filePath) async {
+  Future<String?> uploadImage({
+    required String userId,
+    required File imageFile,
+    required String folder,
+  }) async {
     try {
-      await _client.storage.from('artworks').remove([filePath]);
-    } catch (e) {
-      print('🔴 Error deleting image: $e');
-    }
-  }
-
-  /// Get the MIME type from file extension
-  String getMimeType(String filePath) {
-    final ext = p.extension(filePath).toLowerCase();
-    switch (ext) {
-      case '.jpg':
-      case '.jpeg':
-        return 'image/jpeg';
-      case '.png':
-        return 'image/png';
-      case '.gif':
-        return 'image/gif';
-      case '.webp':
-        return 'image/webp';
-      default:
-        return 'image/jpeg';
-    }
-  }
-
-  /// Get image dimensions (async)
-  Future<Map<String, int>> getImageDimensions(File file) async {
-    try {
-      final bytes = await file.readAsBytes();
-      // Simple dimension detection for JPEG/PNG
-      if (bytes.length > 24) {
-        if (bytes[0] == 0xFF && bytes[1] == 0xD8) {
-          // JPEG
-          int offset = 2;
-          while (offset < bytes.length - 1) {
-            if (bytes[offset] == 0xFF && bytes[offset + 1] == 0xC0) {
-              final height = (bytes[offset + 5] << 8) | bytes[offset + 6];
-              final width = (bytes[offset + 7] << 8) | bytes[offset + 8];
-              return {'width': width, 'height': height};
-            }
-            offset++;
-          }
-        } else if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) {
-          // PNG
-          final width = (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
-          final height = (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
-          return {'width': width, 'height': height};
-        }
+      if (userId.isEmpty) {
+        throw ImageValidationException('User ID cannot be empty');
       }
+
+      if (folder.isEmpty) {
+        throw ImageValidationException('Folder cannot be empty');
+      }
+
+      await _validateImage(imageFile);
+
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${imageFile.path.split('/').last}';
+      final storagePath = '$folder/$userId/$fileName';
+
+      debugPrint('📤 Uploading image to: $storagePath');
+
+      final response = await _supabase.storage
+          .from('artworks')
+          .upload(
+            storagePath,
+            imageFile,
+            fileOptions: const FileOptions(
+              cacheControl: '3600',
+              upsert: false,
+            ),
+          );
+
+      debugPrint('✅ Image uploaded successfully: $response');
+      return response;
+    } on ImageUploadException {
+      rethrow;
     } catch (e) {
-      print('🔴 Error getting dimensions: $e');
+      debugPrint('❌ Upload error: $e');
+      throw ImageUploadException('Failed to upload image', e);
     }
-    return {'width': 0, 'height': 0};
+  }
+
+  String getPublicUrl(String storagePath) {
+    try {
+      if (storagePath.isEmpty) {
+        throw ImageValidationException('Storage path cannot be empty');
+      }
+      final url = _supabase.storage.from('artworks').getPublicUrl(storagePath);
+      debugPrint('🔗 Public URL: $url');
+      return url;
+    } catch (e) {
+      debugPrint('❌ Error getting public URL: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteImage(String storagePath) async {
+    try {
+      if (storagePath.isEmpty) {
+        throw ImageValidationException('Storage path cannot be empty');
+      }
+
+      await _supabase.storage.from('artworks').remove([storagePath]);
+      debugPrint('🗑️ Image deleted: $storagePath');
+    } catch (e) {
+      debugPrint('❌ Error deleting image: $e');
+      throw ImageUploadException('Failed to delete image', e);
+    }
+  }
+
+  Future<Map<String, dynamic>?> getImageMetadata(String storagePath) async {
+    try {
+      if (storagePath.isEmpty) {
+        throw ImageValidationException('Storage path cannot be empty');
+      }
+
+      final metadata = await _supabase.storage
+          .from('artworks')
+          .info(storagePath);
+
+      return {
+        'name': metadata.name,
+        'size': metadata.metadata?['size'],
+        'created': metadata.metadata?['created'],
+        'updated': metadata.metadata?['updated'],
+      };
+    } catch (e) {
+      debugPrint('⚠️ Error getting image metadata: $e');
+      return null;
+    }
   }
 }

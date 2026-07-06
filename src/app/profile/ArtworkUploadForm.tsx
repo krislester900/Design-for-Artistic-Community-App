@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Upload, Check, Image, Music, Pen } from "lucide-react";
 import { categories, type CategorySlug } from "../data/community";
 import { submitArtwork, submitArtistProfile, submitDiscussion, saveUserProfile, getProfile, type SubmissionItem } from "./ProfileUploadService";
+import { ImageUploader } from "../components/ImageUploader";
 
 type UploadTab = "artwork" | "artist" | "discussion";
 
@@ -254,12 +255,13 @@ export function ArtworkUploadForm() {
               value={artworkMedium}
               onChange={(e) => setArtworkMedium(e.target.value)}
             />
-            <input
-              className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:border-primary"
-              placeholder="URL de l'image"
-              value={artworkImage}
-              onChange={(e) => setArtworkImage(e.target.value)}
-            />
+            <div className="md:col-span-2">
+              <label className="mb-1.5 block text-xs text-muted-foreground">Image de l'œuvre</label>
+              <ImageUploader
+                currentUrl={artworkImage}
+                onUpload={(url) => setArtworkImage(url)}
+              />
+            </div>
           </div>
           <button
             type="submit"
@@ -301,12 +303,13 @@ export function ArtworkUploadForm() {
               value={artistRole}
               onChange={(e) => setArtistRole(e.target.value)}
             />
-            <input
-              className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:border-primary"
-              placeholder="URL image portrait"
-              value={artistImage}
-              onChange={(e) => setArtistImage(e.target.value)}
-            />
+            <div className="md:col-span-2">
+              <label className="mb-1.5 block text-xs text-muted-foreground">Photo de profil</label>
+              <ImageUploader
+                currentUrl={artistImage}
+                onUpload={(url) => setArtistImage(url)}
+              />
+            </div>
             <input
               className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:border-primary"
               placeholder="Œuvre mise en avant"
