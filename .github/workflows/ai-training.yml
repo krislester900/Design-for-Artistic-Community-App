@@ -36,7 +36,7 @@ jobs:
   # ==========================================================
   discover-styles:
     name: 🔍 Découverte des styles
-    if: env.TARGET == 'manga-lora' || env.TARGET == 'all'
+    if: github.event.inputs.target == 'manga-lora' || github.event.inputs.target == 'all'
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.discover.outputs.matrix }}
@@ -69,7 +69,7 @@ jobs:
   # ==========================================================
   daily-learner:
     name: 📡 Apprentissage RSS
-    if: env.TARGET == 'daily-learner' || env.TARGET == 'all'
+    if: github.event.inputs.target == 'daily-learner' || github.event.inputs.target == 'all'
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.run.outputs.status }}
@@ -97,7 +97,7 @@ jobs:
 
   pinterest-collector:
     name: 📸 Collecte Pinterest
-    if: env.TARGET == 'daily-learner' || env.TARGET == 'all'
+    if: github.event.inputs.target == 'daily-learner' || github.event.inputs.target == 'all'
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.run.outputs.status }}
@@ -132,7 +132,7 @@ jobs:
   # ==========================================================
   manga-lora-training:
     name: 🤖 ${{ matrix.style_slug }}
-    if: env.TARGET == 'manga-lora' || env.TARGET == 'all'
+    if: github.event.inputs.target == 'manga-lora' || github.event.inputs.target == 'all'
     needs: [discover-styles]
     strategy:
       matrix: ${{ fromJSON(needs.discover-styles.outputs.matrix) }}
@@ -262,7 +262,7 @@ jobs:
   # ==========================================================
   assistant-export:
     name: 📊 Export fine-tuning
-    if: env.TARGET == 'assistant-export' || env.TARGET == 'all'
+    if: github.event.inputs.target == 'assistant-export' || github.event.inputs.target == 'all'
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.run.outputs.status }}
