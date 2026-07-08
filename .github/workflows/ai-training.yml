@@ -27,28 +27,69 @@ env:
   DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
   TIMEOUT_MINUTES: 120
   POLL_INTERVAL: 30
-  TARGET: ${{ inputs.target }}
-  STYLE_SLUG: ${{ inputs.style_slug }}
 
 jobs:
   # ==========================================================
-  # DÉCOUVERTE : liste les styles à entraîner
+  # ROUTER : détermine quels jobs lancer selon les inputs
+  # ==========================================================
+  router:
+    name: 🧭 Orientation
+    runs-on: ubuntu-latest
+    outputs:
+      run_daily: ${{ steps.route.outputs.run_daily }}
+      run_manga: ${{ steps.route.outputs.run_manga }}
+      run_export: ${{ steps.route.outputs.run_export }}
+      style_slug: ${{ steps.route.outputs.style_slug }}
+    steps:
+      - id: route
+        run: |
+          TARGET="${{ github.event.inputs.target }}"
+          SLUG="${{ github.event.inputs.style_slug }}"
+          echo "Cible: $TARGET | Style: ${SLUG:-aucun}"
+
+          case "$TARGET" in
+            all)
+              echo "run_daily=true" >> "$GITHUB_OUTPUT"
+              echo "run_manga=true" >> "$GITHUB_OUTPUT"
+              echo "run_export=true" >> "$GITHUB_OUTPUT"
+              ;;
+            daily-learner)
+              echo "run_daily=true" >> "$GITHUB_OUTPUT"
+              echo "run_manga=false" >> "$GITHUB_OUTPUT"
+              echo "run_export=false" >> "$GITHUB_OUTPUT"
+              ;;
+            manga-lora)
+              echo "run_daily=false" >> "$GITHUB_OUTPUT"
+              echo "run_manga=true" >> "$GITHUB_OUTPUT"
+              echo "run_export=false" >> "$GITHUB_OUTPUT"
+              ;;
+            assistant-export)
+              echo "run_daily=false" >> "$GITHUB_OUTPUT"
+              echo "run_manga=false" >> "$GITHUB_OUTPUT"
+              echo "run_export=true" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+          echo "style_slug=$SLUG" >> "$GITHUB_OUTPUT"
+
+  # ==========================================================
+  # DÉCOUVERTE DES STYLES (pour entraînement manga)
   # ==========================================================
   discover-styles:
     name: 🔍 Découverte des styles
-    if: github.event.inputs.target == 'manga-lora' || github.event.inputs.target == 'all'
+    if: needs.router.outputs.run_manga == 'true'
+    needs: [router]
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.discover.outputs.matrix }}
       count: ${{ steps.discover.outputs.count }}
     steps:
-      - name: Lister les styles ready
-        id: discover
+      - id: discover
         run: |
           echo "::group::🔍 Découverte des styles"
-          if [ -n "$STYLE_SLUG" ]; then
-            echo "Style spécifique: $STYLE_SLUG"
-            echo "matrix={\"style_slug\":[\"$STYLE_SLUG\"]}" >> "$GITHUB_OUTPUT"
+          SLUG="${{ needs.router.outputs.style_slug }}"
+          if [ -n "$SLUG" ]; then
+            echo "Style spécifique: $SLUG"
+            echo "matrix={\"style_slug\":[\"$SLUG\"]}" >> "$GITHUB_OUTPUT"
             echo "count=1" >> "$GITHUB_OUTPUT"
           else
             echo "Recherche de tous les styles 'ready'..."
@@ -56,9 +97,8 @@ jobs:
               -H "apikey: $SUPABASE_KEY" \
               -H "Authorization: Bearer $SUPABASE_KEY")
             SLUGS=$(echo "$RESPONSE" | jq -c '[.[].slug]')
-            NAMES=$(echo "$RESPONSE" | jq -r '.[].name' | paste -sd, -)
             COUNT=$(echo "$RESPONSE" | jq 'length')
-            echo "Styles trouvés: $COUNT ($NAMES)"
+            echo "Styles trouvés: $COUNT"
             echo "matrix={\"style_slug\":$SLUGS}" >> "$GITHUB_OUTPUT"
             echo "count=$COUNT" >> "$GITHUB_OUTPUT"
           fi
@@ -69,13 +109,13 @@ jobs:
   # ==========================================================
   daily-learner:
     name: 📡 Apprentissage RSS
-    if: github.event.inputs.target == 'daily-learner' || github.event.inputs.target == 'all'
+    if: needs.router.outputs.run_daily == 'true'
+    needs: [router]
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.run.outputs.status }}
     steps:
-      - name: Parsing RSS → résumé IA → knowledge base
-        id: run
+      - id: run
         run: |
           echo "::group::📡 Daily Learner"
           echo "Parsing des flux RSS artistiques..."
@@ -97,14 +137,14 @@ jobs:
 
   pinterest-collector:
     name: 📸 Collecte Pinterest
-    if: github.event.inputs.target == 'daily-learner' || github.event.inputs.target == 'all'
+    if: needs.router.outputs.run_daily == 'true'
+    needs: [router]
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.run.outputs.status }}
       pins_count: ${{ steps.run.outputs.pins_count }}
     steps:
-      - name: Scraping boards → nouvelles références
-        id: run
+      - id: run
         run: |
           echo "::group::📸 Pinterest Collector"
           echo "Scraping des boards Pinterest configurés..."
@@ -132,21 +172,13 @@ jobs:
   # ==========================================================
   manga-lora-training:
     name: 🤖 ${{ matrix.style_slug }}
-    if: github.event.inputs.target == 'manga-lora' || github.event.inputs.target == 'all'
-    needs: [discover-styles]
+    if: needs.router.outputs.run_manga == 'true'
+    needs: [router, discover-styles]
     strategy:
       matrix: ${{ fromJSON(needs.discover-styles.outputs.matrix) }}
       fail-fast: false
     runs-on: ubuntu-latest
     steps:
-      - name: Vérification du slug
-        run: |
-          if [ -z "${{ matrix.style_slug }}" ]; then
-            echo "::error::Aucun style_slug trouvé."
-            exit 1
-          fi
-          echo "Style: ${{ matrix.style_slug }}"
-
       - name: Lancement de l'entraînement LoRA
         id: launch
         run: |
@@ -165,7 +197,6 @@ jobs:
               echo "::warning::⚠️ Moins de 5 images disponibles. L'entraînement risque d'échouer."
             fi
           fi
-
           echo "Lancement de l'entraînement..."
           HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/manga-trainer" \
             -H "Authorization: Bearer $CRON_SECRET" \
@@ -192,7 +223,6 @@ jobs:
           JOB_ID="${{ steps.launch.outputs.job_id }}"
           END_TIME=$(( $(date +%s) + TIMEOUT_MINUTES * 60 ))
           TRIES=0
-          LORA_URL=""
           echo "::group::⏳ Suivi du job #$JOB_ID — ${{ matrix.style_slug }}"
           echo "Timeout: ${TIMEOUT_MINUTES}min | Intervalle: ${POLL_INTERVAL}s"
           while [ $(date +%s) -lt $END_TIME ]; do
@@ -242,12 +272,9 @@ jobs:
           cat > "artifacts/lora/${{ matrix.style_slug }}.json" << EOF
           {
             "style_slug": "${{ matrix.style_slug }}",
-            "status": "${{ steps.poll.outputs.status }}",
-            "lora_url": "${{ steps.poll.outputs.lora_url }}",
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           }
           EOF
-          echo "📝 Artifact sauvegardé: artifacts/lora/${{ matrix.style_slug }}.json"
 
       - name: Upload artifact LoRA
         if: always()
@@ -262,13 +289,13 @@ jobs:
   # ==========================================================
   assistant-export:
     name: 📊 Export fine-tuning
-    if: github.event.inputs.target == 'assistant-export' || github.event.inputs.target == 'all'
+    if: needs.router.outputs.run_export == 'true'
+    needs: [router]
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.run.outputs.status }}
     steps:
-      - name: Export conversations → JSONL
-        id: run
+      - id: run
         run: |
           echo "::group::📊 Export Training Data"
           echo "Export des conversations au format JSONL..."
@@ -297,7 +324,6 @@ jobs:
           cat > artifacts/export/result.json << EOF
           {
             "status": "${{ steps.run.outputs.status }}",
-            "target": "$TARGET",
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           }
           EOF
@@ -316,20 +342,15 @@ jobs:
   summary:
     name: 📋 Rapport
     if: always()
-    needs:
-      - discover-styles
-      - daily-learner
-      - pinterest-collector
-      - manga-lora-training
-      - assistant-export
+    needs: [router, daily-learner, pinterest-collector, discover-styles, manga-lora-training, assistant-export]
     runs-on: ubuntu-latest
     steps:
       - name: Génération du rapport
         id: report
         run: |
           echo "::group::📋 RAPPORT D'ENTRAÎNEMENT"
-          echo "Cible: $TARGET"
-          echo "Style(s): ${STYLE_SLUG:-tous les styles ready}"
+          echo "Cible: ${{ github.event.inputs.target }}"
+          echo "Style(s): ${{ github.event.inputs.style_slug }}"
           echo ""
 
           DL_STATUS="${{ needs.daily-learner.outputs.status }}"
@@ -341,13 +362,12 @@ jobs:
           echo "┌──────────────────────────────┬──────────────┐"
           printf "│ %-28s │ %-12s │\n" "📡 Daily Learner" "${DL_STATUS:-N/A}"
           printf "│ %-28s │ %-12s │\n" "📸 Pinterest" "${PC_STATUS:-N/A}"
-          if [ -n "$PC_PINS" ] && [ "$PC_PINS" != "0" ] && [ "$PC_PINS" != "" ]; then
+          if [ -n "$PC_PINS" ] && [ "$PC_PINS" != "0" ]; then
             printf "│ %-28s │ %-12s │\n" "   └ Pins" "$PC_PINS"
           fi
           printf "│ %-28s │ %-12s │\n" "🤖 Styles LoRA" "${STYLE_COUNT:-N/A}"
           printf "│ %-28s │ %-12s │\n" "📊 Export" "${AE_STATUS:-N/A}"
           echo "└──────────────────────────────┴──────────────┘"
-
           echo ""
           echo "📁 Artifacts disponibles dans l'onglet Summary ↑"
           echo "::endgroup::"
@@ -357,12 +377,12 @@ jobs:
           mkdir -p artifacts/report
           cat > artifacts/report/report.json << EOF
           {
-            "target": "$TARGET",
-            "style_slug": "$STYLE_SLUG",
-            "style_count": "${{ needs.discover-styles.outputs.count }}",
+            "target": "${{ github.event.inputs.target }}",
+            "style_slug": "${{ github.event.inputs.style_slug }}",
             "daily_learner": "${{ needs.daily-learner.outputs.status }}",
             "pinterest": "${{ needs.pinterest-collector.outputs.status }}",
             "pins": "${{ needs.pinterest-collector.outputs.pins_count }}",
+            "style_count": "${{ needs.discover-styles.outputs.count }}",
             "assistant_export": "${{ needs.assistant-export.outputs.status }}",
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           }
@@ -376,8 +396,14 @@ jobs:
           retention-days: 90
 
       - name: Notification Discord
-        if: always() && env.DISCORD_WEBHOOK != ''
+        if: always()
+        env:
+          DISCORD_URL: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
+          if [ -z "$DISCORD_URL" ]; then
+            echo "⚠️ DISCORD_WEBHOOK non configuré, notification ignorée"
+            exit 0
+          fi
           DL_STATUS="${{ needs.daily-learner.outputs.status }}"
           PC_STATUS="${{ needs.pinterest-collector.outputs.status }}"
           AE_STATUS="${{ needs.assistant-export.outputs.status }}"
@@ -395,7 +421,7 @@ jobs:
             MSG="✅ Tout est OK"
           fi
 
-          curl -s -X POST "$DISCORD_WEBHOOK" \
+          curl -s -X POST "$DISCORD_URL" \
             -H "Content-Type: application/json" \
             -d "{
               \"embeds\": [{
@@ -403,7 +429,7 @@ jobs:
                 \"description\": \"${MSG}\",
                 \"color\": ${COLOR},
                 \"fields\": [
-                  {\"name\": \"Cible\", \"value\": \"$TARGET\", \"inline\": true},
+                  {\"name\": \"Cible\", \"value\": \"${{ github.event.inputs.target }}\", \"inline\": true},
                   {\"name\": \"Daily Learner\", \"value\": \"${DL_STATUS:-N/A}\", \"inline\": true},
                   {\"name\": \"Pinterest\", \"value\": \"${PC_STATUS:-N/A}\", \"inline\": true},
                   {\"name\": \"Export\", \"value\": \"${AE_STATUS:-N/A}\", \"inline\": true}
