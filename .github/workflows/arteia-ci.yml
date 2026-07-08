@@ -205,7 +205,7 @@ jobs:
       - name: Seed data (connaissances, styles manga, boards Pinterest)
         run: |
           echo "::group::🌱 Seed data"
-          for seed in "database/seed-all.sql" "database/seed-pinterest-boards.sql" "database/enable-auto-train.sql"; do
+          for seed in "database/seed-all.sql" "database/seed-pinterest-boards.sql" "database/seed-ontology-drawing.sql" "database/enable-auto-train.sql"; do
             echo "→ $seed"
             supabase db execute --file "$seed" 2>/dev/null && echo "   ✅ OK" || echo "   ⚠️ Déjà appliqué"
           done
