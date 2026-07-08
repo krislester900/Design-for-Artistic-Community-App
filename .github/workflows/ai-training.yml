@@ -6,15 +6,15 @@ on:
       target:
         description: 'Type d''entraînement'
         required: true
-        default: 'daily-learner'
+        default: 'all'
         type: choice
         options:
+          - all
           - daily-learner
           - manga-lora
           - assistant-export
-          - all
       style_slug:
-        description: 'Slug du style manga (pour manga-lora uniquement)'
+        description: 'Slug du style manga (ex: tite-kubo, kentaro-miura)'
         required: false
         default: ''
         type: string
@@ -26,95 +26,139 @@ env:
   CRON_SECRET: ${{ secrets.CRON_SECRET }}
   TIMEOUT_MINUTES: 120
   POLL_INTERVAL: 30
+  TARGET: ${{ inputs.target }}
+  STYLE_SLUG: ${{ inputs.style_slug }}
 
 jobs:
+  # ==========================================================
+  # PHASE 1 : COLLECTE DE DONNÉES (parallèle)
+  # ==========================================================
   daily-learner:
-    if: inputs.target == 'daily-learner' || inputs.target == 'all'
+    name: 📡 Apprentissage RSS
+    if: env.TARGET == 'daily-learner' || env.TARGET == 'all'
     runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.run.outputs.status }}
     steps:
-      - name: Apprentissage web RSS
+      - name: Parsing RSS → résumé IA → knowledge base
+        id: run
         run: |
           echo "::group::📡 Daily Learner"
-          echo "Lancement de l'apprentissage depuis les flux RSS..."
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/daily-learner" \
+          echo "Parsing des flux RSS artistiques..."
+          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/daily-learner" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json")
-          BODY=$(echo "$RESPONSE" | head -n -1)
-          CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$HTTP_RESPONSE" | head -n -1)
+          CODE=$(echo "$HTTP_RESPONSE" | tail -n 1)
+          echo "HTTP $CODE"
           echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
-          if [ "$CODE" != "200" ]; then
-            echo "::error::Daily Learner a échoué (HTTP $CODE)"
-            exit 1
+          if [ "$CODE" = "200" ]; then
+            echo "✅ Apprentissage terminé"
+            echo "status=success" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Daily Learner a retourné HTTP $CODE (non bloquant)"
+            echo "status=failed" >> "$GITHUB_OUTPUT"
           fi
           echo "::endgroup::"
 
   pinterest-collector:
-    if: inputs.target == 'daily-learner' || inputs.target == 'all'
+    name: 📸 Collecte Pinterest
+    if: env.TARGET == 'daily-learner' || env.TARGET == 'all'
     runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.run.outputs.status }}
     steps:
-      - name: Collecte d'images Pinterest
+      - name: Scraping boards → nouvelles références
+        id: run
         run: |
           echo "::group::📸 Pinterest Collector"
-          echo "Scraping des boards configurés..."
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/pinterest-collector" \
+          echo "Scraping des boards Pinterest configurés..."
+          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/pinterest-collector" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json")
-          BODY=$(echo "$RESPONSE" | head -n -1)
-          CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$HTTP_RESPONSE" | head -n -1)
+          CODE=$(echo "$HTTP_RESPONSE" | tail -n 1)
+          echo "HTTP $CODE"
           echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
-          if [ "$CODE" != "200" ]; then
-            echo "::error::Pinterest Collector a échoué (HTTP $CODE)"
-            exit 1
+          if [ "$CODE" = "200" ]; then
+            echo "✅ Collecte terminée"
+            echo "status=success" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Pinterest Collector a retourné HTTP $CODE (non bloquant)"
+            echo "status=failed" >> "$GITHUB_OUTPUT"
           fi
           echo "::endgroup::"
 
+  # ==========================================================
+  # PHASE 2 : ENTRAÎNEMENT MANGA LoRA (après collecte)
+  # ==========================================================
   manga-lora-training:
-    if: inputs.target == 'manga-lora' || inputs.target == 'all'
+    name: 🤖 Manga LoRA
+    if: env.TARGET == 'manga-lora' || env.TARGET == 'all'
+    needs: [daily-learner, pinterest-collector]
     runs-on: ubuntu-latest
     outputs:
-      job_id: ${{ steps.launch.outputs.job_id }}
-      status: ${{ steps.poll.outputs.status }}
+      training_status: ${{ steps.poll.outputs.status }}
     steps:
       - name: Vérification du slug
         run: |
-          if [ -z "${{ inputs.style_slug }}" ]; then
-            echo "::error::Aucun style_slug fourni. Utilise style_slug (ex: tite-kubo)"
+          if [ -z "$STYLE_SLUG" ]; then
+            echo "::error::Aucun style_slug fourni."
+            echo "Exemple: tite-kubo, kentaro-miura, eiichiro-oda"
             exit 1
           fi
+          echo "Style cible: $STYLE_SLUG"
 
       - name: Lancement de l'entraînement LoRA
         id: launch
         run: |
-          echo "::group::🚀 Manga LoRA - Lancement"
-          echo "Style: ${{ inputs.style_slug }}"
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/manga-trainer" \
+          echo "::group::🚀 Lancement LoRA"
+          echo "Style: $STYLE_SLUG"
+          echo "Vérification du nombre d'images disponibles..."
+          # Vérifier d'abord le statut
+          STATUS_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/manga-trainer" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json" \
-            -d "{\"action\":\"start_training\",\"style_slug\":\"${{ inputs.style_slug }}\"}")
-          BODY=$(echo "$RESPONSE" | head -n -1)
-          CODE=$(echo "$RESPONSE" | tail -n 1)
+            -d "{\"action\":\"status\",\"style_slug\":\"$STYLE_SLUG\"}")
+          STATUS_BODY=$(echo "$STATUS_RESPONSE" | head -n -1)
+          STATUS_CODE=$(echo "$STATUS_RESPONSE" | tail -n 1)
+          if [ "$STATUS_CODE" = "200" ]; then
+            REF_COUNT=$(echo "$STATUS_BODY" | jq -r '.reference_count // 0')
+            echo "📊 Images de référence: $REF_COUNT"
+            if [ "$REF_COUNT" -lt 5 ]; then
+              echo "::warning::⚠️ Moins de 5 images disponibles. L'entraînement risque d'échouer."
+            fi
+          fi
+
+          echo "Lancement de l'entraînement..."
+          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/manga-trainer" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "{\"action\":\"start_training\",\"style_slug\":\"$STYLE_SLUG\"}")
+          BODY=$(echo "$HTTP_RESPONSE" | head -n -1)
+          CODE=$(echo "$HTTP_RESPONSE" | tail -n 1)
           echo "$BODY" | jq .
           if [ "$CODE" != "200" ]; then
-            echo "::error::Échec lancement entraînement (HTTP $CODE)"
+            echo "::error::Échec lancement (HTTP $CODE)"
             exit 1
           fi
           JOB_ID=$(echo "$BODY" | jq -r '.job_id // empty')
           if [ -n "$JOB_ID" ]; then
-            echo "job_id=$JOB_ID" >> $GITHUB_OUTPUT
-            echo "✅ Job ID: $JOB_ID"
-          else
-            echo "::warning::Aucun job_id retourné, vérification manuelle nécessaire"
+            echo "job_id=$JOB_ID" >> "$GITHUB_OUTPUT"
+            echo "✅ Job #$JOB_ID lancé"
           fi
           echo "::endgroup::"
 
-      - name: Suivi de la progression en temps réel
+      - name: Suivi progression (polling toutes les 30s, timeout 2h)
         id: poll
         if: steps.launch.outputs.job_id != ''
         run: |
           JOB_ID="${{ steps.launch.outputs.job_id }}"
           END_TIME=$(( $(date +%s) + TIMEOUT_MINUTES * 60 ))
           TRIES=0
-          echo "::group::⏳ Suivi entraînement (timeout: ${TIMEOUT_MINUTES}min)"
+          echo "::group::⏳ Suivi du job #$JOB_ID"
+          echo "Timeout: ${TIMEOUT_MINUTES}min | Intervalle: ${POLL_INTERVAL}s"
+          echo ""
           while [ $(date +%s) -lt $END_TIME ]; do
             TRIES=$((TRIES + 1))
             RESULT=$(curl -s "$SUPABASE_URL/rest/v1/ai_training_jobs?id=eq.$JOB_ID&select=status,progress,error_message,replicate_job_id,created_at,started_at,completed_at,lora_url" \
@@ -128,50 +172,106 @@ jobs:
 
             case "$STATUS" in
               "completed")
-                echo "✅ [$TIMESTAMP] Entraînement terminé ! (${PROGRESS_PCT}%)"
-                LORA_URL=$(echo "$RESULT" | jq -r '.[0].lora_url // "non disponible"')
-                echo "🎯 LoRA URL: $LORA_URL"
-                echo "status=completed" >> $GITHUB_OUTPUT
+                echo "✅ [$TIMESTAMP] Entraînement terminé ! (100%)"
+                LORA_URL=$(echo "$RESULT" | jq -r '.[0].lora_url // "N/A"')
+                echo "🎯 Modèle LoRA: $LORA_URL"
+                echo "status=completed" >> "$GITHUB_OUTPUT"
                 echo "::endgroup::"
                 exit 0
                 ;;
               "failed")
-                echo "::error::[$TIMESTAMP] Entraînement échoué : $ERROR"
-                echo "status=failed" >> $GITHUB_OUTPUT
+                echo "::error::[$TIMESTAMP] Échec : $ERROR"
+                echo "status=failed" >> "$GITHUB_OUTPUT"
                 echo "::endgroup::"
                 exit 1
                 ;;
-              "training"|"preparing")
-                echo "🔄 [$TIMESTAMP] $STATUS — ${PROGRESS_PCT}% (tentative $TRIES)"
+              "preparing")
+                echo "📦 [$TIMESTAMP] Préparation du dataset..."
+                ;;
+              "training")
+                echo "🔄 [$TIMESTAMP] Entraînement en cours — ${PROGRESS_PCT}% (tentative $TRIES/$((TIMEOUT_MINUTES * 60 / POLL_INTERVAL)))"
                 ;;
               *)
-                echo "⏸️  [$TIMESTAMP] Statut: $STATUS — ${PROGRESS_PCT}%"
+                echo "⏸️  [$TIMESTAMP] Statut: $STATUS (${PROGRESS_PCT}%)"
                 ;;
             esac
             sleep $POLL_INTERVAL
           done
-          echo "::error::Timeout dépassé (${TIMEOUT_MINUTES}min)"
-          echo "status=timeout" >> $GITHUB_OUTPUT
+          echo "::error::Timeout dépassé (${TIMEOUT_MINUTES}min). Vérifier le statut manuellement."
+          echo "status=timeout" >> "$GITHUB_OUTPUT"
           echo "::endgroup::"
           exit 1
 
+  # ==========================================================
+  # PHASE 3 : EXPORT DES DONNÉES (indépendant)
+  # ==========================================================
   assistant-export:
-    if: inputs.target == 'assistant-export' || inputs.target == 'all'
+    name: 📊 Export fine-tuning
+    if: env.TARGET == 'assistant-export' || env.TARGET == 'all'
     runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.run.outputs.status }}
     steps:
-      - name: Export des données pour fine-tuning
+      - name: Export conversations → JSONL
+        id: run
         run: |
-          echo "::group::📊 Assistant - Export Training Data"
+          echo "::group::📊 Export Training Data"
           echo "Export des conversations au format JSONL..."
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/ai-assistant" \
+          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/ai-assistant" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json" \
             -d '{"action":"export_training_data","format":"jsonl"}')
-          BODY=$(echo "$RESPONSE" | head -n -1)
-          CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$HTTP_RESPONSE" | head -n -1)
+          CODE=$(echo "$HTTP_RESPONSE" | tail -n 1)
+          echo "HTTP $CODE"
           echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
-          if [ "$CODE" != "200" ]; then
+          if [ "$CODE" = "200" ]; then
+            echo "✅ Export terminé"
+            echo "status=success" >> "$GITHUB_OUTPUT"
+          else
             echo "::error::Export échoué (HTTP $CODE)"
+            echo "status=failed" >> "$GITHUB_OUTPUT"
             exit 1
+          fi
+          echo "::endgroup::"
+
+  # ==========================================================
+  # PHASE 4 : RAPPORT RÉCAPITULATIF
+  # ==========================================================
+  summary:
+    name: 📋 Rapport d'entraînement
+    if: always()
+    needs:
+      - daily-learner
+      - pinterest-collector
+      - manga-lora-training
+      - assistant-export
+    runs-on: ubuntu-latest
+    steps:
+      - name: Génération du rapport
+        run: |
+          echo "::group::📋 RAPPORT D'ENTRAÎNEMENT"
+          echo "Cible: $TARGET"
+          echo "Style: ${STYLE_SLUG:-non spécifié}"
+          echo ""
+
+          # Récupération des statuts via les needs
+          DL_STATUS="${{ needs.daily-learner.outputs.status }}"
+          PC_STATUS="${{ needs.pinterest-collector.outputs.status }}"
+          ML_STATUS="${{ needs.manga-lora-training.outputs.training_status }}"
+          AE_STATUS="${{ needs.assistant-export.outputs.status }}"
+
+          echo "┌──────────────────────────────┬──────────┐"
+          printf "│ %-28s │ %-8s │\n" "📡 Daily Learner" "${DL_STATUS:-N/A}"
+          printf "│ %-28s │ %-8s │\n" "📸 Pinterest Collector" "${PC_STATUS:-N/A}"
+          printf "│ %-28s │ %-8s │\n" "🤖 Manga LoRA" "${ML_STATUS:-N/A}"
+          printf "│ %-28s │ %-8s │\n" "📊 Assistant Export" "${AE_STATUS:-N/A}"
+          echo "└──────────────────────────────┴──────────┘"
+
+          echo ""
+          if [ "$ML_STATUS" = "completed" ]; then
+            echo "🎉 Nouveau modèle LoRA disponible pour $STYLE_SLUG !"
+          elif [ "$ML_STATUS" = "failed" ]; then
+            echo "⚠️ L'entraînement LoRA a échoué. Vérifier les logs ci-dessus."
           fi
           echo "::endgroup::"
