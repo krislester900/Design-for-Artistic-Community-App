@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: 'Type d''entraînement'
+        description: "Type d'entraînement"
         required: true
-        default: 'all'
+        default: "all"
         type: choice
         options:
           - all
@@ -14,9 +14,9 @@ on:
           - manga-lora
           - assistant-export
       style_slug:
-        description: 'Slug du style manga (ex: tite-kubo, kentaro-miura)'
+        description: "Slug du style manga (ex: tite-kubo) — laisse vide pour tous les styles ready"
         required: false
-        default: ''
+        default: ""
         type: string
 
 env:
@@ -24,6 +24,7 @@ env:
   SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
   FUNCTIONS_URL: ${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}
   CRON_SECRET: ${{ secrets.CRON_SECRET }}
+  SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
   TIMEOUT_MINUTES: 120
   POLL_INTERVAL: 30
   TARGET: ${{ inputs.target }}
@@ -31,7 +32,40 @@ env:
 
 jobs:
   # ==========================================================
-  # PHASE 1 : COLLECTE DE DONNÉES (parallèle)
+  # DÉCOUVERTE : liste les styles à entraîner
+  # ==========================================================
+  discover-styles:
+    name: 🔍 Découverte des styles
+    if: env.TARGET == 'manga-lora' || env.TARGET == 'all'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.discover.outputs.matrix }}
+      count: ${{ steps.discover.outputs.count }}
+    steps:
+      - name: Lister les styles ready
+        id: discover
+        run: |
+          echo "::group::🔍 Découverte des styles"
+          if [ -n "$STYLE_SLUG" ]; then
+            echo "Style spécifique: $STYLE_SLUG"
+            echo "matrix={\"style_slug\":[\"$STYLE_SLUG\"]}" >> "$GITHUB_OUTPUT"
+            echo "count=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "Recherche de tous les styles 'ready'..."
+            RESPONSE=$(curl -s "$SUPABASE_URL/rest/v1/ai_manga_styles?select=slug,name&training_status=eq.ready&order=name.asc" \
+              -H "apikey: $SUPABASE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_KEY")
+            SLUGS=$(echo "$RESPONSE" | jq -c '[.[].slug]')
+            NAMES=$(echo "$RESPONSE" | jq -r '.[].name' | paste -sd, -)
+            COUNT=$(echo "$RESPONSE" | jq 'length')
+            echo "Styles trouvés: $COUNT ($NAMES)"
+            echo "matrix={\"style_slug\":$SLUGS}" >> "$GITHUB_OUTPUT"
+            echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          fi
+          echo "::endgroup::"
+
+  # ==========================================================
+  # TRACK A : COLLECTE (RSS + Pinterest)
   # ==========================================================
   daily-learner:
     name: 📡 Apprentissage RSS
@@ -67,6 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.run.outputs.status }}
+      pins_count: ${{ steps.run.outputs.pins_count }}
     steps:
       - name: Scraping boards → nouvelles références
         id: run
@@ -81,45 +116,46 @@ jobs:
           echo "HTTP $CODE"
           echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
           if [ "$CODE" = "200" ]; then
-            echo "✅ Collecte terminée"
+            PINS=$(echo "$BODY" | jq -r '.pins_collected // .new_pins // 0')
+            echo "✅ Collecte terminée — $PINS nouveaux pins"
             echo "status=success" >> "$GITHUB_OUTPUT"
+            echo "pins_count=$PINS" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::Pinterest Collector a retourné HTTP $CODE (non bloquant)"
             echo "status=failed" >> "$GITHUB_OUTPUT"
+            echo "pins_count=0" >> "$GITHUB_OUTPUT"
           fi
           echo "::endgroup::"
 
   # ==========================================================
-  # PHASE 2 : ENTRAÎNEMENT MANGA LoRA (après collecte)
+  # TRACK B : ENTRAÎNEMENT MANGA LoRA (parallèle à la collecte)
   # ==========================================================
   manga-lora-training:
-    name: 🤖 Manga LoRA
+    name: 🤖 ${{ matrix.style_slug }}
     if: env.TARGET == 'manga-lora' || env.TARGET == 'all'
-    needs: [daily-learner, pinterest-collector]
+    needs: [discover-styles]
+    strategy:
+      matrix: ${{ fromJSON(needs.discover-styles.outputs.matrix) }}
+      fail-fast: false
     runs-on: ubuntu-latest
-    outputs:
-      training_status: ${{ steps.poll.outputs.status }}
     steps:
       - name: Vérification du slug
         run: |
-          if [ -z "$STYLE_SLUG" ]; then
-            echo "::error::Aucun style_slug fourni."
-            echo "Exemple: tite-kubo, kentaro-miura, eiichiro-oda"
+          if [ -z "${{ matrix.style_slug }}" ]; then
+            echo "::error::Aucun style_slug trouvé."
             exit 1
           fi
-          echo "Style cible: $STYLE_SLUG"
+          echo "Style: ${{ matrix.style_slug }}"
 
       - name: Lancement de l'entraînement LoRA
         id: launch
         run: |
-          echo "::group::🚀 Lancement LoRA"
-          echo "Style: $STYLE_SLUG"
+          echo "::group::🚀 Lancement LoRA — ${{ matrix.style_slug }}"
           echo "Vérification du nombre d'images disponibles..."
-          # Vérifier d'abord le statut
           STATUS_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/manga-trainer" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json" \
-            -d "{\"action\":\"status\",\"style_slug\":\"$STYLE_SLUG\"}")
+            -d "{\"action\":\"status\",\"style_slug\":\"${{ matrix.style_slug }}\"}")
           STATUS_BODY=$(echo "$STATUS_RESPONSE" | head -n -1)
           STATUS_CODE=$(echo "$STATUS_RESPONSE" | tail -n 1)
           if [ "$STATUS_CODE" = "200" ]; then
@@ -134,7 +170,7 @@ jobs:
           HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/manga-trainer" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json" \
-            -d "{\"action\":\"start_training\",\"style_slug\":\"$STYLE_SLUG\"}")
+            -d "{\"action\":\"start_training\",\"style_slug\":\"${{ matrix.style_slug }}\"}")
           BODY=$(echo "$HTTP_RESPONSE" | head -n -1)
           CODE=$(echo "$HTTP_RESPONSE" | tail -n 1)
           echo "$BODY" | jq .
@@ -156,9 +192,9 @@ jobs:
           JOB_ID="${{ steps.launch.outputs.job_id }}"
           END_TIME=$(( $(date +%s) + TIMEOUT_MINUTES * 60 ))
           TRIES=0
-          echo "::group::⏳ Suivi du job #$JOB_ID"
+          LORA_URL=""
+          echo "::group::⏳ Suivi du job #$JOB_ID — ${{ matrix.style_slug }}"
           echo "Timeout: ${TIMEOUT_MINUTES}min | Intervalle: ${POLL_INTERVAL}s"
-          echo ""
           while [ $(date +%s) -lt $END_TIME ]; do
             TRIES=$((TRIES + 1))
             RESULT=$(curl -s "$SUPABASE_URL/rest/v1/ai_training_jobs?id=eq.$JOB_ID&select=status,progress,error_message,replicate_job_id,created_at,started_at,completed_at,lora_url" \
@@ -167,21 +203,19 @@ jobs:
             STATUS=$(echo "$RESULT" | jq -r '.[0].status // "unknown"')
             PROGRESS=$(echo "$RESULT" | jq -r '.[0].progress // 0')
             ERROR=$(echo "$RESULT" | jq -r '.[0].error_message // ""')
+            LORA_URL=$(echo "$RESULT" | jq -r '.[0].lora_url // ""')
             PROGRESS_PCT=$(awk "BEGIN {printf \"%.0f\", $PROGRESS * 100}")
             TIMESTAMP=$(date +%H:%M:%S)
 
             case "$STATUS" in
               "completed")
                 echo "✅ [$TIMESTAMP] Entraînement terminé ! (100%)"
-                LORA_URL=$(echo "$RESULT" | jq -r '.[0].lora_url // "N/A"')
                 echo "🎯 Modèle LoRA: $LORA_URL"
-                echo "status=completed" >> "$GITHUB_OUTPUT"
                 echo "::endgroup::"
                 exit 0
                 ;;
               "failed")
                 echo "::error::[$TIMESTAMP] Échec : $ERROR"
-                echo "status=failed" >> "$GITHUB_OUTPUT"
                 echo "::endgroup::"
                 exit 1
                 ;;
@@ -189,7 +223,7 @@ jobs:
                 echo "📦 [$TIMESTAMP] Préparation du dataset..."
                 ;;
               "training")
-                echo "🔄 [$TIMESTAMP] Entraînement en cours — ${PROGRESS_PCT}% (tentative $TRIES/$((TIMEOUT_MINUTES * 60 / POLL_INTERVAL)))"
+                echo "🔄 [$TIMESTAMP] Entraînement en cours — ${PROGRESS_PCT}% (tentative $TRIES)"
                 ;;
               *)
                 echo "⏸️  [$TIMESTAMP] Statut: $STATUS (${PROGRESS_PCT}%)"
@@ -198,12 +232,33 @@ jobs:
             sleep $POLL_INTERVAL
           done
           echo "::error::Timeout dépassé (${TIMEOUT_MINUTES}min). Vérifier le statut manuellement."
-          echo "status=timeout" >> "$GITHUB_OUTPUT"
           echo "::endgroup::"
           exit 1
 
+      - name: Enregistrer l'artifact LoRA
+        if: always()
+        run: |
+          mkdir -p artifacts/lora
+          cat > "artifacts/lora/${{ matrix.style_slug }}.json" << EOF
+          {
+            "style_slug": "${{ matrix.style_slug }}",
+            "status": "${{ steps.poll.outputs.status }}",
+            "lora_url": "${{ steps.poll.outputs.lora_url }}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          echo "📝 Artifact sauvegardé: artifacts/lora/${{ matrix.style_slug }}.json"
+
+      - name: Upload artifact LoRA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lora-${{ matrix.style_slug }}
+          path: artifacts/lora/${{ matrix.style_slug }}.json
+          retention-days: 30
+
   # ==========================================================
-  # PHASE 3 : EXPORT DES DONNÉES (indépendant)
+  # TRACK B (suite) : EXPORT FINE-TUNING
   # ==========================================================
   assistant-export:
     name: 📊 Export fine-tuning
@@ -235,13 +290,34 @@ jobs:
           fi
           echo "::endgroup::"
 
+      - name: Enregistrer métadonnées d'export
+        if: always()
+        run: |
+          mkdir -p artifacts/export
+          cat > artifacts/export/result.json << EOF
+          {
+            "status": "${{ steps.run.outputs.status }}",
+            "target": "$TARGET",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+      - name: Upload artifact export
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assistant-export
+          path: artifacts/export/
+          retention-days: 30
+
   # ==========================================================
-  # PHASE 4 : RAPPORT RÉCAPITULATIF
+  # RAPPORT + NOTIFICATION
   # ==========================================================
   summary:
-    name: 📋 Rapport d'entraînement
+    name: 📋 Rapport
     if: always()
     needs:
+      - discover-styles
       - daily-learner
       - pinterest-collector
       - manga-lora-training
@@ -249,29 +325,78 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Génération du rapport
+        id: report
         run: |
           echo "::group::📋 RAPPORT D'ENTRAÎNEMENT"
           echo "Cible: $TARGET"
-          echo "Style: ${STYLE_SLUG:-non spécifié}"
+          echo "Style(s): ${STYLE_SLUG:-tous les styles ready}"
           echo ""
 
-          # Récupération des statuts via les needs
           DL_STATUS="${{ needs.daily-learner.outputs.status }}"
           PC_STATUS="${{ needs.pinterest-collector.outputs.status }}"
-          ML_STATUS="${{ needs.manga-lora-training.outputs.training_status }}"
+          PC_PINS="${{ needs.pinterest-collector.outputs.pins_count }}"
           AE_STATUS="${{ needs.assistant-export.outputs.status }}"
+          STYLE_COUNT="${{ needs.discover-styles.outputs.count }}"
 
-          echo "┌──────────────────────────────┬──────────┐"
-          printf "│ %-28s │ %-8s │\n" "📡 Daily Learner" "${DL_STATUS:-N/A}"
-          printf "│ %-28s │ %-8s │\n" "📸 Pinterest Collector" "${PC_STATUS:-N/A}"
-          printf "│ %-28s │ %-8s │\n" "🤖 Manga LoRA" "${ML_STATUS:-N/A}"
-          printf "│ %-28s │ %-8s │\n" "📊 Assistant Export" "${AE_STATUS:-N/A}"
-          echo "└──────────────────────────────┴──────────┘"
+          echo "┌──────────────────────────────┬──────────────┐"
+          printf "│ %-28s │ %-12s │\n" "📡 Daily Learner" "${DL_STATUS:-N/A}"
+          printf "│ %-28s │ %-12s │\n" "📸 Pinterest" "${PC_STATUS:-N/A}"
+          if [ -n "$PC_PINS" ] && [ "$PC_PINS" != "0" ] && [ "$PC_PINS" != "" ]; then
+            printf "│ %-28s │ %-12s │\n" "   └ Pins" "$PC_PINS"
+          fi
+          printf "│ %-28s │ %-12s │\n" "🤖 Styles LoRA" "${STYLE_COUNT:-N/A}"
+          printf "│ %-28s │ %-12s │\n" "📊 Export" "${AE_STATUS:-N/A}"
+          echo "└──────────────────────────────┴──────────────┘"
 
           echo ""
-          if [ "$ML_STATUS" = "completed" ]; then
-            echo "🎉 Nouveau modèle LoRA disponible pour $STYLE_SLUG !"
-          elif [ "$ML_STATUS" = "failed" ]; then
-            echo "⚠️ L'entraînement LoRA a échoué. Vérifier les logs ci-dessus."
-          fi
+          echo "📁 Artifacts disponibles dans l'onglet Summary ↑"
           echo "::endgroup::"
+
+      - name: Enregistrer le rapport global
+        run: |
+          mkdir -p artifacts/report
+          cat > artifacts/report/report.json << EOF
+          {
+            "target": "$TARGET",
+            "style_slug": "$STYLE_SLUG",
+            "style_count": "${{ needs.discover-styles.outputs.count }}",
+            "daily_learner": "${{ needs.daily-learner.outputs.status }}",
+            "pinterest": "${{ needs.pinterest-collector.outputs.status }}",
+            "pins": "${{ needs.pinterest-collector.outputs.pins_count }}",
+            "assistant_export": "${{ needs.assistant-export.outputs.status }}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+      - name: Upload artifact rapport
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-report
+          path: artifacts/report/
+          retention-days: 90
+
+      - name: Notification Slack
+        if: always() && env.SLACK_WEBHOOK != ''
+        run: |
+          DL_STATUS="${{ needs.daily-learner.outputs.status }}"
+          PC_STATUS="${{ needs.pinterest-collector.outputs.status }}"
+          AE_STATUS="${{ needs.assistant-export.outputs.status }}"
+
+          HAS_FAILURE=false
+          [ "$DL_STATUS" = "failed" ] && HAS_FAILURE=true
+          [ "$PC_STATUS" = "failed" ] && HAS_FAILURE=true
+          [ "$AE_STATUS" = "failed" ] && HAS_FAILURE=true
+
+          if [ "$HAS_FAILURE" = "true" ]; then
+            ICON="❌"
+            MSG="Certains jobs ont échoué"
+          else
+            ICON="✅"
+            MSG="Tout est OK"
+          fi
+
+          curl -s -X POST "$SLACK_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"text\": \"${ICON} Entraînement IA Arteïa Muse — ${MSG}\n• Cible: $TARGET\n• Daily Learner: ${DL_STATUS:-N/A}\n• Pinterest: ${PC_STATUS:-N/A}\n• Export: ${AE_STATUS:-N/A}\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Détails>\"
+            }"
