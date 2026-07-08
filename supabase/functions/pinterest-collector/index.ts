@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import Parser from "https://esm.sh/rss-parser@3.13.0";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -40,65 +39,57 @@ serve(async (req) => {
         const boardName = board.board_name;
         const styleSlug = board.style_slug;
         const styleId = board.style_id;
+        const boardUrl = `https://www.pinterest.com/${username}/${boardName}/`;
 
-        const feedUrls = [
-          `https://www.pinterest.com/${username}/${boardName}.rss`,
-          `https://www.pinterest.com/rss/pin/${username}/${boardName}.rss`,
-        ];
+        // Scraper le HTML de la board Pinterest pour extraire les URLs d'images
+        const html = await fetch(boardUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "text/html,application/xhtml+xml",
+          },
+        }).then((r) => r.text());
 
-        let feed;
-        for (const url of feedUrls) {
-          try {
-            const parser = new Parser();
-            feed = await parser.parseURL(url);
-            if (feed?.items && feed.items.length > 0) break;
-          } catch {
-            continue;
-          }
-        }
+        // Extraire les URLs d'images i.pinimg.com/originals/
+        const imageUrls = extractPinterestImages(html);
 
-        if (!feed || !feed.items || feed.items.length === 0) {
-          results.push(`⚠️ ${username}/${boardName}: aucun flux trouvé`);
+        if (imageUrls.length === 0) {
+          results.push(`⚠️ ${username}/${boardName}: aucune image trouvée sur la page`);
           continue;
         }
 
-        let newCount = 0;
-        for (const item of feed.items) {
-          const imageUrl = item.enclosure?.url ?? extractImageFromContent(item.content) ?? "";
-          if (!imageUrl) continue;
-
-          const pinUrl = item.link ?? "";
-          const existingPinId = pinUrl.match(/\/pin\/(\d+)/)?.[1];
-          if (existingPinId && board.last_pin_id && existingPinId <= board.last_pin_id) continue;
-
+        // Filtrer les URLs déjà collectées
+        const existingUrls = new Set<string>();
+        const chunkSize = 50;
+        for (let i = 0; i < imageUrls.length; i += chunkSize) {
+          const chunk = imageUrls.slice(i, i + chunkSize);
           const { data: existing } = await supabase
             .from("ai_manga_references")
-            .select("id")
-            .eq("image_url", imageUrl)
-            .limit(1);
+            .select("image_url")
+            .in("image_url", chunk)
+            .limit(chunkSize);
 
-          if (existing && existing.length > 0) continue;
+          if (existing) {
+            for (const row of existing) existingUrls.add(row.image_url);
+          }
+        }
+
+        let newCount = 0;
+        for (const url of imageUrls) {
+          if (existingUrls.has(url)) continue;
 
           await supabase.from("ai_manga_references").insert({
             style_id: styleId,
-            image_url: imageUrl,
+            image_url: url,
             source: "pinterest",
-            caption: item.title ?? "",
+            caption: "",
           });
 
           newCount++;
         }
 
-        const latestPinId = feed.items
-          .map((i) => i.link?.match(/\/pin\/(\d+)/)?.[1])
-          .filter(Boolean)
-          .sort()
-          .pop();
-
         const total = (board.total_collected ?? 0) + newCount;
         await supabase.from("ai_pinterest_sources").update({
           last_fetched_at: new Date().toISOString(),
-          last_pin_id: latestPinId ?? board.last_pin_id,
           total_collected: total,
           last_error: null,
         }).eq("id", board.id);
@@ -137,8 +128,12 @@ serve(async (req) => {
   }
 });
 
-function extractImageFromContent(htmlContent: string | undefined): string | null {
-  if (!htmlContent) return null;
-  const match = htmlContent.match(/<img[^>]+src=["']([^"']+)["']/);
-  return match?.[1] ?? null;
+function extractPinterestImages(html: string): string[] {
+  const urls = new Set<string>();
+  const pattern = /https:\/\/i\.pinimg\.com\/originals\/[a-zA-Z0-9]+\/[a-zA-Z0-9]+\/[a-zA-Z0-9]+\.(jpg|png|webp)/g;
+  let match;
+  while ((match = pattern.exec(html)) !== null) {
+    urls.add(match[0]);
+  }
+  return Array.from(urls);
 }

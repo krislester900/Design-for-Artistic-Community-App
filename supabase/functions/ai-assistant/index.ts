@@ -12,6 +12,8 @@ interface ChatMessage {
 
 interface RequestBody {
   messages: ChatMessage[];
+  action?: string;
+  format?: string;
   context?: {
     contentType?: "visual" | "music" | "writing" | "comics" | "general" | "technique" | "style";
     userId?: string;
@@ -24,6 +26,7 @@ interface RequestBody {
   };
 }
 
+const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 const REPLICATE_KEY = Deno.env.get("REPLICATE_API_KEY") ?? "";
 const STYLES: Record<string, { slug: string; model: string; version: string; prompt: string; neg: string }> = {
   "kubo": { slug: "tite-kubo", model: "stability-ai/sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", prompt: "bleach manga style by tite kubo, sharp bold ink lines, {prompt}, dynamic pose, dramatic composition", neg: "photorealistic, 3d, western comic" },
@@ -94,7 +97,10 @@ serve(async (req) => {
   }
 
   try {
-    // Vérifier l'authentification
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
     const authHeader = req.headers.get("Authorization")?.replace("Bearer ", "");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Non authentifié" }), {
@@ -103,27 +109,34 @@ serve(async (req) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const isAdmin = authHeader === CRON_SECRET;
 
-    // Vérifier l'utilisateur
-    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Utilisateur non trouvé" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
+    // Si ce n'est pas un appel admin, vérifier l'utilisateur normal
+    let userId = "";
+    if (!isAdmin) {
+      const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader);
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: "Utilisateur non trouvé" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      userId = user.id;
     }
 
     const body: RequestBody = await req.json();
     const { messages, context, feedback } = body;
 
+    // Action admin : export des données d'entraînement
+    if (isAdmin && body.action === "export_training_data") {
+      return handleExportTrainingData(supabase, body.format ?? "jsonl");
+    }
+
     // Si c'est un feedback, le sauvegarder
-    if (feedback) {
+    if (feedback && userId) {
       try {
         await supabase.from("ai_feedback").insert({
-          user_id: user.id,
+          user_id: userId,
           conversation_id: feedback.conversationId,
           rating: feedback.rating,
           is_helpful: feedback.isHelpful,
@@ -216,7 +229,7 @@ serve(async (req) => {
             const data = await statusRes.json();
             if (data.status === "succeeded" && data.output?.[0]) {
               await supabase.from("ai_conversations").insert({
-                user_id: user.id,
+                user_id: userId,
                 user_message: lastMsg,
                 assistant_reply: `Voici ton illustration !`,
                 context_type: "visual",
@@ -265,7 +278,7 @@ serve(async (req) => {
           
           if (reply) {
             // Sauvegarder la conversation
-            await saveConversation(supabase, user.id, messages, reply, context, data.usage?.total_tokens ?? 0);
+            await saveConversation(supabase, userId, messages, reply, context, data.usage?.total_tokens ?? 0);
             return new Response(JSON.stringify({ reply }), {
               headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
             });
@@ -300,7 +313,7 @@ serve(async (req) => {
         const reply = data.message?.content ?? "";
         
         if (reply) {
-          await saveConversation(supabase, user.id, messages, reply, context, 0);
+          await saveConversation(supabase, userId, messages, reply, context, 0);
           return new Response(JSON.stringify({ reply }), {
             headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
           });
@@ -349,6 +362,68 @@ async function saveConversation(supabase: any, userId: string, messages: ChatMes
   } catch (e) {
     console.error("Failed to save conversation:", e);
   }
+}
+
+// Export des données d'entraînement au format JSONL
+async function handleExportTrainingData(supabase: any, format: string) {
+  const { data: conversations } = await supabase
+    .from("ai_conversations")
+    .select("user_message, assistant_reply, context_type, created_at")
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  const { data: trainingData } = await supabase
+    .from("ai_training_data")
+    .select("question, answer, category, quality_score, is_approved")
+    .eq("is_approved", true)
+    .limit(200);
+
+  const lines: string[] = [];
+
+  if (conversations) {
+    for (const c of conversations) {
+      lines.push(JSON.stringify({
+        messages: [
+          { role: "system", content: "Tu es Arteïa Muse, assistant créatif artistique." },
+          { role: "user", content: c.user_message },
+          { role: "assistant", content: c.assistant_reply },
+        ],
+      }));
+    }
+  }
+
+  if (trainingData) {
+    for (const d of trainingData) {
+      lines.push(JSON.stringify({
+        messages: [
+          { role: "system", content: "Tu es Arteïa Muse, assistant créatif artistique." },
+          { role: "user", content: d.question },
+          { role: "assistant", content: d.answer },
+        ],
+        metadata: { category: d.category, quality_score: d.quality_score },
+      }));
+    }
+  }
+
+  const output = lines.join("\n");
+  const filename = `artieia-training-${new Date().toISOString().split("T")[0]}.jsonl`;
+
+  // Stocker l'export dans la table ai_training_data
+  await supabase.from("ai_training_data").insert({
+    category: "export",
+    question: `Export ${format} du ${new Date().toISOString()}`,
+    answer: `Export JSONL avec ${lines.length} entrées`,
+    quality_score: 5,
+    is_approved: true,
+  }).catch(() => {});
+
+  return new Response(output, {
+    headers: {
+      "Content-Type": "application/jsonl",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }
 
 // Fallback local : réponses intelligentes sans API
