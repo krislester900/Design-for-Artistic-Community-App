@@ -24,7 +24,7 @@ env:
   SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
   FUNCTIONS_URL: ${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}
   CRON_SECRET: ${{ secrets.CRON_SECRET }}
-  SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+  DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
   TIMEOUT_MINUTES: 120
   POLL_INTERVAL: 30
   TARGET: ${{ inputs.target }}
@@ -375,8 +375,8 @@ jobs:
           path: artifacts/report/
           retention-days: 90
 
-      - name: Notification Slack
-        if: always() && env.SLACK_WEBHOOK != ''
+      - name: Notification Discord
+        if: always() && env.DISCORD_WEBHOOK != ''
         run: |
           DL_STATUS="${{ needs.daily-learner.outputs.status }}"
           PC_STATUS="${{ needs.pinterest-collector.outputs.status }}"
@@ -388,15 +388,26 @@ jobs:
           [ "$AE_STATUS" = "failed" ] && HAS_FAILURE=true
 
           if [ "$HAS_FAILURE" = "true" ]; then
-            ICON="❌"
-            MSG="Certains jobs ont échoué"
+            COLOR=15158332
+            MSG="❌ Certains jobs ont échoué"
           else
-            ICON="✅"
-            MSG="Tout est OK"
+            COLOR=5814783
+            MSG="✅ Tout est OK"
           fi
 
-          curl -s -X POST "$SLACK_WEBHOOK" \
+          curl -s -X POST "$DISCORD_WEBHOOK" \
             -H "Content-Type: application/json" \
             -d "{
-              \"text\": \"${ICON} Entraînement IA Arteïa Muse — ${MSG}\n• Cible: $TARGET\n• Daily Learner: ${DL_STATUS:-N/A}\n• Pinterest: ${PC_STATUS:-N/A}\n• Export: ${AE_STATUS:-N/A}\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Détails>\"
+              \"embeds\": [{
+                \"title\": \"Entraînement IA Arteïa Muse\",
+                \"description\": \"${MSG}\",
+                \"color\": ${COLOR},
+                \"fields\": [
+                  {\"name\": \"Cible\", \"value\": \"$TARGET\", \"inline\": true},
+                  {\"name\": \"Daily Learner\", \"value\": \"${DL_STATUS:-N/A}\", \"inline\": true},
+                  {\"name\": \"Pinterest\", \"value\": \"${PC_STATUS:-N/A}\", \"inline\": true},
+                  {\"name\": \"Export\", \"value\": \"${AE_STATUS:-N/A}\", \"inline\": true}
+                ],
+                \"url\": \"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+              }]
             }"
