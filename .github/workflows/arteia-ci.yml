@@ -173,9 +173,11 @@ jobs:
             fi
           done
 
-      - name: Seed data (connaissances, ontologie, styles manga)
+      - name: Seed data (connaissances, ontologie, styles manga, boards Pinterest)
         run: |
           supabase db execute --file "database/seed-all.sql" || echo "⚠️ Seed déjà appliqué"
+          supabase db execute --file "database/seed-pinterest-boards.sql" || echo "⚠️ Boards Pinterest déjà ajoutés"
+          supabase db execute --file "database/enable-auto-train.sql" || echo "⚠️ Auto-train déjà activé"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
