@@ -1,5 +1,4 @@
 name: Entraînement IA Arteïa Muse
-description: Déclenche manuellement les entraînements IA avec suivi en temps réel
 
 on:
   workflow_dispatch:

@@ -1,5 +1,4 @@
 name: Artéïa CI/CD
-description: Pipeline complet : tests → builds → migrations SQL → déploiement Functions
 
 on:
   push:

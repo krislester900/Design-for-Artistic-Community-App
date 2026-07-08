@@ -1,5 +1,4 @@
 name: 🌅 Apprentissage quotidien Arteïa Muse
-description: Apprentissage web RSS + collecte Pinterest (6h UTC) + entraînement auto
 
 on:
   schedule:
