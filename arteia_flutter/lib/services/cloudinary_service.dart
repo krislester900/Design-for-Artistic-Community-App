@@ -38,7 +38,7 @@ class CloudinaryService {
       final uri = Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/image/upload');
 
       final request = http.MultipartRequest('POST', uri)
-        ..fields['upload_preset'] = _uploadPreset
+        ..fields['upload_preset'] = _uploadPreset!
         ..fields['folder'] = folder
         ..files.add(await http.MultipartFile.fromPath('file', imageFile.path));
 
