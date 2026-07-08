@@ -300,7 +300,8 @@ jobs:
           echo "::group::📊 Export Training Data"
           echo "Export des conversations au format JSONL..."
           HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/ai-assistant" \
-            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "x-cron-secret: $CRON_SECRET" \
             -H "Content-Type: application/json" \
             -d '{"action":"export_training_data","format":"jsonl"}')
           BODY=$(echo "$HTTP_RESPONSE" | head -n -1)

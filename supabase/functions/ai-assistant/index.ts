@@ -109,7 +109,9 @@ serve(async (req) => {
       });
     }
 
-    const isAdmin = authHeader === CRON_SECRET;
+    // Admin via x-cron-secret ou Authorization
+    const cronHeader = req.headers.get("x-cron-secret") ?? "";
+    const isAdmin = authHeader === CRON_SECRET || cronHeader === CRON_SECRET;
 
     // Si ce n'est pas un appel admin, vérifier l'utilisateur normal
     let userId = "";
