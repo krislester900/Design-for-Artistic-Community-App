@@ -84,7 +84,7 @@ jobs:
           retention-days: 7
 
   # ==========================================================
-  # JOB 3 : BUILD APK (optionnel — peut échouer sans blocage)
+  # JOB 3 : BUILD APK (Android SDK setup + build)
   # ==========================================================
   flutter-build-apk:
     name: 📱 Build APK (Android)
@@ -97,6 +97,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Java 17 (Android SDK requis)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        run: |
+          ANDROID_SDK=/usr/local/lib/android/sdk
+          echo "ANDROID_HOME=$ANDROID_SDK" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK" >> $GITHUB_ENV
+          yes | $ANDROID_SDK/tools/bin/sdkmanager --licenses 2>/dev/null || true
 
       - name: Setup Flutter ${{ env.FLUTTER_VERSION }}
         uses: subosito/flutter-action@v2

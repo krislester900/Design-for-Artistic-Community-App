@@ -22,6 +22,12 @@ add-secrets.js
 .DS_Store
 Thumbs.db
 
+# Flutter local machine config (chemins absolus de SDK)
+arteia_flutter/android/local.properties
+arteia_flutter/android/.gradle/
+arteia_flutter/ios/Pods/
+arteia_flutter/ios/.symlinks/
+
 # Vite
 *.local
 
