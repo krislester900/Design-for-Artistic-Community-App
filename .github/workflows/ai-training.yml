@@ -1,5 +1,5 @@
 name: Entraînement IA Arteïa Muse
-description: Déclenche manuellement les entraînements IA (daily learner, manga LoRA)
+description: Déclenche manuellement les entraînements IA avec suivi en temps réel
 
 on:
   workflow_dispatch:
@@ -20,51 +20,159 @@ on:
         default: ''
         type: string
 
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  FUNCTIONS_URL: ${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}
+  CRON_SECRET: ${{ secrets.CRON_SECRET }}
+  TIMEOUT_MINUTES: 120
+  POLL_INTERVAL: 30
+
 jobs:
-  trigger-training:
-    name: Lancer l'entraînement
+  daily-learner:
+    if: inputs.target == 'daily-learner' || inputs.target == 'all'
     runs-on: ubuntu-latest
     steps:
-      - name: Daily Learner — Apprentissage web RSS
-        if: inputs.target == 'daily-learner' || inputs.target == 'all'
+      - name: Apprentissage web RSS
         run: |
-          echo "🚀 Lancement du daily-learner..."
-          curl -s -X POST "${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}/daily-learner" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json"
-          echo "✅ Daily learner terminé"
-
-      - name: Pinterest Collector — Collecte d'images
-        if: inputs.target == 'daily-learner' || inputs.target == 'all'
-        run: |
-          echo "🚀 Lancement du pinterest-collector..."
-          curl -s -X POST "${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}/pinterest-collector" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json"
-          echo "✅ Collecte Pinterest terminée"
-
-      - name: Manga LoRA — Entraînement
-        if: inputs.target == 'manga-lora' || inputs.target == 'all'
-        run: |
-          SLUG="${{ inputs.style_slug }}"
-          if [ -z "$SLUG" ]; then
-            echo "⚠️ Aucun style_slug fourni, entraînement non lancé."
-            echo "Utilise style_slug pour cibler un style spécifique (ex: tite-kubo)"
-            exit 0
+          echo "::group::📡 Daily Learner"
+          echo "Lancement de l'apprentissage depuis les flux RSS..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/daily-learner" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json")
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          CODE=$(echo "$RESPONSE" | tail -n 1)
+          echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+          if [ "$CODE" != "200" ]; then
+            echo "::error::Daily Learner a échoué (HTTP $CODE)"
+            exit 1
           fi
-          echo "🚀 Entraînement LoRA pour $SLUG..."
-          curl -s -X POST "${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}/manga-trainer" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"action\":\"start_training\",\"style_slug\":\"$SLUG\"}"
-          echo "✅ Entraînement LoRA lancé"
+          echo "::endgroup::"
 
-      - name: Assistant — Export des données pour fine-tuning
-        if: inputs.target == 'assistant-export' || inputs.target == 'all'
+  pinterest-collector:
+    if: inputs.target == 'daily-learner' || inputs.target == 'all'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collecte d'images Pinterest
         run: |
-          echo "📊 Export des données d'entraînement..."
-          curl -s -X POST "${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}/ai-assistant" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          echo "::group::📸 Pinterest Collector"
+          echo "Scraping des boards configurés..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/pinterest-collector" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json")
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          CODE=$(echo "$RESPONSE" | tail -n 1)
+          echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+          if [ "$CODE" != "200" ]; then
+            echo "::error::Pinterest Collector a échoué (HTTP $CODE)"
+            exit 1
+          fi
+          echo "::endgroup::"
+
+  manga-lora-training:
+    if: inputs.target == 'manga-lora' || inputs.target == 'all'
+    runs-on: ubuntu-latest
+    outputs:
+      job_id: ${{ steps.launch.outputs.job_id }}
+      status: ${{ steps.poll.outputs.status }}
+    steps:
+      - name: Vérification du slug
+        run: |
+          if [ -z "${{ inputs.style_slug }}" ]; then
+            echo "::error::Aucun style_slug fourni. Utilise style_slug (ex: tite-kubo)"
+            exit 1
+          fi
+
+      - name: Lancement de l'entraînement LoRA
+        id: launch
+        run: |
+          echo "::group::🚀 Manga LoRA - Lancement"
+          echo "Style: ${{ inputs.style_slug }}"
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/manga-trainer" \
+            -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json" \
-            -d '{"action":"export_training_data","format":"jsonl"}'
-          echo "✅ Export terminé"
+            -d "{\"action\":\"start_training\",\"style_slug\":\"${{ inputs.style_slug }}\"}")
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          CODE=$(echo "$RESPONSE" | tail -n 1)
+          echo "$BODY" | jq .
+          if [ "$CODE" != "200" ]; then
+            echo "::error::Échec lancement entraînement (HTTP $CODE)"
+            exit 1
+          fi
+          JOB_ID=$(echo "$BODY" | jq -r '.job_id // empty')
+          if [ -n "$JOB_ID" ]; then
+            echo "job_id=$JOB_ID" >> $GITHUB_OUTPUT
+            echo "✅ Job ID: $JOB_ID"
+          else
+            echo "::warning::Aucun job_id retourné, vérification manuelle nécessaire"
+          fi
+          echo "::endgroup::"
+
+      - name: Suivi de la progression en temps réel
+        id: poll
+        if: steps.launch.outputs.job_id != ''
+        run: |
+          JOB_ID="${{ steps.launch.outputs.job_id }}"
+          END_TIME=$(( $(date +%s) + TIMEOUT_MINUTES * 60 ))
+          TRIES=0
+          echo "::group::⏳ Suivi entraînement (timeout: ${TIMEOUT_MINUTES}min)"
+          while [ $(date +%s) -lt $END_TIME ]; do
+            TRIES=$((TRIES + 1))
+            RESULT=$(curl -s "$SUPABASE_URL/rest/v1/ai_training_jobs?id=eq.$JOB_ID&select=status,progress,error_message,replicate_job_id,created_at,started_at,completed_at,lora_url" \
+              -H "apikey: $SUPABASE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_KEY")
+            STATUS=$(echo "$RESULT" | jq -r '.[0].status // "unknown"')
+            PROGRESS=$(echo "$RESULT" | jq -r '.[0].progress // 0')
+            ERROR=$(echo "$RESULT" | jq -r '.[0].error_message // ""')
+            PROGRESS_PCT=$(awk "BEGIN {printf \"%.0f\", $PROGRESS * 100}")
+            TIMESTAMP=$(date +%H:%M:%S)
+
+            case "$STATUS" in
+              "completed")
+                echo "✅ [$TIMESTAMP] Entraînement terminé ! (${PROGRESS_PCT}%)"
+                LORA_URL=$(echo "$RESULT" | jq -r '.[0].lora_url // "non disponible"')
+                echo "🎯 LoRA URL: $LORA_URL"
+                echo "status=completed" >> $GITHUB_OUTPUT
+                echo "::endgroup::"
+                exit 0
+                ;;
+              "failed")
+                echo "::error::[$TIMESTAMP] Entraînement échoué : $ERROR"
+                echo "status=failed" >> $GITHUB_OUTPUT
+                echo "::endgroup::"
+                exit 1
+                ;;
+              "training"|"preparing")
+                echo "🔄 [$TIMESTAMP] $STATUS — ${PROGRESS_PCT}% (tentative $TRIES)"
+                ;;
+              *)
+                echo "⏸️  [$TIMESTAMP] Statut: $STATUS — ${PROGRESS_PCT}%"
+                ;;
+            esac
+            sleep $POLL_INTERVAL
+          done
+          echo "::error::Timeout dépassé (${TIMEOUT_MINUTES}min)"
+          echo "status=timeout" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+          exit 1
+
+  assistant-export:
+    if: inputs.target == 'assistant-export' || inputs.target == 'all'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Export des données pour fine-tuning
+        run: |
+          echo "::group::📊 Assistant - Export Training Data"
+          echo "Export des conversations au format JSONL..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/ai-assistant" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"export_training_data","format":"jsonl"}')
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          CODE=$(echo "$RESPONSE" | tail -n 1)
+          echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+          if [ "$CODE" != "200" ]; then
+            echo "::error::Export échoué (HTTP $CODE)"
+            exit 1
+          fi
+          echo "::endgroup::"

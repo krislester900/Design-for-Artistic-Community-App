@@ -162,6 +162,8 @@ class ImageUploadService {
         return 'image/jpeg';
       case 'png':
         return 'image/png';
+      case 'gif':
+        return 'image/gif';
       case 'webp':
         return 'image/webp';
       default:

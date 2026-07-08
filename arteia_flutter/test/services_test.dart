@@ -55,8 +55,8 @@ void main() {
       expect(uploadService.getMimeType('image.webp'), 'image/webp');
     });
 
-    test('getMimeType returns image/jpeg as default for unknown', () {
-      expect(uploadService.getMimeType('image.bmp'), 'image/jpeg');
+    test('getMimeType returns application/octet-stream as default for unknown', () {
+      expect(uploadService.getMimeType('image.bmp'), 'application/octet-stream');
     });
 
     test('getMimeType handles uppercase extensions', () {
