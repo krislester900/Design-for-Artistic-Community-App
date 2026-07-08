@@ -31,13 +31,12 @@ arteia_flutter/ios/.symlinks/
 # Vite
 *.local
 
-# Capacitor
-android/app/build/
-android/.gradle/
-ios/App/Pods/
-ios/App/build/
+# Capacitor (racine du projet uniquement)
+/android/
+/ios/
+/android/app/build/
+/android/.gradle/
+/ios/App/Pods/
+/ios/App/build/
 
-# Capacitor generated
-android/
-ios/
 .aider*
