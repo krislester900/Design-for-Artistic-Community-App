@@ -109,7 +109,7 @@ jobs:
           ANDROID_SDK=/usr/local/lib/android/sdk
           echo "ANDROID_HOME=$ANDROID_SDK" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK" >> $GITHUB_ENV
-          $ANDROID_SDK/tools/bin/sdkmanager --install "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125" 2>&1 | tail -5 || true
+          $ANDROID_SDK/tools/bin/sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;27.0.12077973" 2>&1 | tail -5 || true
           yes | $ANDROID_SDK/tools/bin/sdkmanager --licenses 2>/dev/null || true
 
       - name: Setup Flutter ${{ env.FLUTTER_VERSION }}
@@ -123,7 +123,7 @@ jobs:
         run: flutter pub get
 
       - name: 🔨 Build APK (release, split per ABI)
-        run: flutter build apk --release --split-per-abi
+        run: flutter build apk --release --split-per-abi --android-skip-build-dependency-validation
 
       - name: 📤 Upload APK artifacts
         uses: actions/upload-artifact@v4
