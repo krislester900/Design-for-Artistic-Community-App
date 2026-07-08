@@ -81,10 +81,15 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: `Minimum 5 images requises (${refs?.length ?? 0}/5)` }), { status: 400, headers: { "Content-Type": "application/json" } });
       }
 
+      // Prompt descriptif pour l'entraînement LoRA
+      // Utilise le nom + mangaka pour un instance_prompt riche
+      // qui exploite les 2 encodeurs texte de SDXL
+      const instancePrompt = `${style.name} manga art style by ${style.mangaka}`;
+
       const { data: job, error: jobError } = await supabase.from("ai_training_jobs").insert({
         style_id: style.id,
         status: "preparing",
-        instance_prompt: `${style.slug}-artwork style`,
+        instance_prompt: instancePrompt,
         reference_count: refs.length,
       }).select("id").single();
 
@@ -143,11 +148,12 @@ serve(async (req) => {
           body: JSON.stringify({
             destination: `arteia/sdxl-manga-${style.slug}`,
             input: {
-              instance_prompt: `${style.slug}-artwork style`,
-              class_prompt: "manga artwork, anime style",
+              instance_prompt: instancePrompt,
+              class_prompt: "manga artwork, anime comic art, japanese illustration style",
               train_data: publicUrl,
               max_train_steps: 2000,
               learning_rate: 1e-4,
+              resolution: 1024,
             },
           }),
         });

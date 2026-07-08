@@ -1,4 +1,5 @@
-name: Apprentissage quotidien Arteïa Muse
+name: 🌅 Apprentissage quotidien Arteïa Muse
+description: Apprentissage web RSS + collecte Pinterest (6h UTC) + entraînement auto
 
 on:
   schedule:
@@ -11,31 +12,73 @@ on:
         default: false
         type: boolean
 
+env:
+  FUNCTIONS_URL: ${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}
+  CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
 jobs:
-  daily-learn:
-    name: Apprentissage web (RSS → connaissances)
+  daily-learner:
+    name: 📡 Apprentissage web RSS
     runs-on: ubuntu-latest
     steps:
-      - name: Apprentissage web
+      - name: Parsing RSS → résumé IA → knowledge base
         run: |
-          curl -s -X POST "${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}/daily-learner" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json"
+          echo "::group::📡 Daily Learner"
+          echo "Parsing des flux RSS artistiques..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/daily-learner" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json")
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          CODE=$(echo "$RESPONSE" | tail -n 1)
+          echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+          if [ "$CODE" = "200" ]; then
+            echo "✅ Apprentissage quotidien terminé"
+          else
+            echo "::warning::Daily Learner a retourné HTTP $CODE"
+          fi
+          echo "::endgroup::"
 
-      - name: Collecte Pinterest
+  pinterest-collector:
+    name: 📸 Collecte images Pinterest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scraping boards → nouvelles références
         run: |
-          curl -s -X POST "${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}/pinterest-collector" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json"
+          echo "::group::📸 Pinterest Collector"
+          echo "Scraping des boards Pinterest configurés..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/pinterest-collector" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json")
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          CODE=$(echo "$RESPONSE" | tail -n 1)
+          echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+          if [ "$CODE" = "200" ]; then
+            echo "✅ Collecte Pinterest terminée"
+          else
+            echo "::warning::Pinterest Collector a retourné HTTP $CODE"
+          fi
+          echo "::endgroup::"
 
   manga-training:
-    name: Entraînement manga LoRA automatique
+    name: 🤖 Entraînement manga LoRA auto
     if: github.event_name == 'workflow_dispatch' && inputs.run_manga_training == true
     runs-on: ubuntu-latest
     steps:
-      - name: Vérifier les styles prêts à entraîner
+      - name: Vérifier et lancer les entraînements prêts
         run: |
-          curl -s -X POST "${{ secrets.SUPABASE_EDGE_FUNCTIONS_URL }}/manga-trainer" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          echo "::group::🤖 Manga LoRA Auto-Train"
+          echo "Vérification des styles avec ≥20 images prêtes à entraîner..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/manga-trainer" \
+            -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json" \
-            -d '{"action":"auto_train_ready"}'
+            -d '{"action":"auto_train_ready"}')
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          CODE=$(echo "$RESPONSE" | tail -n 1)
+          echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+          if [ "$CODE" = "200" ]; then
+            echo "✅ Vérification terminée"
+          else
+            echo "::error::Échec auto-train (HTTP $CODE)"
+            exit 1
+          fi
+          echo "::endgroup::"

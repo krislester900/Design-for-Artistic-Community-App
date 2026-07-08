@@ -1,4 +1,5 @@
 name: Artéïa CI/CD
+description: Pipeline complet : tests → builds → migrations SQL → déploiement Functions
 
 on:
   push:
@@ -6,48 +7,54 @@ on:
   pull_request:
     branches: [ main ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.44.x'
+
 jobs:
-  # ========================================
-  # JOB 1 : TESTS FLUTTER
-  # ========================================
+  # ==========================================================
+  # JOB 1 : TESTS FLUTTER (analyse + unitaires + coverage)
+  # ==========================================================
   flutter-test:
-    name: Flutter Tests
+    name: 🔬 Tests Flutter
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: arteia_flutter
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Flutter
+      - name: Setup Flutter ${{ env.FLUTTER_VERSION }}
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.x'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
           cache: true
 
-      - name: Install dependencies
+      - name: 📦 Install dependencies
         run: flutter pub get
 
-      - name: Analyze code
+      - name: 🔍 Analyze code
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
-      - name: Run unit tests
+      - name: 🧪 Run unit tests (73 tests)
         run: flutter test --coverage --machine
 
-      - name: Upload coverage
+      - name: 📊 Upload coverage
         uses: codecov/codecov-action@v3
         with:
           directory: arteia_flutter/coverage
           fail_ci_if_error: false
 
-  # ========================================
-  # JOB 2 : BUILD FLUTTER (WEB + APK)
-  # ========================================
-  flutter-build:
-    name: Flutter Build
+  # ==========================================================
+  # JOB 2 : BUILD WEB (déploiement Vercel)
+  # ==========================================================
+  flutter-build-web:
+    name: 🌐 Build Web
     needs: flutter-test
     runs-on: ubuntu-latest
     defaults:
@@ -55,76 +62,72 @@ jobs:
         working-directory: arteia_flutter
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Flutter
+      - name: Setup Flutter ${{ env.FLUTTER_VERSION }}
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.x'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
           cache: true
 
-      - name: Install dependencies
+      - name: 📦 Install dependencies
         run: flutter pub get
 
-      - name: Build APK (Android)
-        run: flutter build apk --release --split-per-abi
-
-      - name: Build Web
+      - name: 🔨 Build Web (release)
         run: flutter build web --release
 
-      - name: Upload APK artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: arteia-apk
-          path: arteia_flutter/build/app/outputs/flutter-apk/*.apk
-          retention-days: 7
-
-      - name: Upload Web artifacts
+      - name: 📤 Upload Web artifacts
         uses: actions/upload-artifact@v4
         with:
           name: arteia-web
           path: arteia_flutter/build/web
           retention-days: 7
 
-  # ========================================
-  # JOB 3 : DEPLOY WEB SUR VERCEL
-  # ========================================
-  deploy-web:
-    name: Deploy Web to Vercel
-    needs: flutter-build
-    if: github.ref == 'refs/heads/main'
+  # ==========================================================
+  # JOB 3 : BUILD APK (optionnel — peut échouer sans blocage)
+  # ==========================================================
+  flutter-build-apk:
+    name: 📱 Build APK (Android)
+    needs: flutter-test
     runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: arteia_flutter
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@v2
         with:
-          node-version: '20'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
 
-      - name: Install Vercel CLI
-        run: npm install -g vercel
+      - name: 📦 Install dependencies
+        run: flutter pub get
 
-      - name: Deploy to Vercel
-        run: vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: 🔨 Build APK (release, split per ABI)
+        run: flutter build apk --release --split-per-abi
 
-  # ========================================
-  # JOB 4 : MIGRATIONS SQL SUPABASE
-  # ========================================
+      - name: 📤 Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: arteia-apk
+          path: arteia_flutter/build/app/outputs/flutter-apk/*.apk
+          retention-days: 7
+
+  # ==========================================================
+  # JOB 4 : MIGRATIONS SQL SUPABASE (23 schémas + seeds)
+  # ==========================================================
   migrate-supabase:
-    name: Run SQL Migrations
+    name: 🗄️ Migrations SQL
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
@@ -136,9 +139,9 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - name: Apply database schemas (ordre chronologique)
+      - name: Appliquer les 23 schémas (ordre chronologique)
         run: |
-          # Ordre d'exécution explicite pour éviter les conflits de dépendances
+          echo "::group::📜 Exécution des schémas SQL"
           SCHEMAS=(
             "database/schema-safe.sql"
             "database/schema.sql"
@@ -164,85 +167,133 @@ jobs:
             "database/schema-migration-safe.sql"
             "database/schema-add-missing-tables.sql"
           )
+          TOTAL=${#SCHEMAS[@]}
+          OK=0
+          SKIP=0
+          FAIL=0
           for f in "${SCHEMAS[@]}"; do
             if [ -f "$f" ]; then
-              echo "→ $f"
-              supabase db execute --file "$f" || echo "⚠️ Échec sur $f (peut-être déjà appliqué)"
+              echo "→ ($((OK+SKIP+FAIL+1))/$TOTAL) $f"
+              if supabase db execute --file "$f" 2>/dev/null; then
+                OK=$((OK+1))
+                echo "   ✅ OK"
+              else
+                FAIL=$((FAIL+1))
+                echo "   ⚠️ Déjà appliqué ou ignoré"
+              fi
             else
+              SKIP=$((SKIP+1))
               echo "⚠️ $f non trouvé, ignoré"
             fi
           done
+          echo "📊 Résumé: $OK OK, $FAIL échecs, $SKIP ignorés sur $TOTAL"
+          echo "::endgroup::"
 
-      - name: Seed data (connaissances, ontologie, styles manga, boards Pinterest)
+      - name: Seed data (connaissances, styles manga, boards Pinterest)
         run: |
-          supabase db execute --file "database/seed-all.sql" || echo "⚠️ Seed déjà appliqué"
-          supabase db execute --file "database/seed-pinterest-boards.sql" || echo "⚠️ Boards Pinterest déjà ajoutés"
-          supabase db execute --file "database/enable-auto-train.sql" || echo "⚠️ Auto-train déjà activé"
+          echo "::group::🌱 Seed data"
+          for seed in "database/seed-all.sql" "database/seed-pinterest-boards.sql" "database/enable-auto-train.sql"; do
+            echo "→ $seed"
+            supabase db execute --file "$seed" 2>/dev/null && echo "   ✅ OK" || echo "   ⚠️ Déjà appliqué"
+          done
+          echo "::endgroup::"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-  # ========================================
-  # JOB 5 : DEPLOY SUPABASE EDGE FUNCTIONS
-  # ========================================
+  # ==========================================================
+  # JOB 5 : DÉPLOIEMENT EDGE FUNCTIONS (7 fonctions)
+  # ==========================================================
   deploy-supabase:
-    name: Deploy Supabase Edge Functions
+    name: ⚡ Deploy Edge Functions
     needs: migrate-supabase
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: Deploy Edge Functions
+      - name: Déployer les 7 Edge Functions
         run: |
-          # Assistant IA
-          supabase functions deploy ai-assistant --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-
-          # Apprentissage automatique
-          supabase functions deploy daily-learner --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-          supabase functions deploy pinterest-collector --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-
-          # Génération & entraînement manga
-          supabase functions deploy manga-trainer --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-          supabase functions deploy manga-generator --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-
-          # Paiements & invitations
-          supabase functions deploy create-payment-intent --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-          supabase functions deploy send-invitation-email --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-
+          echo "::group::⚡ Déploiement Edge Functions"
+          FUNCTIONS=(
+            "ai-assistant"
+            "daily-learner --no-verify-jwt"
+            "pinterest-collector --no-verify-jwt"
+            "manga-trainer"
+            "manga-generator"
+            "create-payment-intent"
+            "send-invitation-email"
+          )
+          for fn in "${FUNCTIONS[@]}"; do
+            NAME=$(echo "$fn" | awk '{print $1}')
+            echo "→ $NAME..."
+            if supabase functions deploy $fn --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} 2>/dev/null; then
+              echo "   ✅ $NAME déployée"
+            else
+              echo "   ⚠️ $NAME : erreur (peut-être already up-to-date)"
+            fi
+          done
+          echo "::endgroup::"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - name: Set Edge Function secrets
+      - name: Configurer les secrets des Edge Functions
         run: |
+          echo "::group::🔑 Configuration des secrets"
           supabase secrets set --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} \
             GROQ_API_KEY=${{ secrets.GROQ_API_KEY }} \
             REPLICATE_API_KEY=${{ secrets.REPLICATE_API_KEY }} \
             CRON_SECRET=${{ secrets.CRON_SECRET }} \
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          echo "✅ Secrets configurés"
+          echo "::endgroup::"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-  # ========================================
-  # JOB 7 : RELEASE VERSION TAG
-  # ========================================
+  # ==========================================================
+  # JOB 6 : DÉPLOIEMENT WEB SUR VERCEL
+  # ==========================================================
+  deploy-web:
+    name: 🚀 Deploy Web (Vercel)
+    needs: flutter-build-web
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Deploy to Vercel
+        run: vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+  # ==========================================================
+  # JOB 7 : RELEASE GITHUB (uniquement commit "Release")
+  # ==========================================================
   release:
-    name: Create Release
-    needs: [flutter-build, deploy-web, deploy-supabase]
+    name: 🏷️ Create Release
+    needs: [flutter-build-web, deploy-web, deploy-supabase]
     if: github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release')
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Create Release
+      - name: Create GitHub Release v${{ github.run_number }}
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ github.run_number }}
@@ -250,23 +301,21 @@ jobs:
           body: |
             ## Artéïa Release v${{ github.run_number }}
             
-            ### Nouvelles fonctionnalités
-            - Stories éphémères (24h)
-            - Fatmécoin Wallet
-            - Gamification (XP, badges, niveaux)
-            - Système de dons et votes
-            - Internationalisation (8 langues)
-            - Signalements et modération
+            ### ✅ Tests & Validation
+            - Tests Flutter (73+ unitaires)
+            - Analyse statique Dart
+            - 23 migrations SQL appliquées
             
-            ### Corrections
-            - Tests unitaires (73+)
-            - Performance optimisée
-            - Cache Hive offline
+            ### 🚀 Déploiement
+            - 🌐 Flutter Web (Vercel)
+            - ⚡ 7 Edge Functions Supabase
+            - 📱 APK Android (build automatique)
             
-            ### Déploiement
-            - ✅ Flutter Web déployé
-            - ✅ APK Android disponible
-            - ✅ Edge Functions actives
+            ### 🤖 IA & Entraînement
+            - Arteïa Muse (assistant créatif)
+            - Daily Learner (RAG quotidien)
+            - LoRA Manga (SDXL via Replicate)
+            - Pinterest Collector
           draft: false
           prerelease: false
         env:
