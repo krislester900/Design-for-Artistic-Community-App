@@ -120,7 +120,8 @@ jobs:
           echo "::group::📡 Daily Learner"
           echo "Parsing des flux RSS artistiques..."
           HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/daily-learner" \
-            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "x-cron-secret: $CRON_SECRET" \
             -H "Content-Type: application/json")
           BODY=$(echo "$HTTP_RESPONSE" | head -n -1)
           CODE=$(echo "$HTTP_RESPONSE" | tail -n 1)
@@ -149,7 +150,8 @@ jobs:
           echo "::group::📸 Pinterest Collector"
           echo "Scraping des boards Pinterest configurés..."
           HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/pinterest-collector" \
-            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "x-cron-secret: $CRON_SECRET" \
             -H "Content-Type: application/json")
           BODY=$(echo "$HTTP_RESPONSE" | head -n -1)
           CODE=$(echo "$HTTP_RESPONSE" | tail -n 1)
@@ -185,7 +187,8 @@ jobs:
           echo "::group::🚀 Lancement LoRA — ${{ matrix.style_slug }}"
           echo "Vérification du nombre d'images disponibles..."
           STATUS_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/manga-trainer" \
-            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "x-cron-secret: $CRON_SECRET" \
             -H "Content-Type: application/json" \
             -d "{\"action\":\"status\",\"style_slug\":\"${{ matrix.style_slug }}\"}")
           STATUS_BODY=$(echo "$STATUS_RESPONSE" | head -n -1)
@@ -199,7 +202,8 @@ jobs:
           fi
           echo "Lancement de l'entraînement..."
           HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/manga-trainer" \
-            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "x-cron-secret: $CRON_SECRET" \
             -H "Content-Type: application/json" \
             -d "{\"action\":\"start_training\",\"style_slug\":\"${{ matrix.style_slug }}\"}")
           BODY=$(echo "$HTTP_RESPONSE" | head -n -1)

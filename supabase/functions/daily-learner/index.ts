@@ -24,7 +24,8 @@ serve(async (req) => {
 
   try {
     const auth = req.headers.get("authorization")?.replace("Bearer ", "");
-    if (auth !== CRON_SECRET) {
+    const cronHeader = req.headers.get("x-cron-secret") ?? "";
+    if (auth !== CRON_SECRET && cronHeader !== CRON_SECRET) {
       return new Response(JSON.stringify({ error: "Non autorisé" }), { status: 403, headers: { "Content-Type": "application/json" } });
     }
 

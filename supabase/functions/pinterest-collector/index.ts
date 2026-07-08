@@ -10,8 +10,9 @@ serve(async (req) => {
 
   try {
     const auth = req.headers.get("authorization")?.replace("Bearer ", "");
+    const cronHeader = req.headers.get("x-cron-secret") ?? "";
     const cronSecret = Deno.env.get("CRON_SECRET");
-    if (cronSecret && auth !== cronSecret) {
+    if (cronSecret && auth !== cronSecret && cronHeader !== cronSecret) {
       return new Response(JSON.stringify({ error: "Non autorisé" }), { status: 403, headers: { "Content-Type": "application/json" } });
     }
 

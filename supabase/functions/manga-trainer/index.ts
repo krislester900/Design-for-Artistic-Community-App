@@ -22,13 +22,21 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Non authentifié" }), { status: 401, headers: { "Content-Type": "application/json" } });
     }
 
+    const cronSecret = Deno.env.get("CRON_SECRET") ?? "";
+    const cronHeader = req.headers.get("x-cron-secret") ?? "";
+    const isAdmin = authHeader === cronSecret || cronHeader === cronSecret;
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { data: { user } } = await supabase.auth.getUser(authHeader);
-    if (!user) {
-      return new Response(JSON.stringify({ error: "Utilisateur non trouvé" }), { status: 401, headers: { "Content-Type": "application/json" } });
+    let userId = "";
+    if (!isAdmin) {
+      const { data: { user } } = await supabase.auth.getUser(authHeader);
+      if (!user) {
+        return new Response(JSON.stringify({ error: "Utilisateur non trouvé" }), { status: 401, headers: { "Content-Type": "application/json" } });
+      }
+      userId = user.id;
     }
 
     const body = await req.json();
@@ -54,7 +62,7 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: "image_url requis" }), { status: 400, headers: { "Content-Type": "application/json" } });
       }
       await supabase.from("ai_manga_references").insert({
-        user_id: user.id, style_id: style.id, image_url, source: "upload",
+        user_id: userId, style_id: style.id, image_url, source: "upload",
       });
       const { count } = await supabase.from("ai_manga_references").select("*", { count: "exact", head: true }).eq("style_id", style.id);
       await supabase.from("ai_manga_styles").update({
