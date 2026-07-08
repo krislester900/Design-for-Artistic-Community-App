@@ -3,18 +3,26 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class CloudinaryService {
   static final CloudinaryService _instance = CloudinaryService._();
   factory CloudinaryService() => _instance;
   CloudinaryService._();
 
-  late final String _cloudName;
-  late final String _uploadPreset;
+  String? _cloudName;
+  String? _uploadPreset;
 
   Future<void> initialize() async {
-    _cloudName = const String.fromEnvironment('CLOUDINARY_CLOUD_NAME', defaultValue: 'leyyabsn');
-    _uploadPreset = const String.fromEnvironment('CLOUDINARY_UPLOAD_PRESET', defaultValue: 'Kris_ndri');
+    try {
+      await dotenv.load(fileName: ".env");
+      _cloudName = dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? 'leyyabsn';
+      _uploadPreset = dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? 'Kris_ndri';
+    } catch (e) {
+      debugPrint('⚠️ Error loading .env: $e');
+      _cloudName = 'leyyabsn';
+      _uploadPreset = 'Kris_ndri';
+    }
 
     if (kDebugMode) {
       debugPrint('☁️ Cloudinary initialized: cloud=$_cloudName, preset=$_uploadPreset');
@@ -23,7 +31,7 @@ class CloudinaryService {
 
   Future<String?> uploadImage(File imageFile, {String folder = 'artworks'}) async {
     try {
-      if (_cloudName.isEmpty || _uploadPreset.isEmpty) {
+      if (_cloudName == null || _uploadPreset == null) {
         throw Exception('Cloudinary configuration missing');
       }
 
@@ -55,7 +63,7 @@ class CloudinaryService {
 
   Future<bool> deleteImage(String imageUrl) async {
     try {
-      if (imageUrl.isEmpty) return false;
+      if (imageUrl.isEmpty || _cloudName == null || _uploadPreset == null) return false;
 
       final publicId = _extractPublicId(imageUrl);
       if (publicId.isEmpty) return false;

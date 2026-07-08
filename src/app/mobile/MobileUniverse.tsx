@@ -2,7 +2,7 @@
  * MobileUniverse — Page univers immersive et visuellement wow
  * Chaque univers a son propre design coloré avec animations vivantes
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChevronLeft, Heart, Share2, MessageCircle, Play, Pause, Music4, Palette, BookOpen, Film, Pen, Clapperboard, Star, TrendingUp, Users, Sparkles, Headphones, Eye, BookMarked, Camera, Wand2 } from "lucide-react";
 import { supabase, hasSupabaseEnv } from "../lib/supabase";
 
@@ -180,6 +180,36 @@ export function MobileUniverse({ slug, onBack }: UniverseProps) {
   const universe = UNIVERSES[slug] || UNIVERSES["music"];
   const [likedItems, setLikedItems] = useState<Set<number>>(new Set());
   const [activeFeature, setActiveFeature] = useState(0);
+  const [playingIndex, setPlayingIndex] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const previewUrls = [
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+  ];
+
+  const togglePlay = (index: number) => {
+    if (playingIndex === index) {
+      audioRef.current?.pause();
+      setPlayingIndex(null);
+      return;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    const audio = new Audio(previewUrls[index]);
+    audio.volume = 0.5;
+    audio.addEventListener("ended", () => setPlayingIndex(null));
+    audio.play().catch(() => {});
+    audioRef.current = audio;
+    setPlayingIndex(index);
+  };
+
+  useEffect(() => {
+    return () => { audioRef.current?.pause(); };
+  }, []);
 
   const toggleLike = (index: number) => {
     setLikedItems(prev => {
@@ -277,19 +307,20 @@ export function MobileUniverse({ slug, onBack }: UniverseProps) {
           </div>
           <div className="space-y-2">
             {universe.trending.map((item, i) => (
-              <div
+              <button
                 key={item.title}
-                className="flex items-center gap-3 p-3 rounded-2xl bg-card border border-border/30 active:scale-[0.98] transition-all duration-100 touch-manipulation"
+                onClick={() => togglePlay(i)}
+                className="flex items-center gap-3 p-3 rounded-2xl bg-card border border-border/30 active:scale-[0.98] transition-all duration-100 touch-manipulation w-full text-left"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/10 to-accent/5 text-lg">
-                  {item.emoji}
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/10 to-accent/5">
+                  {playingIndex === i ? <Pause className="h-4 w-4 text-foreground" /> : <Play className="h-4 w-4 text-foreground" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <h4 className="text-sm font-semibold text-foreground truncate">{item.title}</h4>
                   <p className="text-[11px] text-muted-foreground">{item.artist}</p>
                 </div>
                 <button
-                  onClick={() => toggleLike(i)}
+                  onClick={(e) => { e.stopPropagation(); toggleLike(i); }}
                   className={`flex items-center gap-1 px-3 py-1.5 rounded-full transition-all duration-200 active:scale-95 ${
                     likedItems.has(i)
                       ? "bg-red-500/15 text-red-500"
@@ -299,7 +330,7 @@ export function MobileUniverse({ slug, onBack }: UniverseProps) {
                   <Heart className={`h-3.5 w-3.5 ${likedItems.has(i) ? "fill-red-500" : ""}`} />
                   <span className="text-[11px] font-medium">{item.likes + (likedItems.has(i) ? 1 : 0)}</span>
                 </button>
-              </div>
+              </button>
             ))}
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { neon } from "@neondatabase/serverless";
+import { neon } from "npm:@neondatabase/serverless@1.0.0";
 
 const DATABASE_URL = Deno.env.get("NEON_DATABASE_URL");
 

@@ -43,9 +43,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
     super.dispose();
   }
 
-  void _addMessage(String text, {required bool isUser}) {
+  void _addMessage(String text, {required bool isUser, String? imageUrl}) {
     setState(() {
-      _messages.add(_ChatBubble(text: text, isUser: isUser));
+      _messages.add(_ChatBubble(text: text, isUser: isUser, imageUrl: imageUrl));
     });
     _scrollToBottom();
   }
@@ -76,13 +76,13 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
           .map((m) => {'role': m.isUser ? 'user' : 'assistant', 'content': m.text})
           .toList();
       
-      final reply = await _assistant.sendMessage(
+      final result = await _assistant.sendMessageWithImage(
         message: text,
         contentType: _selectedCategory,
         history: history,
       );
 
-      _addMessage(reply, isUser: false);
+      _addMessage(result['text'] as String, isUser: false, imageUrl: result['image_url'] as String?);
     } catch (e) {
       _addMessage('Désolé, une erreur est survenue. Réessaie ! 🙏', isUser: false);
     } finally {
@@ -360,9 +360,31 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                       : Colors.grey.withOpacity(0.15),
                 ),
               ),
-              child: Text(
-                bubble.text,
-                style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (bubble.imageUrl != null) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        bubble.imageUrl!,
+                        width: 240,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        loadingBuilder: (_, child, progress) {
+                          if (progress == null) return child;
+                          return Container(width: 240, height: 180, color: Colors.grey[900], child: const Center(child: CircularProgressIndicator(strokeWidth: 2)));
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  Text(
+                    bubble.text,
+                    style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
+                  ),
+                ],
               ),
             ),
           ),
@@ -437,6 +459,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
 class _ChatBubble {
   final String text;
   final bool isUser;
+  final String? imageUrl;
 
-  _ChatBubble({required this.text, required this.isUser});
+  _ChatBubble({required this.text, required this.isUser, this.imageUrl});
 }

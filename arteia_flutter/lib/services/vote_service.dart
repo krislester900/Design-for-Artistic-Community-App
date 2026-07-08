@@ -164,7 +164,7 @@ class VoteService {
       // Compter les votes déjà émis
       final count = await _client
           .from('votes')
-          .select('id', count: CountOption.exact)
+          .select('id')
           .filter('competition_id', 'eq', competitionId)
           .filter('voter_id', 'eq', user.id);
 

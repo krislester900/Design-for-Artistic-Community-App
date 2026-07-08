@@ -57,34 +57,35 @@ class AppState extends ChangeNotifier {
 
   // Listen for real-time updates
   void startListening() {
-    // Subscribe to notifications count changes
-    _supabase.client
-        .channel('app_state')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'notifications',
-          callback: (payload) {
-            final newNotification = payload.newRecord;
-            if (newNotification['user_id'] == currentUserId) {
-              _unreadNotifications++;
-              notifyListeners();
-            }
-          },
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'messages',
-          callback: (payload) {
-            final newMessage = payload.newRecord;
-            if (newMessage['receiver_id'] == currentUserId) {
-              _unreadMessages++;
-              notifyListeners();
-            }
-          },
-        )
-        .subscribe();
+    try {
+      _supabase.client
+          .channel('app_state')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'notifications',
+            callback: (payload) {
+              final newNotification = payload.newRecord;
+              if (newNotification['user_id'] == currentUserId) {
+                _unreadNotifications++;
+                notifyListeners();
+              }
+            },
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'messages',
+            callback: (payload) {
+              final newMessage = payload.newRecord;
+              if (newMessage['receiver_id'] == currentUserId) {
+                _unreadMessages++;
+                notifyListeners();
+              }
+            },
+          )
+          .subscribe();
+    } catch (_) {}
   }
 
   // Reset counts
@@ -101,11 +102,10 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     try {
-      final channel = _supabase.client.channel('app_state');
-      _supabase.client.removeChannel(channel);
-    } catch (e) {
-      // Channel might already be removed
-    }
+      final client = Supabase.instance.client;
+      final channel = client.channel('app_state');
+      client.removeChannel(channel);
+    } catch (_) {}
     super.dispose();
   }
 }

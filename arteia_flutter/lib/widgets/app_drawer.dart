@@ -5,7 +5,6 @@ import '../pages/settings_page.dart';
 import '../pages/notifications_page_enhanced.dart';
 import '../pages/favorites_page.dart';
 import '../pages/quests_page.dart';
-import '../pages/theme_customizer_page.dart';
 import '../pages/music_page.dart';
 import '../pages/universe_page.dart';
 import '../pages/artwork_upload_page.dart';
@@ -14,6 +13,8 @@ import '../pages/writing_page.dart';
 import '../pages/comics_upload_page.dart';
 import '../pages/auth_page.dart';
 import '../pages/ai_assistant_page.dart';
+import '../pages/manga_generator_page.dart';
+import '../pages/manga_training_page.dart';
 import 'arteia_logo.dart';
 
 class AppDrawer extends StatelessWidget {
@@ -93,6 +94,14 @@ class AppDrawer extends StatelessWidget {
         _drawerItem(Icons.auto_awesome, 'Arteïa Muse ✨', () {
           onClose();
           Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage()));
+        }),
+        _drawerItem(Icons.brush, 'Générateur Manga 🎨', () {
+          onClose();
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const MangaGeneratorPage()));
+        }),
+        _drawerItem(Icons.model_training, 'Entraînement Manga', () {
+          onClose();
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const MangaTrainingPage()));
         }),
         const Divider(),
         _drawerItem(Icons.notifications_outlined, 'Notifications', () {

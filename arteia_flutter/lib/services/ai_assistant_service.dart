@@ -60,6 +60,51 @@ class AiAssistantService {
     }
   }
 
+  /// Envoie un message et retourne texte + éventuelle image
+  Future<Map<String, dynamic>> sendMessageWithImage({
+    required String message,
+    String contentType = 'general',
+    List<Map<String, String>>? history,
+  }) async {
+    try {
+      final session = _supabase.client.auth.currentSession;
+      if (session == null) {
+        return {'text': _getLocalResponse(message), 'image_url': null};
+      }
+
+      final messages = <Map<String, String>>[];
+      if (history != null) {
+        for (final msg in history) {
+          messages.add({'role': msg['role'] ?? 'user', 'content': msg['content'] ?? ''});
+        }
+      }
+      messages.add({'role': 'user', 'content': message});
+
+      final response = await http.post(
+        Uri.parse(_functionUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${session.accessToken}',
+        },
+        body: jsonEncode({
+          'messages': messages,
+          'context': {'contentType': contentType, 'userId': _supabase.currentUser?.id},
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return {
+          'text': data['reply'] as String? ?? _getLocalResponse(message),
+          'image_url': data['image_url'] as String?,
+        };
+      }
+      return {'text': _getLocalResponse(message), 'image_url': null};
+    } catch (e) {
+      return {'text': _getLocalResponse(message), 'image_url': null};
+    }
+  }
+
   /// Réponses locales sans besoin de backend
   String _getLocalResponse(String message) {
     final lowerMsg = message.toLowerCase();

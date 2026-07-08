@@ -104,6 +104,20 @@ class ImageUploadService {
     }
   }
 
+  Future<Map<String, dynamic>> uploadArtworkImage(File imageFile) async {
+    final userId = Supabase.instance.client.auth.currentUser?.id ?? 'anonymous';
+    final storagePath = await uploadImage(
+      userId: userId,
+      imageFile: imageFile,
+      folder: 'artworks',
+    );
+    if (storagePath == null) {
+      throw ImageUploadException('Upload failed');
+    }
+    final imageUrl = getPublicUrl(storagePath);
+    return {'image_url': imageUrl};
+  }
+
   Future<void> deleteImage(String storagePath) async {
     try {
       if (storagePath.isEmpty) {

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState, lazy, Suspense } from "react";
 import {
   signIn,
   signUp,
@@ -13,6 +13,7 @@ import { categories, categoryLabels, type CategorySlug } from "../data/community
 import { getStaticPagePath, type StaticPageId } from "../lib/page-links";
 import ProfilePage from "./ProfilePage";
 import { ProfileBird } from "./ProfileBird";
+import { MusicPage } from "./MusicPage";
 
 interface MultiPageAppProps {
   page: StaticPageId;
@@ -183,6 +184,10 @@ export default function MultiPageApp({ page }: MultiPageAppProps) {
           <p>Forum, discussions créatives, événements et tendances de la communauté Arteïa.</p>
         </div>
       );
+    }
+
+    if (page === "music") {
+      return <MusicPage />;
     }
 
     if (categorySlug) {

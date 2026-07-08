@@ -45,18 +45,15 @@ class CollaborationService {
   /// Obtenir les projets ouverts
   Future<List<Map<String, dynamic>>> getOpenProjects({String? category}) async {
     try {
-      var query = _client
+      var filter = _client
           .from('collaboration_projects')
-          .select('*, creator:profiles!creator_id(id, username, avatar_url, level)')
-          .eq('is_open', true)
-          .order('created_at', ascending: false)
-          .limit(50);
+          .select('*, creator:profiles!creator_id(id, username, avatar_url, level)');
 
       if (category != null) {
-        query = query.eq('category', category);
+        filter = filter.eq('category', category);
       }
-
-      final response = await query;
+      filter = filter.eq('is_open', true);
+      final response = await filter.order('created_at', ascending: false).limit(50);
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
       print('🔴 getOpenProjects error: $e');

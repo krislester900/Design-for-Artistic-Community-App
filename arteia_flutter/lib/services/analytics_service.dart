@@ -64,15 +64,12 @@ class AnalyticsService {
   Future<void> _flushEvents() async {
     if (_eventBuffer.isEmpty) return;
 
-    final eventsToSend = List.from(_eventBuffer);
+    final eventsToSend = List<Map<String, dynamic>>.from(_eventBuffer);
     _eventBuffer.clear();
 
     try {
       await _client.from('analytics_events').insert(eventsToSend);
-      print('✅ Analytics events sent: ${eventsToSend.length}');
-    } catch (e) {
-      print('🔴 Error sending analytics: $e');
-      // Re-add events to buffer on failure
+    } catch (_) {
       _eventBuffer.addAll(eventsToSend);
     }
   }

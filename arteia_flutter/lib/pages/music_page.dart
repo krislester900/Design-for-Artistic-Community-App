@@ -5,6 +5,8 @@ import '../theme/category_themes.dart';
 import '../widgets/rive_loading.dart';
 import '../widgets/spotify_playlist.dart';
 import 'music_player_page.dart';
+import 'music_studio_page.dart';
+import 'search_page.dart';
 
 class MusicPage extends StatefulWidget {
   const MusicPage({super.key});
@@ -164,7 +166,10 @@ class _MusicPageState extends State<MusicPage>
           ),
           Row(
             children: [
-              _roundIcon(Icons.search_rounded),
+              GestureDetector(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchPage())),
+                child: _roundIcon(Icons.search_rounded),
+              ),
               const SizedBox(width: 12),
               _roundIcon(Icons.history_rounded),
             ],

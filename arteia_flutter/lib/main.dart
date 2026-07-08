@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'utils/app_constants.dart';
 import 'services/supabase_service.dart';
 import 'services/theme_service.dart';
@@ -28,11 +29,18 @@ import 'pages/quests_page.dart';
 import 'widgets/page_transition.dart';
 import 'widgets/arteia_logo.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Hive for local cache (skip on web)
-  if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+  // Load environment variables
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint('⚠️ Error loading .env: $e');
+  }
+  
+  // Initialize Hive for local cache (not supported on web)
+  if (!kIsWeb) {
     try {
       await Hive.initFlutter();
       await Hive.openBox('arteia_cache');
@@ -41,10 +49,15 @@ void main() async {
     }
   }
   
-  await Supabase.initialize(
-    url: SupabaseConfig.supabaseUrl,
-    publishableKey: SupabaseConfig.supabaseAnonKey,
-  );
+  try {
+    await Supabase.initialize(
+      url: SupabaseConfig.supabaseUrl,
+      publishableKey: SupabaseConfig.supabaseAnonKey,
+    );
+  } catch (e) {
+    debugPrint('⚠️ Supabase initialization failed (app will work offline): $e');
+  }
+
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
@@ -91,30 +104,17 @@ class _LoadingScreenWrapperState extends State<LoadingScreenWrapper> {
   }
   
   void _startRealtimeNotifications() {
-    final appState = AppState();
-    appState.startListening();
+    try {
+      final appState = AppState();
+      appState.startListening();
+    } catch (_) {}
   }
 
   Future<void> _checkInitialization() async {
-    // Wait minimum duration for smooth UX
     await Future.delayed(AppConstants.loadingScreenMinDuration);
-    
+
     if (!mounted) return;
-    
-    // Check if Supabase is ready
-    try {
-      final session = Supabase.instance.client.auth.currentSession;
-      if (session != null || !_isLoading) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
-      }
-    } catch (e) {
-      // If error, still proceed after delay
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+    setState(() => _isLoading = false);
   }
 
   @override

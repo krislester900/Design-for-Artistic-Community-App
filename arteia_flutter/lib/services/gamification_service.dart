@@ -246,7 +246,7 @@ class GamificationService {
 
       final count = await _client
           .from('profiles')
-          .select('id', count: CountOption.exact)
+          .select('id')
           .gt('xp', xp);
 
       return (count as List).length + 1;

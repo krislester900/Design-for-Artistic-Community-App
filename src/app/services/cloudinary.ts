@@ -27,6 +27,30 @@ export async function uploadImage(file: File): Promise<string> {
   return data.secure_url.replace("/upload/", "/upload/q_auto,f_auto/");
 }
 
+export async function uploadAudio(file: File): Promise<string> {
+  if (!hasCloudinaryEnv) {
+    throw new Error("Cloudinary non configuré — ajoute VITE_CLOUDINARY_CLOUD_NAME et VITE_CLOUDINARY_UPLOAD_PRESET dans .env");
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", UPLOAD_PRESET);
+  formData.append("resource_type", "video");
+
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`,
+    { method: "POST", body: formData }
+  );
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
+    throw new Error(err.error?.message || "Échec upload audio Cloudinary");
+  }
+
+  const data = await res.json();
+  return data.secure_url;
+}
+
 export function getOptimizedUrl(url: string): string {
   if (!url?.includes("cloudinary.com")) return url;
   return url.replace("/upload/", "/upload/q_auto,f_auto/");

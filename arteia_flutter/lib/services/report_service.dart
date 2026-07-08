@@ -75,17 +75,15 @@ class ReportService {
   /// Obtenir les signalements de l'utilisateur (admin)
   Future<List<Map<String, dynamic>>> getReports({String? status}) async {
     try {
-      var query = _client
+      var filter = _client
           .from('reports')
-          .select('*, reporter:profiles!reporter_id(id, username), reason:report_reasons(code, label_fr)')
-          .order('created_at', ascending: false)
-          .limit(50);
+          .select('*, reporter:profiles!reporter_id(id, username), reason:report_reasons(code, label_fr)');
 
       if (status != null) {
-        query = query.filter('status', 'eq', status);
+        filter = filter.filter('status', 'eq', status);
       }
 
-      final response = await query;
+      final response = await filter.order('created_at', ascending: false).limit(50);
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {
       print('🔴 getReports error: $e');
