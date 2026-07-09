@@ -265,32 +265,109 @@ function pngEncode(w: number, h: number, rgba: Uint8Array): Uint8Array {
   return out;
 }
 
-// ---------- Pose helpers ----------
-function mirrorPose(kps: Poseless): Poseless {
-  return kps.map(([x, y]) => [POSE_W - 1 - x, y]) as Poseless;
-}
+// ---------- Foreshortening segmentaire (2D qui simule la 3D) ----------
+const LIMB_SEGMENTS: Record<string, { root: number; joints: number[] }> = {
+  "left-arm":  { root: 2,  joints: [3, 4] },
+  "right-arm": { root: 5,  joints: [6, 7] },
+  "left-leg":  { root: 8,  joints: [9, 10] },
+  "right-leg": { root: 11, joints: [12, 13] },
+  "head":      { root: 1,  joints: [0, 14, 15, 16, 17] },
+};
 
-function adjustForPerspective(kps: Poseless, angle: string): Poseless {
+type ForeshortenRule = { limb: string; scales: number[]; char?: number };
+
+const FORESHORTEN_MAP: Record<string, ForeshortenRule[]> = {
+  "action-punch":       [{ limb: "right-arm", scales: [1.3, 2.2] }],
+  "action-high-punch":  [{ limb: "right-arm", scales: [1.4, 2.5] }],
+  "action-kick":        [{ limb: "right-leg", scales: [1.3, 2.2] }],
+  "action-spin-kick":   [{ limb: "right-leg", scales: [1.4, 2.5] }],
+  "action-air-kick":    [{ limb: "right-leg", scales: [1.3, 2.0] }],
+  "action-slash":       [{ limb: "right-arm", scales: [1.2, 2.5] }],
+  "action-grab-thrust": [{ limb: "right-arm", scales: [1.2, 1.8] }],
+  "action-leap":        [{ limb: "left-leg", scales: [1.2, 1.5] }, { limb: "right-leg", scales: [1.2, 1.5] }],
+  "action-jump":        [{ limb: "left-leg", scales: [1.1, 1.3] }, { limb: "right-leg", scales: [1.1, 1.3] }],
+  "action-ground-punch":[{ limb: "left-arm", scales: [1.2, 1.8] }],
+  "action-swing":       [{ limb: "right-arm", scales: [1.1, 1.8] }],
+  "action-defend":      [{ limb: "left-arm", scales: [1.1, 1.2] }, { limb: "right-arm", scales: [1.1, 1.2] }],
+  "action-duel":        [{ limb: "right-arm", scales: [1.1, 1.4] }],
+  "action-point":       [{ limb: "right-arm", scales: [1.1, 1.5] }],
+  "action-power-up":    [{ limb: "left-arm", scales: [1.1, 1.3] }, { limb: "right-arm", scales: [1.1, 1.3] }],
+  "emotion-triumph":    [{ limb: "right-arm", scales: [1.1, 1.5] }],
+  "emotion-taunt":      [{ limb: "right-arm", scales: [1.2, 1.8] }],
+  "interact-punch-block": [
+    { limb: "right-arm", scales: [1.3, 2.2], char: 0 },
+    { limb: "left-arm",  scales: [1.2, 1.8], char: 1 },
+  ],
+  "interact-clash": [
+    { limb: "right-arm", scales: [1.3, 2.0], char: 0 },
+    { limb: "left-arm",  scales: [1.3, 2.0], char: 1 },
+  ],
+  "interact-grab": [
+    { limb: "right-arm", scales: [1.2, 1.8], char: 0 },
+    { limb: "left-arm",  scales: [1.1, 1.3], char: 1 },
+  ],
+  "interact-throw": [
+    { limb: "right-arm", scales: [1.2, 1.8], char: 0 },
+    { limb: "left-arm",  scales: [1.2, 1.5], char: 1 },
+  ],
+  "interact-air-kick": [
+    { limb: "right-leg", scales: [1.3, 2.0], char: 0 },
+    { limb: "left-arm",  scales: [1.2, 1.5], char: 1 },
+  ],
+};
+
+function applyForeshortening(kps: Poseless, poseKey: string, angle: string): Poseless {
+  const out = kps.map(kp => [kp[0], kp[1]]) as [number, number][];
+  const isInteraction = kps.length > 18;
+
+  for (const [prefix, rules] of Object.entries(FORESHORTEN_MAP)) {
+    if (!poseKey.startsWith(prefix)) continue;
+    for (const { limb, scales, char } of rules) {
+      const seg = LIMB_SEGMENTS[limb];
+      if (!seg) continue;
+      const offset = (isInteraction && char === 1) ? 18 : 0;
+      const root = out[seg.root + offset];
+      for (let si = 0; si < seg.joints.length && si < scales.length; si++) {
+        const ji = seg.joints[si] + offset;
+        const dx = out[ji][0] - root[0];
+        const dy = out[ji][1] - root[1];
+        out[ji][0] = Math.round(root[0] + dx * scales[si]);
+        out[ji][1] = Math.round(root[1] + dy * scales[si]);
+      }
+    }
+    break;
+  }
+
+  // Clamp to canvas
+  const clamped = out.map(([x, y]) => [
+    Math.max(0, Math.min(POSE_W - 1, x)),
+    Math.max(0, Math.min(POSE_H - 1, y)),
+  ]) as Poseless;
+
+  // Apply camera angle adjustment
   const cx = POSE_W / 2, cy = POSE_H / 2;
   let sx = 1, sy = 1, dx = 0, dy = 0;
   switch (angle) {
-    case "low-angle": sx = 0.85; sy = 0.85; dy = -30; break;
-    case "high-angle": sx = 0.9; sy = 0.75; dy = 20; break;
-    case "bird": sx = 0.7; sy = 0.6; dy = -40; break;
-    case "worm": sx = 1.15; sy = 0.8; dy = -50; break;
+    case "low-angle":  sx = 0.85; sy = 0.85; dy = -30; break;
+    case "high-angle": sx = 0.9;  sy = 0.75; dy = 20;  break;
+    case "bird":       sx = 0.7;  sy = 0.6;  dy = -40; break;
+    case "worm":       sx = 1.15; sy = 0.8;  dy = -50; break;
   }
-  return kps.map(([x, y]) => {
+  return clamped.map(([x, y]) => {
     const nx = Math.round(cx + (x - cx) * sx + dx);
     const ny = Math.round(cy + (y - cy) * sy + dy);
     return [Math.max(0, Math.min(POSE_W - 1, nx)), Math.max(0, Math.min(POSE_H - 1, ny))];
   }) as Poseless;
 }
 
+function mirrorPose(kps: Poseless): Poseless {
+  return kps.map(([x, y]) => [POSE_W - 1 - x, y]) as Poseless;
+}
+
 function renderSkeleton(kps: Poseless): Uint8Array {
   const stride = 4;
   const pixels = new Uint8Array(POSE_H * POSE_W * stride);
   const isInteraction = kps.length > 18;
-  const charCount = isInteraction ? 2 : 1;
 
   function setPx(x: number, y: number, r: number, g: number, b: number) {
     if (x < 0 || x >= POSE_W || y < 0 || y >= POSE_H) return;
@@ -311,6 +388,18 @@ function renderSkeleton(kps: Poseless): Uint8Array {
     }
   }
 
+  function weightedLine(x1: number, y1: number, x2: number, y2: number, r: number, g: number, b: number, weight: number) {
+    if (weight <= 1) { line(x1, y1, x2, y2, r, g, b); return; }
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.sqrt(dx*dx + dy*dy) || 1;
+    const px = -dy / len, py = dx / len;
+    const half = Math.floor(weight / 2);
+    for (let w = -half; w <= half; w++) {
+      const ox = Math.round(px * w), oy = Math.round(py * w);
+      line(x1 + ox, y1 + oy, x2 + ox, y2 + oy, r, g, b);
+    }
+  }
+
   function circle(cx: number, cy: number, r: number, cr: number, cg: number, cb: number) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
@@ -320,19 +409,38 @@ function renderSkeleton(kps: Poseless): Uint8Array {
   }
 
   function drawSingleChar(start: number, colR: number, colG: number, colB: number) {
-    // Draw connections
-    for (const [i, j] of SKELETON_CONNECTIONS) {
-      line(kps[start+i][0], kps[start+i][1], kps[start+j][0], kps[start+j][1], colR, colG, colB);
+    // Compute segment lengths for variable line weight (longer = closer = thicker)
+    const lengths = SKELETON_CONNECTIONS.map(([i, j]) => {
+      const dx = kps[start+j][0] - kps[start+i][0], dy = kps[start+j][1] - kps[start+i][1];
+      return Math.sqrt(dx*dx + dy*dy);
+    });
+    const minLen = Math.min(...lengths, 1);
+    const maxLen = Math.max(...lengths, minLen + 1);
+
+    // Draw connections with variable weight (1–3)
+    for (let ci = 0; ci < SKELETON_CONNECTIONS.length; ci++) {
+      const [i, j] = SKELETON_CONNECTIONS[ci];
+      const weight = 1 + 2 * (lengths[ci] - minLen) / (maxLen - minLen);
+      weightedLine(kps[start+i][0], kps[start+i][1], kps[start+j][0], kps[start+j][1],
+        colR, colG, colB, Math.round(weight));
     }
-    // Draw joints
+
+    // Torso center for depth heuristic
+    const torsoX = (kps[start+2][0] + kps[start+5][0] + kps[start+8][0] + kps[start+11][0]) / 4;
+    const torsoY = (kps[start+2][1] + kps[start+5][1] + kps[start+8][1] + kps[start+11][1]) / 4;
+
+    // Draw joints with variable size (farther from torso = closer to camera = larger)
     for (let i = start; i < start + 18; i++) {
-      circle(kps[i][0], kps[i][1], 4, colR, colG, colB);
+      const dist = Math.sqrt((kps[i][0] - torsoX) ** 2 + (kps[i][1] - torsoY) ** 2);
+      const jointR = Math.max(2, Math.min(7, Math.round(2 + dist / 40)));
+      circle(kps[i][0], kps[i][1], jointR, colR, colG, colB);
     }
+
     // Draw head
     circle(kps[start+0][0], kps[start+0][1], 12, colR, colG, colB);
   }
 
-  // Always draw character A in white
+  // Draw character A in white
   drawSingleChar(0, 255, 255, 255);
 
   // Draw character B in light blue if interaction
@@ -651,10 +759,8 @@ async function processNextPendingPanel(supabase: any, planche: any) {
 async function generatePoseForPanel(supabase: any, panel: any, plancheId: string): Promise<string | null> {
   const poseKey = panel.metadata?.pose_description || "neutral-stand";
   let kps: Poseless = (POSES[poseKey] || POSES["neutral-stand"]);
-  // Apply perspective adjustment for single-character poses
-  if (kps.length === 18 && panel.metadata?.camera_angle) {
-    kps = adjustForPerspective(kps, panel.metadata.camera_angle);
-  }
+  // Apply foreshortening (segment-based perspective) + camera angle
+  kps = applyForeshortening(kps, poseKey, panel.metadata?.camera_angle || "eye-level");
   // Mirror odd panels for variety
   if (panel.panel_index % 2 === 1 && kps.length === 18) {
     kps = mirrorPose(kps);
@@ -1188,9 +1294,12 @@ async function compositePlanchePage(
     const cellH = Math.round(l.h * scaleY);
     const burstCx = cellX + cellW / 2;
     const burstCy = cellY + cellH / 2;
-    // Add speed lines for striking poses
+    // Add flow lines for striking poses (direction radiale depuis le centre de la page)
     if (poseKey.includes("punch") || poseKey.includes("kick") || poseKey.includes("slash") || poseKey.includes("clash")) {
-      applySpeedLines(processed, COMPOSITE_W, COMPOSITE_H, burstCx, burstCy, 0.35);
+      const pageCx = COMPOSITE_W / 2, pageCy = COMPOSITE_H / 2;
+      const flowEndX = burstCx + (burstCx - pageCx) * 0.6;
+      const flowEndY = burstCy + (burstCy - pageCy) * 0.5;
+      drawFlowLines(processed, COMPOSITE_W, COMPOSITE_H, burstCx, burstCy, flowEndX, flowEndY, 0.35);
     }
     // Add impact burst for clash / heavy hit
     if (poseKey.includes("clash") || poseKey.includes("impact") || poseKey.includes("throw")) {
@@ -1656,31 +1765,70 @@ function applyScreentone(rgba: Uint8Array, w: number, h: number, density: number
   return out;
 }
 
-// ---------- Dynamic effects ----------
-function applySpeedLines(rgba: Uint8Array, w: number, h: number, cx: number, cy: number, intensity: number = 0.3): void {
-  // Draw speed lines radiating from a point (like a manga impact)
-  for (let y = 0; y < h; y += 2) {
-    for (let x = 0; x < w; x += 2) {
-      const dx = x - cx, dy = y - cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 10 || dist > 600) continue;
-      const angle = Math.atan2(dy, dx);
-      // Create parallel lines aligned with the radial direction
-      const perp = dx * Math.cos(angle + Math.PI / 2) + dy * Math.sin(angle + Math.PI / 2);
-      if (Math.abs(perp) > 3) continue;
-      const i = (y * w + x) * 4;
-      const alpha = Math.min(255, Math.round(180 * intensity * (1 - dist / 600)));
-      if (alpha < 20) continue;
-      // Darken pixels along the motion line
-      rgba[i] = Math.max(0, rgba[i] - alpha);
-      rgba[i+1] = Math.max(0, rgba[i+1] - alpha);
-      rgba[i+2] = Math.max(0, rgba[i+2] - alpha);
+// ---------- Lignes de flux vectorielles + impact ----------
+function drawThickLine(rgba: Uint8Array, w: number, h: number,
+  x1: number, y1: number, x2: number, y2: number,
+  r: number, g: number, b: number, alpha: number, thickness: number = 1): void {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.sqrt(dx*dx + dy*dy) || 1;
+  const px = -dy / len, py = dx / len;
+  const half = Math.floor(thickness / 2);
+  for (let t = -half; t <= half; t++) {
+    const ox = Math.round(px * t), oy = Math.round(py * t);
+    let cx = x1 + ox, cy = y1 + oy;
+    const ex = x2 + ox, ey = y2 + oy;
+    const ddx = Math.abs(ex - cx), ddy = Math.abs(ey - cy);
+    const sx = cx < ex ? 1 : -1, sy = cy < ey ? 1 : -1;
+    let err = ddx - ddy;
+    while (true) {
+      if (cx >= 0 && cx < w && cy >= 0 && cy < h) {
+        const i = (cy * w + cx) * 4;
+        const blend = alpha / 255;
+        rgba[i] = Math.round(rgba[i] * (1 - blend) + r * blend);
+        rgba[i+1] = Math.round(rgba[i+1] * (1 - blend) + g * blend);
+        rgba[i+2] = Math.round(rgba[i+2] * (1 - blend) + b * blend);
+      }
+      if (cx === ex && cy === ey) break;
+      const e2 = err * 2;
+      if (e2 > -ddy) { err -= ddy; cx += sx; }
+      if (e2 < ddx) { err += ddx; cy += sy; }
+    }
+  }
+}
+
+function drawFlowLines(rgba: Uint8Array, w: number, h: number,
+  startX: number, startY: number, endX: number, endY: number,
+  intensity: number = 0.3): void {
+  const dirX = endX - startX, dirY = endY - startY;
+  const len = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
+  const nx = -dirY / len, ny = dirX / len;
+  const alpha = Math.round(180 * intensity);
+
+  // 3 courbes de Bézier parallèles
+  for (let lineN = -1; lineN <= 1; lineN++) {
+    const offset = lineN * 5;
+    const cpx = (startX + endX) / 2 + nx * offset + dirX * 0.3;
+    const cpy = (startY + endY) / 2 + ny * offset + dirY * 0.3;
+    const extX = endX + dirX * 0.5;
+    const extY = endY + dirY * 0.5;
+
+    const steps = Math.max(8, Math.round(len / 6));
+    let prevX = startX, prevY = startY;
+    const thickness = Math.max(3, Math.round(6 * (1 - Math.abs(lineN) * 0.3)));
+
+    for (let t = 1; t <= steps; t++) {
+      const u = t / steps;
+      const bx = (1-u)*(1-u)*startX + 2*(1-u)*u*cpx + u*u*extX;
+      const by = (1-u)*(1-u)*startY + 2*(1-u)*u*cpy + u*u*extY;
+      const segAlpha = Math.round(alpha * (1 - 0.5 * u));
+      drawThickLine(rgba, w, h, Math.round(prevX), Math.round(prevY),
+        Math.round(bx), Math.round(by), 0, 0, 0, segAlpha, thickness);
+      prevX = bx; prevY = by;
     }
   }
 }
 
 function drawImpactBurst(rgba: Uint8Array, w: number, h: number, cx: number, cy: number, radius: number = 80): void {
-  // Draw a starburst impact effect (concentric jagged star shapes)
   function setPx(x: number, y: number, r: number, g: number, b: number, a: number) {
     if (x < 0 || x >= w || y < 0 || y >= h) return;
     const i = (y * w + x) * 4;
@@ -1690,32 +1838,46 @@ function drawImpactBurst(rgba: Uint8Array, w: number, h: number, cx: number, cy:
     rgba[i+2] = Math.round(rgba[i+2] * (1 - blend) + b * blend);
   }
 
-  function line(x1: number, y1: number, x2: number, y2: number, colR: number, colG: number, colB: number, a: number) {
-    const dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
-    const sx = x1 < x2 ? 1 : -1, sy = y1 < y2 ? 1 : -1;
-    let err = dx - dy, x = x1, y = y1;
-    while (true) {
-      setPx(x, y, colR, colG, colB, a);
-      if (x === x2 && y === y2) break;
-      const e2 = err * 2;
-      if (e2 > -dy) { err -= dy; x += sx; }
-      if (e2 < dx) { err += dx; y += sy; }
-    }
+  function burstLine(x1: number, y1: number, x2: number, y2: number, colR: number, colG: number, colB: number, a: number, thick: number = 1) {
+    drawThickLine(rgba, w, h, x1, y1, x2, y2, colR, colG, colB, a, thick);
   }
 
-  // Draw 8 radiating spokes
+  // 8 spokes avec épaisseur variable (plus épais au centre)
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * Math.PI * 2;
-    const x2 = Math.round(cx + Math.cos(angle) * radius);
-    const y2 = Math.round(cy + Math.sin(angle) * radius);
-    const innerR = radius * 0.3;
+    const outerR = radius + (Math.random() - 0.5) * 20; // irrégularité
+    const x2 = Math.round(cx + Math.cos(angle) * outerR);
+    const y2 = Math.round(cy + Math.sin(angle) * outerR);
+    const innerR = radius * 0.25;
     const x1 = Math.round(cx + Math.cos(angle + 0.15) * innerR);
     const y1 = Math.round(cy + Math.sin(angle + 0.15) * innerR);
-    line(x1, y1, x2, y2, 0, 0, 0, 120);
+    burstLine(x1, y1, x2, y2, 0, 0, 0, 120, 3);
     // White highlight edge
     const x1h = Math.round(cx + Math.cos(angle - 0.15) * innerR);
     const y1h = Math.round(cy + Math.sin(angle - 0.15) * innerR);
-    line(x1h, y1h, Math.round(cx + Math.cos(angle) * radius * 0.7), Math.round(cy + Math.sin(angle) * radius * 0.7), 255, 255, 255, 80);
+    burstLine(x1h, y1h,
+      Math.round(cx + Math.cos(angle) * outerR * 0.6),
+      Math.round(cy + Math.sin(angle) * outerR * 0.6),
+      255, 255, 255, 80, 2);
+  }
+
+  // Smear frame : halo d'étirement autour de l'impact
+  for (let ring = 0; ring < 3; ring++) {
+    const r = radius * (0.4 + ring * 0.15);
+    const alphaRing = 30 - ring * 8;
+    const stretch = 1 + ring * 0.3;
+    for (let a = 0; a < 16; a++) {
+      const aRad = (a / 16) * Math.PI * 2;
+      const sx = Math.cos(aRad) * stretch, sy = Math.sin(aRad);
+      const px = Math.round(cx + sx * r);
+      const py = Math.round(cy + sy * r);
+      if (px >= 0 && px < w && py >= 0 && py < h) {
+        const i = (py * w + px) * 4;
+        rgba[i] = Math.max(0, rgba[i] - alphaRing);
+        rgba[i+1] = Math.max(0, rgba[i+1] - alphaRing);
+        rgba[i+2] = Math.max(0, rgba[i+2] - alphaRing);
+      }
+    }
   }
 }
 
