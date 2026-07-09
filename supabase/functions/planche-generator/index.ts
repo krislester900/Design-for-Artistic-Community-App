@@ -463,7 +463,7 @@ async function processNextPendingPanel(supabase: any, planche: any) {
     await supabase.from("ai_planche_panels").update({ status: "failed" }).eq("id", panel.id);
   }
 
-  // Step 4: check if all panels are done → update planche status
+  // Step 4: check if all panels are done → composite + update planche status
   const { data: remaining } = await supabase
     .from("ai_planche_panels")
     .select("id")
@@ -473,11 +473,33 @@ async function processNextPendingPanel(supabase: any, planche: any) {
   if (!remaining || remaining.length === 0) {
     const { data: allPanels } = await supabase
       .from("ai_planche_panels")
-      .select("status")
-      .eq("planche_id", planche.id);
+      .select("*")
+      .eq("planche_id", planche.id)
+      .order("panel_index");
 
     const allCompleted = allPanels?.every((p: any) => p.status === "completed") ?? false;
-    await supabase.from("ai_planches").update({ status: allCompleted ? "completed" : "failed" }).eq("id", planche.id);
+
+    if (allCompleted) {
+      const { data: layoutRow } = await supabase
+        .from("ai_planche_layouts")
+        .select("layout_data")
+        .eq("slug", planche.layout_slug)
+        .limit(1)
+        .single();
+      const layoutPanels = layoutRow?.layout_data?.panels as PanelLayout[] | undefined;
+      let compositeUrl: string | null = null;
+      if (layoutPanels && layoutPanels.length > 0) {
+        compositeUrl = await compositePlanchePage(supabase, planche.id, allPanels, layoutPanels, style);
+      }
+      const updateData: Record<string, any> = { status: "completed" };
+      if (compositeUrl) {
+        updateData.image_url = compositeUrl;
+        updateData.metadata = { ...(planche.metadata ?? {}), composite: { width: COMPOSITE_W, height: COMPOSITE_H } };
+      }
+      await supabase.from("ai_planches").update(updateData).eq("id", planche.id);
+    } else {
+      await supabase.from("ai_planches").update({ status: "failed" }).eq("id", planche.id);
+    }
   }
 }
 
@@ -805,6 +827,169 @@ async function generateSdxlImage(prompt: string, style: any, refImageUrl: string
   if (!res.ok) return null;
   const prediction = await res.json();
   return pollReplicate(prediction.id, "panel");
+}
+
+// ============================================================
+// PHASE 4: POST-PROCESSING — Compositing & Upscaling
+// ============================================================
+
+const COMPOSITE_W = 2400;
+const COMPOSITE_H = 3400;
+const BORDER_PX = 3;
+
+async function pngDecode(buf: ArrayBuffer): Promise<{width: number; height: number; rgba: Uint8Array}> {
+  const b = new Uint8Array(buf);
+  const sig = [137,80,78,71,13,10,26,10];
+  for (let i = 0; i < 8; i++) if (b[i] !== sig[i]) throw new Error("Not a PNG");
+  const r32 = (o: number) => (b[o]<<24)|(b[o+1]<<16)|(b[o+2]<<8)|b[o+3];
+  let pos = 8, width = 0, height = 0, colorType = 0;
+  let idat: Uint8Array | null = null;
+  while (pos < b.length) {
+    const len = r32(pos);
+    const type = String.fromCharCode(b[pos+4],b[pos+5],b[pos+6],b[pos+7]);
+    const data = b.slice(pos+8, pos+8+len);
+    if (type === "IHDR") { width = r32(pos+8); height = r32(pos+12); colorType = data[9]; }
+    else if (type === "IDAT") { idat = idat ? new Uint8Array([...idat, ...data]) : data.slice(); }
+    else if (type === "IEND") break;
+    pos += 12 + len;
+  }
+  if (!idat || !width || !height) throw new Error("Invalid PNG data");
+  const ds = new DecompressionStream("deflate");
+  const writer = ds.writable.getWriter();
+  await writer.write(idat);
+  await writer.close();
+  const reader = ds.readable.getReader();
+  const chunks: Uint8Array[] = [];
+  while (true) { const {done,value} = await reader.read(); if (done) break; chunks.push(value); }
+  const raw = new Uint8Array(chunks.reduce((s,c) => s + c.length, 0));
+  let off = 0; for (const c of chunks) { raw.set(c, off); off += c.length; }
+  const chMap = [1,0,3,1,2,0,4];
+  const ch = chMap[colorType];
+  if (!ch) throw new Error(`Unsupported color type ${colorType}`);
+  const stride = ch * width;
+  const rgba = new Uint8Array(width * height * 4);
+  const prev = new Uint8Array(stride);
+  const cur = new Uint8Array(stride);
+  for (let y = 0; y < height; y++) {
+    const ft = raw[y * (1 + stride)];
+    const base = y * (1 + stride) + 1;
+    for (let x = 0; x < stride; x++) cur[x] = raw[base + x];
+    for (let x = 0; x < stride; x++) {
+      let v = cur[x];
+      if (ft === 1) v = (v + (x >= ch ? cur[x-ch] : 0)) & 0xFF;
+      else if (ft === 2) v = (v + prev[x]) & 0xFF;
+      else if (ft === 3) v = (v + Math.floor(((x >= ch ? cur[x-ch] : 0) + prev[x]) / 2)) & 0xFF;
+      else if (ft === 4) {
+        const a = x >= ch ? cur[x-ch] : 0, b2 = prev[x], c = x >= ch ? prev[x-ch] : 0;
+        const p = a + b2 - c;
+        const pa = Math.abs(p-a), pb = Math.abs(p-b2), pc = Math.abs(p-c);
+        v = (v + (pa <= pb && pa <= pc ? a : pb <= pc ? b2 : c)) & 0xFF;
+      }
+      cur[x] = v;
+    }
+    for (let x = 0; x < width; x++) {
+      const d = (y * width + x) * 4, s = x * ch;
+      if (colorType === 2) { rgba[d]=cur[s];rgba[d+1]=cur[s+1];rgba[d+2]=cur[s+2];rgba[d+3]=255; }
+      else if (colorType === 6) { rgba[d]=cur[s];rgba[d+1]=cur[s+1];rgba[d+2]=cur[s+2];rgba[d+3]=cur[s+3]; }
+      else if (colorType === 0) { rgba[d]=cur[s];rgba[d+1]=cur[s];rgba[d+2]=cur[s];rgba[d+3]=255; }
+      else if (colorType === 4) { rgba[d]=cur[s];rgba[d+1]=cur[s];rgba[d+2]=cur[s];rgba[d+3]=cur[s+1]; }
+    }
+    prev.set(cur);
+  }
+  return { width, height, rgba };
+}
+
+function bilinearResize(src: Uint8Array, sw: number, sh: number, dw: number, dh: number): Uint8Array {
+  const dst = new Uint8Array(dw * dh * 4);
+  for (let dy = 0; dy < dh; dy++) {
+    for (let dx = 0; dx < dw; dx++) {
+      const sx = (dx + 0.5) * sw / dw - 0.5, sy = (dy + 0.5) * sh / dh - 0.5;
+      const x1 = Math.max(0, Math.floor(sx)), y1 = Math.max(0, Math.floor(sy));
+      const x2 = Math.min(sw - 1, x1 + 1), y2 = Math.min(sh - 1, y1 + 1);
+      const xf = sx - x1, yf = sy - y1;
+      for (let c = 0; c < 4; c++) {
+        const tl = src[(y1 * sw + x1) * 4 + c], tr = src[(y1 * sw + x2) * 4 + c];
+        const bl = src[(y2 * sw + x1) * 4 + c], br = src[(y2 * sw + x2) * 4 + c];
+        const t = tl + (tr - tl) * xf, b2 = bl + (br - bl) * xf;
+        dst[(dy * dw + dx) * 4 + c] = Math.round(t + (b2 - t) * yf);
+      }
+    }
+  }
+  return dst;
+}
+
+async function compositePlanchePage(
+  supabase: any, plancheId: string, panels: any[], layoutPanels: PanelLayout[], style: any
+): Promise<string | null> {
+  const scaleX = COMPOSITE_W / 100, scaleY = COMPOSITE_H / 100;
+  const page = new Uint8Array(COMPOSITE_W * COMPOSITE_H * 4);
+  for (let i = 0; i < page.length; i += 4) { page[i] = 255; page[i+1] = 255; page[i+2] = 255; page[i+3] = 255; }
+  for (let i = 0; i < panels.length; i++) {
+    const p = panels[i];
+    if (!p.image_url || p.status !== "completed") continue;
+    const l = layoutPanels[i];
+    if (!l) continue;
+    let imgBuf: ArrayBuffer;
+    try { imgBuf = await (await fetch(p.image_url)).arrayBuffer(); } catch { continue; }
+    let srcRgba: Uint8Array, srcW: number, srcH: number;
+    try { const dec = await pngDecode(imgBuf); srcRgba = dec.rgba; srcW = dec.width; srcH = dec.height; } catch { continue; }
+    const cellX = Math.round(l.x * scaleX);
+    const cellY = Math.round(l.y * scaleY);
+    const cellW = Math.round(l.w * scaleX);
+    const cellH = Math.round(l.h * scaleY);
+    if (cellW <= BORDER_PX*2 || cellH <= BORDER_PX*2) continue;
+    const drawW = cellW - BORDER_PX * 2;
+    const drawH = cellH - BORDER_PX * 2;
+    const scaled = bilinearResize(srcRgba, srcW, srcH, drawW, drawH);
+    for (let y = 0; y < drawH; y++) {
+      const rowOff = (cellY + BORDER_PX + y) * COMPOSITE_W + cellX + BORDER_PX;
+      for (let x = 0; x < drawW; x++) {
+        const si = (y * drawW + x) * 4;
+        const di = (rowOff + x) * 4;
+        if (scaled[si+3] > 0) { page[di]=scaled[si];page[di+1]=scaled[si+1];page[di+2]=scaled[si+2];page[di+3]=255; }
+      }
+    }
+    for (let by = 0; by < BORDER_PX; by++) {
+      for (let bx = cellX; bx < cellX + cellW; bx++) {
+        let di = ((cellY + by) * COMPOSITE_W + bx) * 4;
+        page[di]=0;page[di+1]=0;page[di+2]=0;page[di+3]=255;
+        di = ((cellY + cellH - 1 - by) * COMPOSITE_W + bx) * 4;
+        page[di]=0;page[di+1]=0;page[di+2]=0;page[di+3]=255;
+      }
+    }
+    for (let by = 0; by < BORDER_PX; by++) {
+      for (let bx = cellY; bx < cellY + cellH; bx++) {
+        let di = (bx * COMPOSITE_W + (cellX + by)) * 4;
+        page[di]=0;page[di+1]=0;page[di+2]=0;page[di+3]=255;
+        di = (bx * COMPOSITE_W + (cellX + cellW - 1 - by)) * 4;
+        page[di]=0;page[di+1]=0;page[di+2]=0;page[di+3]=255;
+      }
+    }
+  }
+  const png = pngEncode(COMPOSITE_W, COMPOSITE_H, page);
+  const fileName = `composites/${plancheId}.png`;
+  try {
+    const { data, error } = await supabase.storage.from("planche-assets").upload(fileName, png, { contentType: "image/png", upsert: true });
+    if (!error && data) {
+      const { data: { publicUrl } } = supabase.storage.from("planche-assets").getPublicUrl(fileName);
+      return publicUrl;
+    }
+  } catch {}
+  return null;
+}
+
+const UPSCALER = { owner: "nightmareai", name: "real-esrgan", version: "42a4a07ad14e8b0b2b3b0c2a3e5c5c0a8d0f1e2a3b4c5d6e7f8a9b0c1d2e3f" };
+
+async function upscaleImage(imageUrl: string): Promise<string | null> {
+  if (!REPLICATE_API_KEY) return null;
+  const res = await fetch(`https://api.replicate.com/v1/models/${UPSCALER.owner}/${UPSCALER.name}/predictions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${REPLICATE_API_KEY}` },
+    body: JSON.stringify({ version: UPSCALER.version, input: { image: imageUrl, scale: 2, face_enhance: false } }),
+  });
+  if (!res.ok) return null;
+  const pred = await res.json();
+  return pollReplicate(pred.id, "upscale");
 }
 
 function getDefaultLayout(): { panels: PanelLayout[]; slug: string } {

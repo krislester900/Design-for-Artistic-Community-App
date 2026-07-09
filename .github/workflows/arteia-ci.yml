@@ -182,6 +182,7 @@ jobs:
             "database/schema-add-missing-tables.sql"
             "database/schema-planches.sql",
             "database/migration-planche-panels-metadata.sql"
+            "database/migration-phase4-postprocessing.sql"
             "database/schema-knowledge-contrib.sql"
           )
           TOTAL=${#SCHEMAS[@]}
