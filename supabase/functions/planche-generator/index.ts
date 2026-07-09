@@ -480,6 +480,15 @@ async function processNextPendingPanel(supabase: any, planche: any) {
     const allCompleted = allPanels?.every((p: any) => p.status === "completed") ?? false;
 
     if (allCompleted) {
+      // Re-fetch metadata to avoid overwriting char_ref_map (Phase 3)
+      const { data: freshPlanche } = await supabase
+        .from("ai_planches")
+        .select("metadata")
+        .eq("id", planche.id)
+        .limit(1)
+        .single();
+      const currentMeta = freshPlanche?.metadata ?? planche.metadata ?? {};
+
       const { data: layoutRow } = await supabase
         .from("ai_planche_layouts")
         .select("layout_data")
@@ -494,7 +503,7 @@ async function processNextPendingPanel(supabase: any, planche: any) {
       const updateData: Record<string, any> = { status: "completed" };
       if (compositeUrl) {
         updateData.image_url = compositeUrl;
-        updateData.metadata = { ...(planche.metadata ?? {}), composite: { width: COMPOSITE_W, height: COMPOSITE_H } };
+        updateData.metadata = { ...currentMeta, composite: { width: COMPOSITE_W, height: COMPOSITE_H } };
       }
       await supabase.from("ai_planches").update(updateData).eq("id", planche.id);
     } else {
@@ -922,8 +931,7 @@ async function compositePlanchePage(
   supabase: any, plancheId: string, panels: any[], layoutPanels: PanelLayout[], style: any
 ): Promise<string | null> {
   const scaleX = COMPOSITE_W / 100, scaleY = COMPOSITE_H / 100;
-  const page = new Uint8Array(COMPOSITE_W * COMPOSITE_H * 4);
-  for (let i = 0; i < page.length; i += 4) { page[i] = 255; page[i+1] = 255; page[i+2] = 255; page[i+3] = 255; }
+  const page = new Uint8Array(COMPOSITE_W * COMPOSITE_H * 4).fill(255);
   for (let i = 0; i < panels.length; i++) {
     const p = panels[i];
     if (!p.image_url || p.status !== "completed") continue;
