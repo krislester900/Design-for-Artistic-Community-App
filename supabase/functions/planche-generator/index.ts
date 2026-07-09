@@ -297,7 +297,7 @@ async function handleCreate(req: Request): Promise<Response> {
       scene_prompt: scene,
       characters: charList,
       status: "generating",
-      metadata: { panel_count: panelCount, char_refs: [] },
+      metadata: { panel_count: panelCount, char_ref_map: {} },
     }).select().single();
 
     if (insertError || !planche) {
@@ -325,7 +325,7 @@ async function handleCreate(req: Request): Promise<Response> {
         narration: script.narration || "",
         prompt_sdxl: promptSdxl,
         status: "pending",
-        metadata: { pose_description: script.pose_description },
+        metadata: { pose_description: script.pose_description, camera_angle: script.camera_angle },
       });
     }
 
@@ -417,22 +417,22 @@ async function processNextPendingPanel(supabase: any, planche: any) {
   if (!style) return;
 
   const charList: Character[] = Array.isArray(planche.characters) ? planche.characters : [];
-  let charRefs: string[] = planche.metadata?.char_refs ?? [];
+  let charRefMap: Record<string, Record<string, string>> = planche.metadata?.char_ref_map ?? {};
 
-  // Step 1: generate character reference portraits if needed
-  if (charList.length > 0 && charRefs.length === 0) {
+  // Step 1: generate multi-view character reference portraits if needed
+  if (charList.length > 0 && Object.keys(charRefMap).length === 0) {
     for (const ch of charList) {
-      const refUrl = await generateCharacterRef(ch, style);
-      if (refUrl) charRefs.push(refUrl);
+      const refs = await generateCharacterRefs(ch, style);
+      if (refs) charRefMap[ch.name] = refs;
     }
-    if (charRefs.length > 0) {
+    if (Object.keys(charRefMap).length > 0) {
       await supabase.from("ai_planches").update({
-        metadata: { ...(planche.metadata ?? {}), char_refs: charRefs },
+        metadata: { ...(planche.metadata ?? {}), char_ref_map: charRefMap },
       }).eq("id", planche.id);
     }
   }
 
-  // Step 2: generate next pending panel (with or without img2img ref)
+  // Step 2: generate next pending panel
   const { data: pending } = await supabase
     .from("ai_planche_panels")
     .select("*")
@@ -443,6 +443,9 @@ async function processNextPendingPanel(supabase: any, planche: any) {
   if (!pending || pending.length === 0) return;
 
   const panel = pending[0];
+
+  // Step 3: select best character reference for this panel based on camera angle
+  const refImageUrl = selectBestRefForPanel(panel, charList, charRefMap);
   await supabase.from("ai_planche_panels").update({ status: "generating" }).eq("id", panel.id);
 
   const poseUrl = await generatePoseForPanel(supabase, panel, planche.id);
@@ -450,7 +453,7 @@ async function processNextPendingPanel(supabase: any, planche: any) {
   const imageUrl = await generateSdxlImage(
     panel.prompt_sdxl,
     style,
-    charRefs.length > 0 ? charRefs[0] : null,
+    refImageUrl,
     poseUrl,
   );
 
@@ -460,7 +463,7 @@ async function processNextPendingPanel(supabase: any, planche: any) {
     await supabase.from("ai_planche_panels").update({ status: "failed" }).eq("id", panel.id);
   }
 
-  // Step 3: check if all panels are done → update planche status
+  // Step 4: check if all panels are done → update planche status
   const { data: remaining } = await supabase
     .from("ai_planche_panels")
     .select("id")
@@ -505,39 +508,83 @@ async function generatePoseForPanel(supabase: any, panel: any, plancheId: string
   return `data:image/png;base64,${b64}`;
 }
 
-async function generateCharacterRef(ch: Character, style: any): Promise<string | null> {
+function selectBestRefForPanel(panel: any, charList: Character[], charRefMap: Record<string, Record<string, string>>): string | null {
+  if (Object.keys(charRefMap).length === 0) return null;
+
+  // Find which character is in this panel
+  const panelChars = (panel.scene_description || "").toLowerCase() + " " + (panel.metadata?.pose_description || "");
+  let targetChar = charList.find((c) => panelChars.includes(c.name.toLowerCase()));
+  if (!targetChar) targetChar = charList[0];
+  if (!targetChar || !charRefMap[targetChar.name]) return null;
+
+  const refs = charRefMap[targetChar.name];
+  const camAngle = panel.metadata?.camera_angle || "eye-level";
+
+  // Map camera angle to best reference view
+  const angleToView: Record<string, string> = {
+    "eye-level": "front",
+    "high-angle": "front",
+    "low-angle": "front",
+    "bird": "front",
+    "worm": "front",
+  };
+
+  // If panel has a profile-like pose, use profile ref
+  const profilePoses = ["action-punch", "action-point", "action-duel", "action-defend"];
+  if (profilePoses.some((p) => (panel.metadata?.pose_description || "").includes(p))) {
+    angleToView["eye-level"] = "three_quarter";
+  }
+
+  const bestView = angleToView[camAngle] || "front";
+  return refs[bestView] || refs["front"] || null;
+}
+
+async function generateCharacterRefs(ch: Character, style: any): Promise<Record<string, string> | null> {
   if (!REPLICATE_API_KEY) return null;
 
   const qualityTags = "masterpiece, best quality, absurdres, highres";
-  const prompt = `${qualityTags}, ${
-    style.prompt_template.replace("{prompt}", `close-up portrait of ${ch.name}, ${ch.appearance}`)
-  }, manga character portrait, clean lineart, neutral expression, bust up, front facing, highly detailed face, distinct facial features, recognizable character design`;
+  const basePrompt = `${qualityTags}, ${
+    style.prompt_template.replace("{prompt}", `portrait of ${ch.name}, ${ch.appearance}`)
+  }, manga character portrait, clean lineart, neutral expression, bust up, highly detailed face, distinct facial features, recognizable character design, consistent features`;
 
-  const input = {
-    prompt,
-    negative_prompt: style.negative_prompt || "lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, fewer digits, cropped, worst quality, low quality, low score, bad score, average score, signature, watermark, username, blurry, ugly, deformed, photorealistic, 3d",
-    width: 768,
-    height: 768,
-    num_inference_steps: 25,
-    guidance_scale: 6,
-    scheduler: "Euler a",
-    num_outputs: 1,
-  };
+  const views: [string, string][] = [
+    ["front", "front facing, symmetrical, looking at viewer"],
+    ["three_quarter", "three-quarter view, slightly turned, looking forward"],
+    ["profile", "profile view, side facing, looking to the side"],
+  ];
 
-  if (style.lora_url) {
-    input.lora_urls = [style.lora_url];
-    input.lora_scale = Number(style.lora_scale ?? 0.8);
+  const result: Record<string, string> = {};
+  for (const [viewName, viewDesc] of views) {
+    const prompt = `${basePrompt}, ${viewDesc}`;
+    const input: Record<string, any> = {
+      prompt,
+      negative_prompt: style.negative_prompt || "lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, fewer digits, cropped, worst quality, low quality, low score, bad score, average score, signature, watermark, username, blurry, ugly, deformed, photorealistic, 3d",
+      width: 768,
+      height: 768,
+      num_inference_steps: 25,
+      guidance_scale: 6,
+      scheduler: "Euler a",
+      num_outputs: 1,
+    };
+
+    if (style.lora_url) {
+      input.lora_urls = [style.lora_url];
+      input.lora_scale = Number(style.lora_scale ?? 0.8);
+    }
+
+    const res = await fetch(`https://api.replicate.com/v1/models/${SDXL.owner}/${SDXL.name}/predictions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${REPLICATE_API_KEY}` },
+      body: JSON.stringify({ version: SDXL.version, input }),
+    });
+
+    if (!res.ok) continue;
+    const prediction = await res.json();
+    const url = await pollReplicate(prediction.id, `${ch.name}-${viewName}`);
+    if (url) result[viewName] = url;
   }
 
-  const res = await fetch(`https://api.replicate.com/v1/models/${SDXL.owner}/${SDXL.name}/predictions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${REPLICATE_API_KEY}` },
-    body: JSON.stringify({ version: SDXL.version, input }),
-  });
-
-  if (!res.ok) return null;
-  const prediction = await res.json();
-  return pollReplicate(prediction.id, ch.name);
+  return Object.keys(result).length > 0 ? result : null;
 }
 
 async function pollReplicate(predictionId: string, label: string): Promise<string | null> {
@@ -653,11 +700,22 @@ function generateFallbackScripts(scene: string, panelCount: number): PanelScript
 function buildPanelPrompt(script: PanelScript, style: any, characters: Character[]): string {
   let prompt = style.prompt_template.replace("{prompt}", script.scene);
 
+  // Character consistency: inject detailed appearance + name identity
   if (script.characters) {
-    prompt += `, featuring ${script.characters}`;
+    prompt += `, featuring ${script.characters}, consistent character design`;
   } else if (characters.length > 0) {
-    const names = characters.map((c) => `${c.name}: ${c.appearance}`).join(", ");
+    const names = characters.map((c) => `${c.name}: ${c.appearance}, consistent ${c.name} design`).join(", ");
     prompt += `, featuring ${names}`;
+  }
+
+  // Add panel-specific character detail if a single character is named in scene
+  if (script.characters && characters.length > 0) {
+    for (const ch of characters) {
+      if (script.characters.toLowerCase().includes(ch.name.toLowerCase())) {
+        prompt += `, ${ch.name} portrayed with consistent facial features: ${ch.appearance}`;
+        break;
+      }
+    }
   }
 
   if (script.emotion && script.emotion !== "neutre") {
