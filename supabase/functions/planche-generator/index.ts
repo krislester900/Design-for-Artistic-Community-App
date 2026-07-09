@@ -484,17 +484,25 @@ async function generatePoseForPanel(supabase: any, panel: any, plancheId: string
   const png = renderSkeleton(kps);
   const fileName = `poses/${plancheId}/${panel.panel_index}.png`;
 
-  const { data, error } = await supabase.storage
-    .from("planche-assets")
-    .upload(fileName, png, { contentType: "image/png", upsert: true });
+  // Upload to Supabase Storage
+  try {
+    const { data, error } = await supabase.storage
+      .from("planche-assets")
+      .upload(fileName, png, { contentType: "image/png", upsert: true });
 
-  if (error || !data) return null;
+    if (!error && data) {
+      const { data: { publicUrl } } = supabase.storage
+        .from("planche-assets")
+        .getPublicUrl(fileName);
+      return publicUrl;
+    }
+  } catch {
+    // fallback to data URI
+  }
 
-  const { data: { publicUrl } } = supabase.storage
-    .from("planche-assets")
-    .getPublicUrl(fileName);
-
-  return publicUrl;
+  // Fallback: embed as base64 data URI
+  const b64 = btoa(String.fromCharCode(...png));
+  return `data:image/png;base64,${b64}`;
 }
 
 async function generateCharacterRef(ch: Character, style: any): Promise<string | null> {
