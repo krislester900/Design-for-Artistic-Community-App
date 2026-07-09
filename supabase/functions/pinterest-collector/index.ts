@@ -50,21 +50,38 @@ serve(async (req) => {
         }
 
         const allNewUrls: string[] = [];
-        for (let page = 0; page < 3; page++) {
-          const pageParam = page === 0 ? "" : `?page=${page + 1}`;
-          const boardUrl = `https://www.pinterest.com/${username}/${boardName}/${pageParam}`;
-          const html = await fetch(boardUrl, {
-            headers: {
-              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-              "Accept": "text/html,application/xhtml+xml",
-            },
+
+        // 1) Try RSS feed (most reliable for Pinterest)
+        try {
+          const rssUrl = `https://www.pinterest.com/${username}/${boardName}.rss`;
+          const rssXml = await fetch(rssUrl, {
+            headers: { "User-Agent": "Mozilla/5.0" },
           }).then((r) => r.text());
-          const urls = extractPinterestImages(html);
-          for (const u of urls) allNewUrls.push(u);
-          if (urls.length < 30) break;
-          await new Promise((r) => setTimeout(r, 1000));
+          const rssUrls = extractFromRss(rssXml);
+          for (const u of rssUrls) allNewUrls.push(u);
+        } catch { /* RSS fallback silencieux */ }
+
+        // 2) Try HTML scraping (fallback)
+        if (allNewUrls.length < 100) {
+          for (let page = 0; page < 3; page++) {
+            const pageParam = page === 0 ? "" : `?page=${page + 1}`;
+            const boardUrl = `https://www.pinterest.com/${username}/${boardName}/${pageParam}`;
+            try {
+              const html = await fetch(boardUrl, {
+                headers: {
+                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                  "Accept": "text/html,application/xhtml+xml",
+                },
+              }).then((r) => r.text());
+              const urls = extractPinterestImages(html);
+              for (const u of urls) allNewUrls.push(u);
+              if (urls.length < 30) break;
+            } catch { break; }
+            await new Promise((r) => setTimeout(r, 1000));
+          }
         }
 
+        // 3) Try Google Images (second fallback)
         if (allNewUrls.length < 50) {
           try {
             const searchQuery = encodeURIComponent(`${styleName} manga ${username}`);
@@ -140,7 +157,12 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ ok: true, results }), {
+    const totalPins = results.reduce((sum, r) => {
+      const m = r.match(/^✅.*?(\d+) nouvelles/);
+      return sum + (m ? parseInt(m[1]) : 0);
+    }, 0);
+
+    return new Response(JSON.stringify({ ok: true, results, pins_collected: totalPins, styles_ready: Array.from(stylesToTrain) }), {
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   } catch (error) {
@@ -151,9 +173,13 @@ serve(async (req) => {
 
 function extractPinterestImages(html: string): string[] {
   const urls = new Set<string>();
-  const pattern = /https:\/\/i\.pinimg\.com\/originals\/[a-zA-Z0-9]+\/[a-zA-Z0-9]+\/[a-zA-Z0-9]+\.(jpg|png|webp)/g;
+  // Match any i.pinimg.com URL variation (originals, 236x, 564x, 736x, etc.)
+  const pattern = /https:\/\/i\.pinimg\.com\/(?:originals|[0-9]+x)\/[a-zA-Z0-9]+\/[a-zA-Z0-9]+\/[a-zA-Z0-9]+\.(?:jpg|png|webp)/g;
   let match;
-  while ((match = pattern.exec(html)) !== null) urls.add(match[0]);
+  while ((match = pattern.exec(html)) !== null) {
+    const u = match[0].replace(/\/[0-9]+x\//, "/originals/");
+    urls.add(u);
+  }
   return Array.from(urls);
 }
 
@@ -164,6 +190,21 @@ function extractGoogleImages(html: string): string[] {
   while ((match = pattern.exec(html)) !== null) {
     const u = match[1].replace(/\\u003d/g, "=").replace(/\\u0026/g, "&").split("?")[0];
     if (u.startsWith("http") && !u.includes("google")) urls.add(u);
+  }
+  return Array.from(urls);
+}
+
+function extractFromRss(xml: string): string[] {
+  const urls = new Set<string>();
+  const imgPattern = /<img[^>]+src="(https?:\/\/i\.pinimg\.com\/[^"]+\.(?:jpg|png|webp))"/g;
+  let match;
+  while ((match = imgPattern.exec(xml)) !== null) urls.add(match[1]);
+  if (urls.size > 0) return Array.from(urls);
+  const descPattern = /<description>([^<]+)<\/description>/g;
+  while ((match = descPattern.exec(xml)) !== null) {
+    const desc = match[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
+    const imgMatch = desc.match(/https?:\/\/i\.pinimg\.com\/[^\s"']+\.(?:jpg|png|webp)/);
+    if (imgMatch) urls.add(imgMatch[0]);
   }
   return Array.from(urls);
 }

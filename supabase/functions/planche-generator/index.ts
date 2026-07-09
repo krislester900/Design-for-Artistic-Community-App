@@ -974,19 +974,84 @@ async function compositePlanchePage(
       }
     }
   }
-  const png = pngEncode(COMPOSITE_W, COMPOSITE_H, page);
+  // Step 5: Apply post-processing pipeline — lineart cleanup → screentone → speech bubbles
+  let processed = applyLineartCleanup(page, COMPOSITE_W, COMPOSITE_H);
+  processed = applyScreentone(processed, COMPOSITE_W, COMPOSITE_H, 0.18);
+
+  // Draw speech bubbles for panels with dialogue
+  for (let i = 0; i < panels.length; i++) {
+    const p = panels[i];
+    if (!p.dialogue) continue;
+    const l = layoutPanels[i];
+    if (!l) continue;
+    const cellX = Math.round(l.x * scaleX);
+    const cellY = Math.round(l.y * scaleY);
+    const cellW = Math.round(l.w * scaleX);
+    const cellH = Math.round(l.h * scaleY);
+    const pad = 16;
+    const textScale = Math.max(1, Math.floor(cellH / 40));
+    const maxCharsPerLine = Math.max(1, Math.floor((cellW - 32) / (FONT_W * textScale)));
+    const dialogue = p.dialogue;
+    const words = dialogue.split(/\s+/);
+    const lines: string[] = [];
+    let curLine = "";
+    for (const w of words) {
+      const candidate = curLine.length === 0 ? w : curLine + " " + w;
+      if (candidate.length > maxCharsPerLine && curLine.length > 0) {
+        lines.push(curLine.trim());
+        curLine = w;
+      } else {
+        curLine = candidate;
+      }
+    }
+    if (curLine.trim().length > 0) lines.push(curLine.trim());
+    const lineH = textHeight(textScale);
+    const textBlockH = lines.length * lineH + (lines.length - 1) * 4;
+    const bubbleW = Math.min(cellW - pad * 2, Math.max(120, ...lines.map((ln) => textWidth(ln, textScale))) + 20);
+    const bubbleH = Math.max(textBlockH + pad * 2, 40);
+    const bubbleX = cellX + (cellW - bubbleW) / 2;
+    const bubbleY = cellY + pad;
+    // Draw bubble shape once (ellipse + tail, no text)
+    drawMangaSpeechBubble(processed, COMPOSITE_W, COMPOSITE_H,
+      bubbleX, bubbleY, bubbleW, bubbleH, "", "bottom", textScale);
+    // Render each text line centered within the bubble
+    const startY = bubbleY + (bubbleH - textBlockH) / 2;
+    for (let li = 0; li < lines.length; li++) {
+      const lineW = textWidth(lines[li], textScale);
+      const lineX = bubbleX + (bubbleW - lineW) / 2;
+      renderTextOnPage(processed, COMPOSITE_W, COMPOSITE_H, lines[li],
+        lineX, startY + li * (lineH + 4), textScale, 0, 255);
+    }
+  }
+
+  const png = pngEncode(COMPOSITE_W, COMPOSITE_H, processed);
   const fileName = `composites/${plancheId}.png`;
   try {
     const { data, error } = await supabase.storage.from("planche-assets").upload(fileName, png, { contentType: "image/png", upsert: true });
     if (!error && data) {
       const { data: { publicUrl } } = supabase.storage.from("planche-assets").getPublicUrl(fileName);
+
+      // Step 6: Upscale the composite image
+      const upscaledUrl = await upscaleImage(publicUrl);
+      if (upscaledUrl) {
+        // Upload upscaled version
+        const upscaledFileName = `composites/${plancheId}_upscaled.png`;
+        try {
+          const upscaledBuf = await (await fetch(upscaledUrl)).arrayBuffer();
+          await supabase.storage.from("planche-assets").upload(upscaledFileName, new Uint8Array(upscaledBuf), { contentType: "image/png", upsert: true });
+          const { data: { publicUrl: upscaledPublicUrl } } = supabase.storage.from("planche-assets").getPublicUrl(upscaledFileName);
+          return upscaledPublicUrl;
+        } catch {
+          return publicUrl;
+        }
+      }
       return publicUrl;
     }
   } catch {}
   return null;
 }
 
-const UPSCALER = { owner: "nightmareai", name: "real-esrgan", version: "42a4a07ad14e8b0b2b3b0c2a3e5c5c0a8d0f1e2a3b4c5d6e7f8a9b0c1d2e3f" };
+const UPSCALER = { owner: "nightmareai", name: "real-esrgan", version: "42fed1c4974146d4d2414e2be2c5277c7fcf05fcc3a73abf41610695738c1d7b" };
 
 async function upscaleImage(imageUrl: string): Promise<string | null> {
   if (!REPLICATE_API_KEY) return null;
@@ -998,6 +1063,423 @@ async function upscaleImage(imageUrl: string): Promise<string | null> {
   if (!res.ok) return null;
   const pred = await res.json();
   return pollReplicate(pred.id, "upscale");
+}
+
+// ============================================================
+// BITMAP FONT (8x8) — Public Domain X11 font, ASCII 32-126
+// ============================================================
+const FONT8X8 = new Uint8Array([
+  // 32 space
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  // 33 !
+  0x18,0x3C,0x3C,0x18,0x18,0x00,0x18,0x00,
+  // 34 "
+  0x66,0x66,0x66,0x24,0x00,0x00,0x00,0x00,
+  // 35 #
+  0x36,0x36,0x7F,0x36,0x36,0x7F,0x36,0x36,
+  // 36 $
+  0x18,0x3E,0x60,0x3E,0x06,0x7C,0x18,0x00,
+  // 37 %
+  0x63,0x66,0x0C,0x18,0x30,0x66,0x46,0x00,
+  // 38 &
+  0x1C,0x36,0x36,0x1C,0x3B,0x6E,0x3B,0x00,
+  // 39 '
+  0x18,0x18,0x30,0x00,0x00,0x00,0x00,0x00,
+  // 40 (
+  0x0C,0x18,0x30,0x30,0x30,0x18,0x0C,0x00,
+  // 41 )
+  0x30,0x18,0x0C,0x0C,0x0C,0x18,0x30,0x00,
+  // 42 *
+  0x24,0x66,0x3C,0xFF,0x3C,0x66,0x24,0x00,
+  // 43 +
+  0x18,0x18,0x18,0x7E,0x18,0x18,0x18,0x00,
+  // 44 ,
+  0x00,0x00,0x00,0x00,0x18,0x18,0x30,0x00,
+  // 45 -
+  0x00,0x00,0x00,0x7E,0x00,0x00,0x00,0x00,
+  // 46 .
+  0x00,0x00,0x00,0x00,0x00,0x00,0x18,0x00,
+  // 47 /
+  0x02,0x06,0x0C,0x18,0x30,0x60,0x40,0x00,
+  // 48 0
+  0x3C,0x66,0x6E,0x76,0x66,0x66,0x3C,0x00,
+  // 49 1
+  0x18,0x38,0x18,0x18,0x18,0x18,0x7E,0x00,
+  // 50 2
+  0x3C,0x66,0x06,0x0C,0x18,0x30,0x7E,0x00,
+  // 51 3
+  0x3C,0x66,0x06,0x1C,0x06,0x66,0x3C,0x00,
+  // 52 4
+  0x0C,0x1C,0x3C,0x6C,0x7E,0x0C,0x0C,0x00,
+  // 53 5
+  0x7E,0x60,0x60,0x7C,0x06,0x46,0x3C,0x00,
+  // 54 6
+  0x3C,0x66,0x60,0x7C,0x66,0x66,0x3C,0x00,
+  // 55 7
+  0x7E,0x06,0x0C,0x18,0x30,0x30,0x30,0x00,
+  // 56 8
+  0x3C,0x66,0x66,0x3C,0x66,0x66,0x3C,0x00,
+  // 57 9
+  0x3C,0x66,0x66,0x3E,0x06,0x66,0x3C,0x00,
+  // 58 :
+  0x00,0x18,0x00,0x00,0x00,0x18,0x00,0x00,
+  // 59 ;
+  0x00,0x18,0x00,0x00,0x18,0x18,0x30,0x00,
+  // 60 <
+  0x06,0x0C,0x18,0x30,0x18,0x0C,0x06,0x00,
+  // 61 =
+  0x00,0x00,0x7E,0x00,0x7E,0x00,0x00,0x00,
+  // 62 >
+  0x30,0x18,0x0C,0x06,0x0C,0x18,0x30,0x00,
+  // 63 ?
+  0x3C,0x66,0x06,0x0C,0x18,0x00,0x18,0x00,
+  // 64 @
+  0x3C,0x66,0x6E,0x6E,0x60,0x62,0x3C,0x00,
+  // 65 A
+  0x18,0x3C,0x66,0x66,0x7E,0x66,0x66,0x00,
+  // 66 B
+  0x7C,0x66,0x66,0x7C,0x66,0x66,0x7C,0x00,
+  // 67 C
+  0x3C,0x66,0x60,0x60,0x60,0x66,0x3C,0x00,
+  // 68 D
+  0x78,0x6C,0x66,0x66,0x66,0x6C,0x78,0x00,
+  // 69 E
+  0x7E,0x60,0x60,0x7C,0x60,0x60,0x7E,0x00,
+  // 70 F
+  0x7E,0x60,0x60,0x7C,0x60,0x60,0x60,0x00,
+  // 71 G
+  0x3C,0x66,0x60,0x60,0x6E,0x66,0x3C,0x00,
+  // 72 H
+  0x66,0x66,0x66,0x7E,0x66,0x66,0x66,0x00,
+  // 73 I
+  0x7E,0x18,0x18,0x18,0x18,0x18,0x7E,0x00,
+  // 74 J
+  0x1E,0x06,0x06,0x06,0x46,0x66,0x3C,0x00,
+  // 75 K
+  0x66,0x6C,0x78,0x70,0x78,0x6C,0x66,0x00,
+  // 76 L
+  0x60,0x60,0x60,0x60,0x60,0x60,0x7E,0x00,
+  // 77 M
+  0x63,0x77,0x7F,0x6B,0x63,0x63,0x63,0x00,
+  // 78 N
+  0x66,0x76,0x7E,0x7E,0x6E,0x66,0x66,0x00,
+  // 79 O
+  0x3C,0x66,0x66,0x66,0x66,0x66,0x3C,0x00,
+  // 80 P
+  0x7C,0x66,0x66,0x66,0x7C,0x60,0x60,0x00,
+  // 81 Q
+  0x3C,0x66,0x66,0x66,0x6E,0x3C,0x07,0x00,
+  // 82 R
+  0x7C,0x66,0x66,0x7C,0x78,0x6C,0x66,0x00,
+  // 83 S
+  0x3C,0x66,0x60,0x3C,0x06,0x66,0x3C,0x00,
+  // 84 T
+  0x7E,0x18,0x18,0x18,0x18,0x18,0x18,0x00,
+  // 85 U
+  0x66,0x66,0x66,0x66,0x66,0x66,0x3C,0x00,
+  // 86 V
+  0x66,0x66,0x66,0x66,0x66,0x3C,0x18,0x00,
+  // 87 W
+  0x63,0x63,0x63,0x6B,0x7F,0x77,0x63,0x00,
+  // 88 X
+  0x66,0x66,0x3C,0x18,0x3C,0x66,0x66,0x00,
+  // 89 Y
+  0x66,0x66,0x66,0x3C,0x18,0x18,0x18,0x00,
+  // 90 Z
+  0x7E,0x06,0x0C,0x18,0x30,0x60,0x7E,0x00,
+  // 91 [
+  0x3C,0x30,0x30,0x30,0x30,0x30,0x3C,0x00,
+  // 92 backslash
+  0x40,0x60,0x30,0x18,0x0C,0x06,0x02,0x00,
+  // 93 ]
+  0x3C,0x0C,0x0C,0x0C,0x0C,0x0C,0x3C,0x00,
+  // 94 ^
+  0x18,0x3C,0x66,0x00,0x00,0x00,0x00,0x00,
+  // 95 _
+  0x00,0x00,0x00,0x00,0x00,0x00,0x7E,0x00,
+  // 96 `
+  0x18,0x18,0x0C,0x00,0x00,0x00,0x00,0x00,
+  // 97 a
+  0x00,0x00,0x3C,0x06,0x3E,0x66,0x3E,0x00,
+  // 98 b
+  0x60,0x60,0x7C,0x66,0x66,0x66,0x7C,0x00,
+  // 99 c
+  0x00,0x00,0x3C,0x66,0x60,0x66,0x3C,0x00,
+  // 100 d
+  0x06,0x06,0x3E,0x66,0x66,0x66,0x3E,0x00,
+  // 101 e
+  0x00,0x00,0x3C,0x66,0x7E,0x60,0x3C,0x00,
+  // 102 f
+  0x1C,0x36,0x30,0x7C,0x30,0x30,0x30,0x00,
+  // 103 g
+  0x00,0x00,0x3E,0x66,0x66,0x3E,0x06,0x3C,
+  // 104 h
+  0x60,0x60,0x7C,0x66,0x66,0x66,0x66,0x00,
+  // 105 i
+  0x18,0x00,0x38,0x18,0x18,0x18,0x3C,0x00,
+  // 106 j
+  0x06,0x00,0x06,0x06,0x06,0x66,0x66,0x3C,
+  // 107 k
+  0x60,0x60,0x66,0x6C,0x78,0x6C,0x66,0x00,
+  // 108 l
+  0x38,0x18,0x18,0x18,0x18,0x18,0x3C,0x00,
+  // 109 m
+  0x00,0x00,0x7C,0x7E,0x6A,0x6A,0x6A,0x00,
+  // 110 n
+  0x00,0x00,0x7C,0x66,0x66,0x66,0x66,0x00,
+  // 111 o
+  0x00,0x00,0x3C,0x66,0x66,0x66,0x3C,0x00,
+  // 112 p
+  0x00,0x00,0x7C,0x66,0x66,0x7C,0x60,0x60,
+  // 113 q
+  0x00,0x00,0x3E,0x66,0x66,0x3E,0x06,0x06,
+  // 114 r
+  0x00,0x00,0x7C,0x66,0x60,0x60,0x60,0x00,
+  // 115 s
+  0x00,0x00,0x3E,0x60,0x3C,0x06,0x7C,0x00,
+  // 116 t
+  0x30,0x30,0x7E,0x30,0x30,0x36,0x1C,0x00,
+  // 117 u
+  0x00,0x00,0x66,0x66,0x66,0x66,0x3E,0x00,
+  // 118 v
+  0x00,0x00,0x66,0x66,0x66,0x3C,0x18,0x00,
+  // 119 w
+  0x00,0x00,0x6A,0x6A,0x6A,0x7E,0x3C,0x00,
+  // 120 x
+  0x00,0x00,0x66,0x3C,0x18,0x3C,0x66,0x00,
+  // 121 y
+  0x00,0x00,0x66,0x66,0x66,0x3E,0x06,0x3C,
+  // 122 z
+  0x00,0x00,0x7E,0x0C,0x18,0x30,0x7E,0x00,
+  // 123 {
+  0x0E,0x18,0x18,0x70,0x18,0x18,0x0E,0x00,
+  // 124 |
+  0x18,0x18,0x18,0x18,0x18,0x18,0x18,0x00,
+  // 125 }
+  0x70,0x18,0x18,0x0E,0x18,0x18,0x70,0x00,
+  // 126 ~
+  0x3B,0x6E,0x00,0x00,0x00,0x00,0x00,0x00,
+]);
+
+const FONT_W = 8;
+const FONT_H = 8;
+
+function renderTextOnPage(page: Uint8Array, pw: number, ph: number, text: string, px: number, py: number, scale: number, fg: number, bg: number) {
+  const upper = text.toUpperCase();
+  for (let ci = 0; ci < upper.length; ci++) {
+    const code = upper.charCodeAt(ci);
+    if (code < 32 || code > 126) continue;
+    const off = (code - 32) * FONT_H;
+    for (let r = 0; r < FONT_H; r++) {
+      const row = off + r;
+      const bits = row < FONT8X8.length ? FONT8X8[row] : 0;
+      for (let c = 0; c < FONT_W; c++) {
+        if (!(bits & (0x80 >> c))) continue;
+        for (let sy = 0; sy < scale; sy++) {
+          for (let sx = 0; sx < scale; sx++) {
+            const x = px + ci * FONT_W * scale + c * scale + sx;
+            const y = py + r * scale + sy;
+            if (x < 0 || x >= pw || y < 0 || y >= ph) continue;
+            const i = (y * pw + x) * 4;
+            page[i] = fg;
+            page[i+1] = fg;
+            page[i+2] = fg;
+            page[i+3] = (fg === 255) ? 255 : fg;
+          }
+        }
+      }
+    }
+  }
+}
+
+function textWidth(text: string, scale: number): number {
+  return text.length * FONT_W * scale;
+}
+
+function textHeight(scale: number): number {
+  return FONT_H * scale;
+}
+
+function drawEllipse(page: Uint8Array, pw: number, ph: number, cx: number, cy: number, rx: number, ry: number, fill: number, stroke: number) {
+  for (let y = cy - ry; y <= cy + ry; y++) {
+    for (let x = cx - rx; x <= cx + rx; x++) {
+      const dx = x - cx, dy = y - cy;
+      const inside = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1;
+      if (!inside) continue;
+      const edge = Math.abs((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) - 1);
+      let col: number, a: number;
+      if (edge < 0.05 && stroke >= 0) {
+        col = stroke; a = 255;
+      } else {
+        col = fill; a = fill === 255 ? 255 : (fill >= 0 ? 255 : 0);
+      }
+      if (x < 0 || x >= pw || y < 0 || y >= ph) continue;
+      const i = (y * pw + x) * 4;
+      page[i] = col; page[i+1] = col; page[i+2] = col; page[i+3] = a;
+    }
+  }
+}
+
+function drawLine(page: Uint8Array, pw: number, ph: number, x1: number, y1: number, x2: number, y2: number, color: number) {
+  const dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
+  const sx = x1 < x2 ? 1 : -1, sy = y1 < y2 ? 1 : -1;
+  let err = dx - dy, x = x1, y = y1;
+  while (true) {
+    if (x >= 0 && x < pw && y >= 0 && y < ph) {
+      const i = (y * pw + x) * 4;
+      page[i] = color; page[i+1] = color; page[i+2] = color; page[i+3] = 255;
+    }
+    if (x === x2 && y === y2) break;
+    const e2 = err * 2;
+    if (e2 > -dy) { err -= dy; x += sx; }
+    if (e2 < dx) { err += dx; y += sy; }
+  }
+}
+
+function drawMangaSpeechBubble(page: Uint8Array, pw: number, ph: number,
+  bubbleX: number, bubbleY: number, bubbleW: number, bubbleH: number,
+  text: string, tailDir: string,
+  scale: number) {
+  const cx = bubbleX + bubbleW / 2;
+  const cy = bubbleY + bubbleH / 2;
+  const rx = bubbleW / 2;
+  const ry = bubbleH / 2;
+
+  // Fill bubble white with black outline
+  drawEllipse(page, pw, ph, cx, cy, rx, ry, 255, 0);
+
+  // Draw tail pointer (triangle from bubble edge toward speaker)
+  let tx: number, ty: number, dirX: number, dirY: number;
+  const tailLen = 24;
+  switch (tailDir) {
+    case "bottom-left": tx = cx - rx * 0.4; ty = cy + ry; dirX = -1; dirY = 1; break;
+    case "bottom-right": tx = cx + rx * 0.4; ty = cy + ry; dirX = 1; dirY = 1; break;
+    default: tx = cx; ty = cy + ry; dirX = 0; dirY = 1; break;
+  }
+  // Draw tail as two lines from edge outward
+  const tailEndX = tx + dirX * tailLen;
+  const tailEndY = ty + dirY * tailLen;
+  for (let i = 0; i <= 6; i++) {
+    const t = i / 6;
+    const lx = tx + (tailEndX - tx) * t;
+    const ly = ty + (tailEndY - ty) * t;
+    const spread = 6 * (1 - t);
+    drawLine(page, pw, ph, lx - spread, ly, lx + spread, ly, 0);
+  }
+  drawLine(page, pw, ph, tx, ty, tailEndX, tailEndY, 0);
+  // Fill tail area white
+  const tailBaseX = tx, tailBaseY = ty;
+  const tailTipX = tailEndX, tailTipY = tailEndY;
+  const spreadBase = 8;
+  for (let t = 1; t < 1.0; t += 0.1) {
+    const mx = tailBaseX + (tailTipX - tailBaseX) * t;
+    const my = tailBaseY + (tailTipY - tailBaseY) * t;
+    const sp = Math.round(spreadBase * (1 - t));
+    for (let s = -sp; s <= sp; s++) {
+      const x = Math.round(mx + s);
+      const y = Math.round(my);
+      if (x >= 0 && x < pw && y >= 0 && y < ph) {
+        const i = (y * pw + x) * 4;
+        if (page[i] === 0 && page[i+1] === 0 && page[i+2] === 0) continue;
+        page[i] = 255; page[i+1] = 255; page[i+2] = 255; page[i+3] = 255;
+      }
+    }
+  }
+
+  // Render text centered in bubble (skip if empty — caller handles multi-line)
+  if (text.length > 0) {
+    const tw = textWidth(text, scale);
+    const th = textHeight(scale);
+    const textX = Math.round(cx - tw / 2);
+    const textY = Math.round(cy - th / 2);
+    renderTextOnPage(page, pw, ph, text, textX, textY, scale, 0, 255);
+  }
+}
+
+// ============================================================
+// POST-PROCESSING: Lineart cleanup (adaptive threshold)
+// ============================================================
+function applyLineartCleanup(rgba: Uint8Array, w: number, h: number): Uint8Array {
+  const out = new Uint8Array(rgba.length);
+  const blurRadius = 8;
+  const threshold = 48;
+
+  // Compute integral image for fast local mean
+  const integral = new Int32Array((w + 1) * (h + 1));
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const lum = (rgba[i] * 77 + rgba[i+1] * 150 + rgba[i+2] * 29) >> 8;
+      integral[(y+1)*(w+1)+(x+1)] = lum + integral[y*(w+1)+(x+1)] + integral[(y+1)*(w+1)+x] - integral[y*(w+1)+x];
+    }
+  }
+
+  function localMean(px: number, py: number): number {
+    const x1 = Math.max(0, px - blurRadius), y1 = Math.max(0, py - blurRadius);
+    const x2 = Math.min(w - 1, px + blurRadius), y2 = Math.min(h - 1, py + blurRadius);
+    const area = (x2 - x1 + 1) * (y2 - y1 + 1);
+    const sum = integral[(y2+1)*(w+1)+(x2+1)] - integral[y1*(w+1)+(x2+1)] - integral[(y2+1)*(w+1)+x1] + integral[y1*(w+1)+x1];
+    return sum / area;
+  }
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const lum = (rgba[i] * 77 + rgba[i+1] * 150 + rgba[i+2] * 29) >> 8;
+      const mean = localMean(x, y);
+      const val = (lum < mean - threshold) ? 0 : 255;
+      out[i] = val; out[i+1] = val; out[i+2] = val; out[i+3] = 255;
+    }
+  }
+  return out;
+}
+
+// ============================================================
+// POST-PROCESSING: Screentone overlay (manga dot pattern)
+// ============================================================
+function applyScreentone(rgba: Uint8Array, w: number, h: number, density: number = 0.15): Uint8Array {
+  const out = new Uint8Array(rgba.length);
+  const period = 12;
+  const angle = Math.PI / 6;
+  const cosA = Math.cos(angle), sinA = Math.sin(angle);
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      // Get luminance from source
+      const lum = (rgba[i] * 77 + rgba[i+1] * 150 + rgba[i+2] * 29) >> 8;
+      out[i] = rgba[i]; out[i+1] = rgba[i+1]; out[i+2] = rgba[i+2]; out[i+3] = 255;
+
+      // Rotate coordinates for screen angle
+      const u = x * cosA + y * sinA;
+      const v = -x * sinA + y * cosA;
+      const du = ((u % period) + period) % period;
+      const dv = ((v % period) + period) % period;
+      const cx2 = period / 2, cy2 = period / 2;
+      const dist = Math.sqrt((du - cx2) ** 2 + (dv - cy2) ** 2);
+      const maxD = period / 2 + 1;
+      const dotVal = Math.min(1, dist / maxD);
+
+      // Dot area varies with luminance: darker -> larger dots
+      const tone = Math.max(0, Math.min(255, lum));
+      const dotRadius = Math.max(0, Math.min(1, 1 - tone / 255 - density));
+
+      let outputLum: number;
+      if (dotVal < dotRadius) {
+        // Inside dot: ink (dark)
+        outputLum = Math.max(0, tone - 40);
+      } else {
+        // Outside dot: paper (light)
+        outputLum = Math.min(255, tone + 30);
+      }
+
+      // Blend with original using the halftone value
+      const blend = 0.7;
+      const finalLum = Math.round(lum * (1 - blend) + outputLum * blend);
+      out[i] = finalLum; out[i+1] = finalLum; out[i+2] = finalLum;
+    }
+  }
+  return out;
 }
 
 function getDefaultLayout(): { panels: PanelLayout[]; slug: string } {
