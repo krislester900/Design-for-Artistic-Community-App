@@ -181,6 +181,7 @@ jobs:
             "database/schema-migration-safe.sql"
             "database/schema-add-missing-tables.sql"
             "database/schema-planches.sql",
+            "database/migration-planche-panels-metadata.sql"
             "database/schema-knowledge-contrib.sql"
           )
           TOTAL=${#SCHEMAS[@]}

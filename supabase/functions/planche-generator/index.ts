@@ -21,6 +21,190 @@ interface PanelScript {
   camera_angle: string;
   emotion: string;
   action: string;
+  pose_description: string;
+}
+
+// ---------- OpenPose skeleton library ----------
+const POSE_W = 256, POSE_H = 384;
+type Kps = [number, number][]; // 18 keypoints [x,y] in POSE_W×POSE_H space
+
+const POSES: Record<string, Kps> = {
+  "neutral-stand": [
+    [128,60],[128,88],[96,88],[76,118],[64,150],[160,88],[180,118],[192,150],
+    [104,160],[104,220],[104,306],[152,160],[152,220],[152,306],
+    [118,54],[138,54],[110,58],[146,58],
+  ],
+  "action-punch": [
+    [128,52],[128,80],[96,80],[72,100],[200,96],[160,80],[184,100],[192,130],
+    [104,158],[104,218],[104,304],[152,158],[152,218],[152,304],
+    [118,46],[138,46],[110,50],[146,50],
+  ],
+  "action-kick": [
+    [128,48],[128,80],[96,80],[76,110],[64,145],[160,80],[180,110],[192,145],
+    [104,150],[104,200],[104,260],[152,150],[180,200],[200,280],
+    [118,42],[138,42],[110,46],[146,46],
+  ],
+  "action-run": [
+    [128,56],[128,84],[88,84],[68,60],[56,50],[168,84],[188,108],[200,140],
+    [100,160],[100,240],[96,310],[156,160],[156,240],[160,310],
+    [118,50],[138,50],[110,54],[146,54],
+  ],
+  "action-jump": [
+    [128,36],[128,64],[92,64],[72,38],[58,24],[164,64],[184,90],[196,120],
+    [100,144],[100,204],[96,290],[156,144],[156,204],[160,290],
+    [118,30],[138,30],[110,34],[146,34],
+  ],
+  "action-crouch": [
+    [128,52],[128,80],[92,80],[64,90],[48,110],[164,80],[192,90],[208,110],
+    [100,180],[100,250],[96,330],[156,180],[156,250],[160,330],
+    [118,46],[138,46],[110,50],[146,50],
+  ],
+  "action-point": [
+    [128,58],[128,86],[96,86],[76,116],[220,80],[160,86],[180,116],[192,148],
+    [104,158],[104,218],[104,304],[152,158],[152,218],[152,304],
+    [118,52],[138,52],[110,56],[146,56],
+  ],
+  "action-duel": [
+    [128,56],[128,84],[88,84],[60,100],[44,130],[168,84],[192,100],[208,128],
+    [100,158],[100,218],[100,304],[156,158],[156,218],[156,304],
+    [118,50],[138,50],[110,54],[146,54],
+  ],
+  "emotion-sit": [
+    [128,36],[128,64],[96,64],[76,94],[64,126],[160,64],[180,94],[192,126],
+    [104,160],[124,200],[128,290],[152,160],[132,200],[136,290],
+    [118,30],[138,30],[110,34],[146,34],
+  ],
+  "emotion-collapse": [
+    [128,46],[128,74],[96,74],[76,104],[64,136],[160,74],[180,104],[192,136],
+    [104,156],[112,220],[100,320],[152,156],[144,220],[156,320],
+    [118,40],[138,40],[110,44],[146,44],
+  ],
+  "action-swing": [
+    [128,48],[128,76],[92,76],[60,56],[40,38],[164,76],[192,56],[212,38],
+    [104,148],[104,208],[104,294],[152,148],[152,208],[152,294],
+    [118,42],[138,42],[110,46],[146,46],
+  ],
+  "action-defend": [
+    [128,58],[128,86],[88,86],[56,70],[44,54],[168,86],[200,70],[212,54],
+    [104,158],[104,218],[104,304],[152,158],[152,218],[152,304],
+    [118,52],[138,52],[110,56],[146,56],
+  ],
+};
+
+const SKELETON_CONNECTIONS: [number,number][] = [
+  [0,1],[1,2],[2,3],[3,4],[1,5],[5,6],[6,7],
+  [1,8],[8,9],[9,10],[1,11],[11,12],[12,13],
+  [0,14],[14,16],[0,15],[15,17],[0,1],
+];
+
+// ---------- Minimal inline PNG encoder ----------
+function crc32(data: Uint8Array): number {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < data.length; i++) {
+    c ^= data[i];
+    for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+  }
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function chunk(type: string, data: Uint8Array): Uint8Array {
+  const t = new TextEncoder().encode(type);
+  const len = new Uint8Array(4);
+  new DataView(len.buffer).setUint32(0, data.length, false);
+  const crcIn = new Uint8Array(t.length + data.length);
+  crcIn.set(t); crcIn.set(data, t.length);
+  const cv = crc32(crcIn);
+  const crc = new Uint8Array(4);
+  new DataView(crc.buffer).setUint32(0, cv, false);
+  const buf = new Uint8Array(8 + t.length + data.length + 4);
+  buf.set(len,0); buf.set(t,4); buf.set(data,8); buf.set(crc,8+t.length+data.length);
+  return buf;
+}
+
+function pngEncode(w: number, h: number, rgba: Uint8Array): Uint8Array {
+  const rawRow = w * 4;
+  const raw = new Uint8Array(h * (1 + rawRow));
+  for (let y = 0; y < h; y++) {
+    raw[y * (1 + rawRow)] = 0;
+    raw.set(rgba.subarray(y * rawRow, (y + 1) * rawRow), y * (1 + rawRow) + 1);
+  }
+
+  // deflate stored blocks
+  const MAX = 65535;
+  const blocks: Uint8Array[] = [];
+  let offset = 0;
+  while (offset < raw.length) {
+    const sz = Math.min(raw.length - offset, MAX);
+    const last = offset + sz >= raw.length;
+    const hdr = new Uint8Array(5);
+    hdr[0] = last ? 1 : 0;
+    hdr[1] = sz & 0xFF; hdr[2] = (sz >> 8) & 0xFF;
+    const nlen = (~sz) & 0xFFFF;
+    hdr[3] = nlen & 0xFF; hdr[4] = (nlen >> 8) & 0xFF;
+    blocks.push(hdr, raw.slice(offset, offset + sz));
+    offset += sz;
+  }
+  const deflated = new Uint8Array(blocks.reduce((s,b) => s + b.length, 0));
+  let pos = 0; for (const b of blocks) { deflated.set(b, pos); pos += b.length; }
+
+  const sig = new Uint8Array([137,80,78,71,13,10,26,10]);
+  const ihdr = new Uint8Array(13);
+  const dv = new DataView(ihdr.buffer);
+  dv.setUint32(0, w, false); dv.setUint32(4, h, false);
+  ihdr[8]=8; ihdr[9]=6; // RGBA
+
+  const parts = [sig, chunk("IHDR",ihdr), chunk("IDAT",deflated), chunk("IEND",new Uint8Array(0))];
+  const total = parts.reduce((s,b) => s + b.length, 0);
+  const out = new Uint8Array(total);
+  pos = 0; for (const b of parts) { out.set(b, pos); pos += b.length; }
+  return out;
+}
+
+function renderSkeleton(kps: Kps): Uint8Array {
+  const stride = 4;
+  const pixels = new Uint8Array(POSE_H * POSE_W * stride);
+
+  function setPx(x: number, y: number) {
+    if (x < 0 || x >= POSE_W || y < 0 || y >= POSE_H) return;
+    const i = (y * POSE_W + x) * stride;
+    pixels[i]=255; pixels[i+1]=255; pixels[i+2]=255; pixels[i+3]=255;
+  }
+
+  function line(x1: number, y1: number, x2: number, y2: number) {
+    const dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
+    const sx = x1 < x2 ? 1 : -1, sy = y1 < y2 ? 1 : -1;
+    let err = dx - dy, x = x1, y = y1;
+    while (true) {
+      setPx(x, y);
+      if (x === x2 && y === y2) break;
+      const e2 = err * 2;
+      if (e2 > -dy) { err -= dy; x += sx; }
+      if (e2 < dx) { err += dx; y += sy; }
+    }
+  }
+
+  function circle(cx: number, cy: number, r: number) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (dx * dx + dy * dy <= r * r) setPx(cx + dx, cy + dy);
+      }
+    }
+  }
+
+  // Draw connections
+  for (const [i, j] of SKELETON_CONNECTIONS) {
+    line(kps[i][0], kps[i][1], kps[j][0], kps[j][1]);
+  }
+
+  // Draw joints
+  for (const [x, y] of kps) {
+    circle(x, y, 4);
+  }
+
+  // Draw head (larger circle around nose)
+  circle(kps[0][0], kps[0][1], 12);
+
+  return pngEncode(POSE_W, POSE_H, pixels);
 }
 
 interface Character {
@@ -129,7 +313,7 @@ async function handleCreate(req: Request): Promise<Response> {
       const script = panelScripts[i] || {
         panel_index: i, scene: "...", characters: "", dialogue: "",
         narration: "", framing: "medium", camera_angle: "eye-level",
-        emotion: "neutre", action: "",
+        emotion: "neutre", action: "", pose_description: "neutral-stand",
       };
       const promptSdxl = buildPanelPrompt(script, style, charList);
       panelRows.push({
@@ -141,6 +325,7 @@ async function handleCreate(req: Request): Promise<Response> {
         narration: script.narration || "",
         prompt_sdxl: promptSdxl,
         status: "pending",
+        metadata: { pose_description: script.pose_description },
       });
     }
 
@@ -260,10 +445,13 @@ async function processNextPendingPanel(supabase: any, planche: any) {
   const panel = pending[0];
   await supabase.from("ai_planche_panels").update({ status: "generating" }).eq("id", panel.id);
 
+  const poseUrl = await generatePoseForPanel(supabase, panel, planche.id);
+
   const imageUrl = await generateSdxlImage(
     panel.prompt_sdxl,
     style,
     charRefs.length > 0 ? charRefs[0] : null,
+    poseUrl,
   );
 
   if (imageUrl) {
@@ -288,6 +476,25 @@ async function processNextPendingPanel(supabase: any, planche: any) {
     const allCompleted = allPanels?.every((p: any) => p.status === "completed") ?? false;
     await supabase.from("ai_planches").update({ status: allCompleted ? "completed" : "failed" }).eq("id", planche.id);
   }
+}
+
+async function generatePoseForPanel(supabase: any, panel: any, plancheId: string): Promise<string | null> {
+  const poseKey = panel.metadata?.pose_description || "neutral-stand";
+  const kps = POSES[poseKey] || POSES["neutral-stand"];
+  const png = renderSkeleton(kps);
+  const fileName = `poses/${plancheId}/${panel.panel_index}.png`;
+
+  const { data, error } = await supabase.storage
+    .from("planche-assets")
+    .upload(fileName, png, { contentType: "image/png", upsert: true });
+
+  if (error || !data) return null;
+
+  const { data: { publicUrl } } = supabase.storage
+    .from("planche-assets")
+    .getPublicUrl(fileName);
+
+  return publicUrl;
 }
 
 async function generateCharacterRef(ch: Character, style: any): Promise<string | null> {
@@ -349,6 +556,8 @@ async function generatePanelScripts(scene: string, characters: Character[], pane
       ).join("\n")
       : "Pas de personnages définis.";
 
+    const poseKeys = Object.keys(POSES).join(", ");
+
     const systemPrompt = `Tu es un **scénariste et storyboarder manga** expert (style gekiga/shonen/seinen).
 Tu découpes une scène en EXACTEMENT ${panelCount} cases pour une planche de manga.
 
@@ -367,10 +576,11 @@ Pour CHAQUE case, fournis ces champs :
 - camera_angle : eye-level | high-angle | low-angle | bird | worm
 - emotion : l'émotion dominante de la case
 - action : l'action principale en 1 phrase courte
+- pose_description : choisir PARMI cette liste exacte (la plus proche de l'action) : ${poseKeys}
 
 Retourne UNIQUEMENT un JSON array valide. Exemple :
 [
-  {"panel_index":0,"scene":"...","characters":"...","dialogue":"","narration":"","framing":"wide","camera_angle":"high-angle","emotion":"mélancolie","action":"..."},
+  {"panel_index":0,"scene":"...","characters":"...","dialogue":"","narration":"","framing":"wide","camera_angle":"high-angle","emotion":"mélancolie","action":"...","pose_description":"neutral-stand"},
   ...
 ]`;
 
@@ -380,7 +590,8 @@ ${charSection}
 
 NOMBRE DE CASES : ${panelCount}
 
-Génère un découpage narratif professionnel avec progression dramatique.`;
+Génère un découpage narratif professionnel avec progression dramatique.
+Chaque case doit avoir un pose_description valide parmi : ${poseKeys}`;
 
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -425,6 +636,7 @@ function generateFallbackScripts(scene: string, panelCount: number): PanelScript
       camera_angle: "eye-level",
       emotion: "neutre",
       action: "",
+      pose_description: "neutral-stand",
     });
   }
   return result;
@@ -480,7 +692,7 @@ function buildPanelPrompt(script: PanelScript, style: any, characters: Character
   return prompt;
 }
 
-async function generateSdxlImage(prompt: string, style: any, refImageUrl: string | null): Promise<string | null> {
+async function generateSdxlImage(prompt: string, style: any, refImageUrl: string | null, poseImageUrl: string | null = null): Promise<string | null> {
   if (!REPLICATE_API_KEY) return null;
 
   const qualityTags = "masterpiece, best quality, absurdres, highres";
@@ -508,6 +720,14 @@ async function generateSdxlImage(prompt: string, style: any, refImageUrl: string
   if (style.lora_url) {
     input.lora_urls = [style.lora_url];
     input.lora_scale = Number(style.lora_scale ?? 0.8);
+  }
+
+  if (poseImageUrl) {
+    input.controlnet_units = [{
+      controlnet_model: "thibaud/controlnet-openpose-sdxl-1.0",
+      controlnet_image: poseImageUrl,
+      controlnet_weight: 0.8,
+    }];
   }
 
   const res = await fetch(`https://api.replicate.com/v1/models/${SDXL.owner}/${SDXL.name}/predictions`, {
