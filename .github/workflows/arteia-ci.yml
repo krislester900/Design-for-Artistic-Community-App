@@ -171,6 +171,7 @@ jobs:
             "database/schema-web-sources.sql"
             "database/schema-pinterest-sources.sql"
             "database/schema-ontology.sql"
+            "database/schema-ontology-reasoning.sql"
             "database/schema-stories.sql"
             "database/schema-fatmecoin.sql"
             "database/schema-donations-votes.sql"

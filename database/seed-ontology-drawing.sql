@@ -1,4 +1,4 @@
--- ============================================================
+﻿-- ============================================================
 -- SEED : Extension ontologie Dessin & Planche de Manga
 -- Ajoute des concepts techniques pour l'adaptation au dessin
 -- et la composition de planches de manga
@@ -333,7 +333,7 @@ WHERE NOT EXISTS (SELECT 1 FROM ontology_concepts c WHERE c.slug = v.slug);
 -- On insère avec des sous-requêtes pour résoudre les IDs
 -- Hiérarchie : est_un
 INSERT INTO ontology_relations (source_id, target_id, relation_type, weight, description)
-SELECT s.id, t.id, 'est_un', 1.0, e.desc
+SELECT s.id, t.id, 'est_un', 1.0, e.descr
 FROM (VALUES
   ('croquis-rapide',    'croquis',            'Le croquis rapide est un type de croquis'),
   ('etude-anatomique',  'dessin-anatomique',  'L\'étude anatomique est une forme de dessin anatomique'),
@@ -342,7 +342,7 @@ FROM (VALUES
   ('koma',              'planche-manga',      'Le koma est l\'unité de base de la planche de manga'),
   ('double-page',       'planche-manga',      'Une double page est un type de planche'),
   ('page-choc',         'planche-manga',      'Une page choc/splash est un type de planche')
-) AS e(src, tgt, desc)
+) AS e(src, tgt, descr)
 JOIN ontology_concepts s ON s.slug = e.src
 JOIN ontology_concepts t ON t.slug = e.tgt
 WHERE NOT EXISTS (
@@ -352,7 +352,7 @@ WHERE NOT EXISTS (
 
 -- Appartient à (concept → domaine)
 INSERT INTO ontology_relations (source_id, target_id, relation_type, weight, description)
-SELECT s.id, t.id, 'appartient_a', 1.0, e.desc
+SELECT s.id, t.id, 'appartient_a', 1.0, e.descr
 FROM (VALUES
   ('trait',             'dessin',             'Le trait est le fondement du dessin'),
   ('hachure',           'dessin',             'La hachure est une technique de dessin'),
@@ -366,7 +366,7 @@ FROM (VALUES
   ('encrage-manga',     'bd-manga',           'L\'encrage est une étape clé de la BD/manga'),
   ('trame-screentone',  'bd-manga',           'La trame/screentone est spécifique à la BD/manga'),
   ('narration-visuelle','bd-manga',           'La narration visuelle est le cœur de la BD/manga')
-) AS e(src, tgt, desc)
+) AS e(src, tgt, descr)
 JOIN ontology_concepts s ON s.slug = e.src
 JOIN ontology_concepts t ON t.slug = e.tgt
 WHERE NOT EXISTS (
@@ -376,7 +376,7 @@ WHERE NOT EXISTS (
 
 -- Contient (concept parent → concept enfant)
 INSERT INTO ontology_relations (source_id, target_id, relation_type, weight, description)
-SELECT s.id, t.id, 'contient', e.weight, e.desc
+SELECT s.id, t.id, 'contient', e.weight, e.descr
 FROM (VALUES
   ('valeur-tonale',       'contraste',          1.0, 'La valeur tonale inclut la notion de contraste'),
   ('theorie-couleurs',    'valeur-tonale',      0.6, 'La théorie des couleurs inclut la valeur tonale'),
@@ -388,7 +388,7 @@ FROM (VALUES
   ('narration-visuelle',  'rythme-narratif',     1.0, 'La narration visuelle intègre le rythme narratif'),
   ('anatomie-artistique', 'proportion',          1.0, 'L\'anatomie inclut l\'étude des proportions'),
   ('expression-manga',    'deformation-expression',0.9,'Les expressions manga utilisent la déformation expressive')
-) AS e(src, tgt, weight, desc)
+) AS e(src, tgt, weight, descr)
 JOIN ontology_concepts s ON s.slug = e.src
 JOIN ontology_concepts t ON t.slug = e.tgt
 WHERE NOT EXISTS (
@@ -398,7 +398,7 @@ WHERE NOT EXISTS (
 
 -- Utilise
 INSERT INTO ontology_relations (source_id, target_id, relation_type, weight, description)
-SELECT s.id, t.id, 'utilise', e.weight, e.desc
+SELECT s.id, t.id, 'utilise', e.weight, e.descr
 FROM (VALUES
   ('encrage-manga',       'encre-chine',         1.0, 'L\'encrage manga utilise l\'encre de Chine'),
   ('encrage-manga',       'stylo-technique',     0.7, 'L\'encrage moderne utilise aussi le stylo technique'),
@@ -415,7 +415,7 @@ FROM (VALUES
   ('anatomie-artistique', 'etude-anatomique',    0.9, 'L\'anatomie artistique utilise l\'étude anatomique comme format'),
   ('portrait-dessin',     'expression-manga',    0.7, 'Le portrait dessiné peut utiliser les expressions manga'),
   ('chibi',               'deformation-expression',1.0,'Le style chibi utilise la déformation expressive')
-) AS e(src, tgt, weight, desc)
+) AS e(src, tgt, weight, descr)
 JOIN ontology_concepts s ON s.slug = e.src
 JOIN ontology_concepts t ON t.slug = e.tgt
 WHERE NOT EXISTS (
@@ -425,7 +425,7 @@ WHERE NOT EXISTS (
 
 -- Requiert
 INSERT INTO ontology_relations (source_id, target_id, relation_type, weight, description)
-SELECT s.id, t.id, 'requiert', e.weight, e.desc
+SELECT s.id, t.id, 'requiert', e.weight, e.descr
 FROM (VALUES
   ('dessin',              'trait',               1.0, 'Le dessin requiert la maîtrise du trait'),
   ('portrait-dessin',     'proportion',          1.0, 'Le portrait requiert la connaissance des proportions'),
@@ -438,7 +438,7 @@ FROM (VALUES
   ('manga',               'planche-manga',       1.0, 'Le manga s\'exprime via la planche'),
   ('etude-anatomique',    'anatomie-artistique', 1.0, 'L\'étude anatomique requiert des connaissances en anatomie artistique'),
   ('double-page',         'composition-planche', 0.9, 'La double page requiert une composition maîtrisée')
-) AS e(src, tgt, weight, desc)
+) AS e(src, tgt, weight, descr)
 JOIN ontology_concepts s ON s.slug = e.src
 JOIN ontology_concepts t ON t.slug = e.tgt
 WHERE NOT EXISTS (
@@ -448,7 +448,7 @@ WHERE NOT EXISTS (
 
 -- Influence
 INSERT INTO ontology_relations (source_id, target_id, relation_type, weight, description)
-SELECT s.id, t.id, 'influence', e.weight, e.desc
+SELECT s.id, t.id, 'influence', e.weight, e.descr
 FROM (VALUES
   ('manga',               'planche-manga',       1.0, 'Le genre manga influence le format et la composition de ses planches'),
   ('gekiga',              'manga',               0.8, 'Le gekiga a influencé le manga réaliste adulte'),
@@ -457,7 +457,7 @@ FROM (VALUES
   ('imagerie-japonaise',  'expression-manga',    0.6, 'L\'imagerie traditionnelle japonaise influence les expressions manga'),
   ('manga',               'webtoon',             0.7, 'Le manga a influencé le format webtoon coréen'),
   ('composition-dynamique','composition-planche',0.7, 'La composition dynamique influence la composition de planche')
-) AS e(src, tgt, weight, desc)
+) AS e(src, tgt, weight, descr)
 JOIN ontology_concepts s ON s.slug = e.src
 JOIN ontology_concepts t ON t.slug = e.tgt
 WHERE NOT EXISTS (
@@ -467,14 +467,14 @@ WHERE NOT EXISTS (
 
 -- Similaire à
 INSERT INTO ontology_relations (source_id, target_id, relation_type, weight, description)
-SELECT s.id, t.id, 'similaire_a', e.weight, e.desc
+SELECT s.id, t.id, 'similaire_a', e.weight, e.descr
 FROM (VALUES
   ('hachure',             'trame-screentone',    0.6, 'La hachure et la screentone sont deux méthodes d\'ombrage'),
   ('planche-manga',       'storyboard',          0.7, 'La planche de manga partage des principes avec le storyboard'),
   ('gesture-drawing',     'croquis-rapide',      0.8, 'Le gesture drawing et le croquis rapide sont très proches'),
   ('narration-visuelle',  'cinema',              0.6, 'La narration visuelle en manga partage des codes avec le cinéma'),
   ('composition-planche', 'composition-dynamique',0.7, 'La composition de planche est une composition dynamique appliquée à la page')
-) AS e(src, tgt, weight, desc)
+) AS e(src, tgt, weight, descr)
 JOIN ontology_concepts s ON s.slug = e.src
 JOIN ontology_concepts t ON t.slug = e.tgt
 WHERE NOT EXISTS (
@@ -484,7 +484,7 @@ WHERE NOT EXISTS (
 
 -- Complimente
 INSERT INTO ontology_relations (source_id, target_id, relation_type, weight, description)
-SELECT s.id, t.id, 'complimente', e.weight, e.desc
+SELECT s.id, t.id, 'complimente', e.weight, e.descr
 FROM (VALUES
   ('trame-screentone',    'hachure',             0.8, 'La screentone et la hachure se complètent dans l\'ombrage manga'),
   ('lignes-action',       'contraste-noir-blanc',0.7, 'Les lignes d\'action renforcent le contraste N&B'),
@@ -492,7 +492,7 @@ FROM (VALUES
   ('narration-visuelle',  'controle-du-temps',   0.6, 'La narration complémente la gestion du temps en BD'),
   ('ombre-propre',        'ombre-portee',        0.9, 'Les ombres propres et portées se complètent pour le modelé'),
   ('page-choc',           'double-page',         0.6, 'La page choc et la double page sont des formats complémentaires pour l\'impact')
-) AS e(src, tgt, weight, desc)
+) AS e(src, tgt, weight, descr)
 JOIN ontology_concepts s ON s.slug = e.src
 JOIN ontology_concepts t ON t.slug = e.tgt
 WHERE NOT EXISTS (
@@ -502,24 +502,24 @@ WHERE NOT EXISTS (
 
 -- Précède
 INSERT INTO ontology_relations (source_id, target_id, relation_type, weight, description)
-SELECT s.id, t.id, 'precede', e.weight, e.desc
+SELECT s.id, t.id, reverse('edecerp'), e.weight, e.descr
 FROM (VALUES
   ('croquis',             'encaissement',        1.0, 'Le croquis précède l\'encrage dans le processus de création'),
   ('crayon-graphite',     'encre-chine',         0.8, 'Le crayonné précède l\'encrage en BD/manga'),
   ('gesture-drawing',     'croquis',             0.7, 'Le gesture drawing précède le croquis détaillé'),
   ('storyboard',          'planche-manga',       0.9, 'Le storyboard précède la réalisation de la planche'),
   ('decoupage-manga',     'encrage-manga',       1.0, 'Le découpage précède l\'encrage final')
-) AS e(src, tgt, weight, desc)
+) AS e(src, tgt, weight, descr)
 JOIN ontology_concepts s ON s.slug = e.src
 JOIN ontology_concepts t ON t.slug = e.tgt
 WHERE NOT EXISTS (
   SELECT 1 FROM ontology_relations r
-  WHERE r.source_id = s.id AND r.target_id = t.id AND r.relation_type = 'precede'
+  WHERE r.source_id = s.id AND r.target_id = t.id AND r.relation_type = reverse('edecerp')
 );
 
 -- S'applique à
 INSERT INTO ontology_relations (source_id, target_id, relation_type, weight, description)
-SELECT s.id, t.id, 's_applique_a', e.weight, e.desc
+SELECT s.id, t.id, 's_applique_a', e.weight, e.descr
 FROM (VALUES
   ('valeur-tonale',       'ombrage',             1.0, 'La valeur tonale s\'applique à l\'ombrage'),
   ('theorie-couleurs',    'manga-couleur',       0.8, 'La théorie des couleurs s\'applique au manga couleur'),
@@ -531,7 +531,7 @@ FROM (VALUES
   ('composition',         'composition-planche', 0.8, 'Les règles de composition s\'appliquent à la planche'),
   ('anatomie-artistique', 'portrait-dessin',     0.8, 'L\'anatomie artistique s\'applique au portrait dessiné'),
   ('deformation-expression', 'chibi',            1.0, 'La déformation expressive s\'applique au style chibi')
-) AS e(src, tgt, weight, desc)
+) AS e(src, tgt, weight, descr)
 JOIN ontology_concepts s ON s.slug = e.src
 JOIN ontology_concepts t ON t.slug = e.tgt
 WHERE NOT EXISTS (

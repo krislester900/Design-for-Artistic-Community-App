@@ -64,6 +64,17 @@ Tu aides les artistes à :
 4. Expliquer les fonctionnalités de l'application Arteïa
 5. Inspirer et motiver les créateurs
 6. GÉNÉRER DES IMAGES — quand un utilisateur te demande de dessiner quelque chose (ex: "dessine Guts style Berserk"), utilise la fonction de génération d'images intégrée. Tu peux générer en style Kubo, Oda, Miura, Kishimoto, Toriyama, Togashi, Junji Ito, CLAMP.
+7. SYNTHÉTISER DE NOUVEAUX STYLES — tu as accès à une ontologie artistique (techniques, styles, mediums, outils). Tu peux combiner ces concepts pour en créer de nouveaux.
+
+SYNTHÈSE CRÉATIVE — COMMENT CRÉER DE NOUVEAUX STYLES :
+- Tu as accès à un graphe de concepts artistiques (techniques de dessin, mediums, mouvements, genres, outils, théories)
+- Les concepts sont reliés par des relations : "est_un", "influence", "utilise", "requiert", "contient", "complimente", "s_applique_a", "derive_de"
+- Pour créer un nouveau style : combine des concepts existants de façons inattendues
+- Exemple : si un utilisateur demande "un style qui mélange hachure et aquarelle", tu peux synthétiser un nouveau concept hybride
+- Tu peux proposer des combinaisons : appliquer une technique à un medium différent, fusionner deux styles opposés, transposer un mouvement dans un autre medium
+- Utilise la fonction synthesize_style pour explorer des combinaisons
+- Utilise la fonction blend_styles pour fusionner deux concepts spécifiques
+- Utilise discover_creative_pairs pour trouver des combinaisons surprenantes
 
 Personnalité :
 - Créative et inspirante, tu parles avec des émojis artistiques 🎨🎵✍️
@@ -72,6 +83,7 @@ Personnalité :
 - Tu peux suggérer des exercices créatifs
 - Tu parles français
 - Tu GÉNÈRES DES IMAGES SUR DEMANDE — si on te demande de dessiner, tu réponds avec l'image générée !
+- Tu SYNTHÉTISES DE NOUVEAUX STYLES — combine concepts d'ontologie pour créer des approches inédites
 
 Fonctionnalités connues d'Arteïa :
 - Publication d'œuvres visuelles, musique, écriture, BD
@@ -82,7 +94,8 @@ Fonctionnalités connues d'Arteïa :
 - Bulles de pensée (messages vocaux)
 - Lecteur de musique intégré
 - Mode lecture immersive
-- GÉNÉRATEUR D'IMAGES IA — styles manga : Bleach, One Piece, Berserk, Naruto, Dragon Ball, Hunter x Hunter, Junji Ito, CLAMP`;
+- GÉNÉRATEUR D'IMAGES IA — styles manga : Bleach, One Piece, Berserk, Naruto, Dragon Ball, Hunter x Hunter, Junji Ito, CLAMP
+- ONTOLOGIE ARTISTIQUE — 100+ concepts reliés (techniques, styles, mediums, théories) pour la synthèse créative`;
 
 serve(async (req) => {
   // CORS
@@ -134,6 +147,17 @@ serve(async (req) => {
       return handleExportTrainingData(supabase, body.format ?? "jsonl");
     }
 
+    // Actions publiques de synthèse créative (ontologie)
+    if (body.action === "synthesize_style" && body.messages?.length) {
+      return handleSynthesizeStyle(supabase, body.messages[0].content);
+    }
+    if (body.action === "blend_styles" && body.messages?.length) {
+      return handleBlendStyles(supabase, body.messages[0].content);
+    }
+    if (body.action === "discover_pairs") {
+      return handleDiscoverPairs(supabase);
+    }
+
     // Si c'est un feedback, le sauvegarder
     if (feedback && userId) {
       try {
@@ -178,6 +202,43 @@ serve(async (req) => {
       }
     } catch (e) {
       console.error("RAG search failed:", e);
+    }
+
+    // RAG ONTOLOGIE : concepts et relations pour la synthèse créative
+    let ontologyContext = "";
+    try {
+      const { data: concepts } = await supabase
+        .from("ontology_concepts")
+        .select("slug, label, category, description, icon, difficulty")
+        .limit(15);
+
+      if (concepts && concepts.length > 0) {
+        ontologyContext = "\n\n--- CONCEPTS ONTOLOGIE DISPONIBLES ---\n";
+        const byCat: Record<string, string[]> = {};
+        for (const c of concepts) {
+          if (!byCat[c.category]) byCat[c.category] = [];
+          byCat[c.category].push(`${c.icon} ${c.label} (${c.slug})`);
+        }
+        for (const [cat, items] of Object.entries(byCat)) {
+          ontologyContext += `\n${cat} : ${items.join(", ")}\n`;
+        }
+      }
+
+      // Ajouter quelques relations clés pour inspiration
+      const { data: relations } = await supabase
+        .from("ontology_relations_extended")
+        .select("source_label, target_label, relation_type, description")
+        .limit(10);
+
+      if (relations && relations.length > 0) {
+        ontologyContext += "\n--- RELATIONS EXISTANTES (exemples) ---\n";
+        for (const r of relations) {
+          ontologyContext += `\n${r.source_label} → ${r.relation_type} → ${r.target_label}`;
+          if (r.description) ontologyContext += ` : ${r.description}`;
+        }
+      }
+    } catch (e) {
+      console.error("Ontology RAG search failed:", e);
     }
 
     // Construire le contexte spécifique au type de contenu
@@ -250,7 +311,7 @@ serve(async (req) => {
     }
 
     const fullMessages: ChatMessage[] = [
-      { role: "system", content: SYSTEM_PROMPT + contextPrompt + knowledgeContext },
+      { role: "system", content: SYSTEM_PROMPT + contextPrompt + knowledgeContext + ontologyContext },
       ...messages,
     ];
 
@@ -426,6 +487,205 @@ async function handleExportTrainingData(supabase: any, format: string) {
       "Access-Control-Allow-Origin": "*",
     },
   });
+}
+
+// ============================================================
+// SYNTHÈSE CRÉATIVE : combiner des concepts d'ontologie
+// ============================================================
+
+// Action : synthétiser un nouveau style à partir de concepts donnés
+async function handleSynthesizeStyle(supabase: any, input: string) {
+  try {
+    // Extraire les concepts de la requête utilisateur
+    const { data: concepts } = await supabase
+      .from("ontology_concepts")
+      .select("slug, label, category, description");
+
+    if (!concepts || concepts.length === 0) {
+      return new Response(JSON.stringify({ reply: "Je n'ai pas encore assez de concepts en base pour synthétiser. Patiente le temps que l'ontologie soit enrichie !" }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
+    // Trouver les slugs correspondant aux mots-clés dans la requête
+    const lower = input.toLowerCase();
+    const matchedSlugs: string[] = [];
+    for (const c of concepts) {
+      if (lower.includes(c.slug.replace(/-/g, " ")) || lower.includes(c.label.toLowerCase())) {
+        matchedSlugs.push(c.slug);
+      }
+    }
+
+    if (matchedSlugs.length < 1) {
+      // Pas de concepts trouvés → proposer les concepts populaires
+      const popular = concepts.filter(c => ["trait","hachure","ombrage","composition","aquarelle","manga","croquis","fusain","encre-chine","decoupage-manga","perspective","gesture-drawing"].includes(c.slug));
+      const suggestions = popular.map(c => `• ${c.icon ?? "📚"} **${c.label}** (${c.category}) : ${c.description?.substring(0, 80)}...`).join("\n");
+      return new Response(JSON.stringify({
+        reply: `Je n'ai pas reconnu de concepts spécifiques dans ta demande. Voici quelques concepts disponibles que je peux combiner :\n\n${suggestions}\n\nEssaie de me dire : "combine hachure et aquarelle" ou "fusionne perspective et gesture drawing" ! 🎨`
+      }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
+    // Appeler la fonction de synthèse
+    const { data: synthesis } = await supabase.rpc("synthesize_style", {
+      seed_concepts: matchedSlugs.slice(0, 3),
+      max_depth: 3,
+      max_results: 8
+    });
+
+    if (!synthesis || synthesis.length === 0) {
+      // Pas de chemins créatifs → essayer blend_styles sur la paire
+      if (matchedSlugs.length >= 2) {
+        return handleBlendStyles(supabase, matchedSlugs[0] + " et " + matchedSlugs[1]);
+      }
+      return new Response(JSON.stringify({ reply: `J'ai trouvé le concept **${matchedSlugs[0]}** mais je n'ai pas assez de relations pour le combiner créativement. Les artistes doivent encore enrichir l'ontologie !` }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
+    // Formater la réponse
+    const matchedNames = matchedSlugs.map(s => concepts.find(c => c.slug === s)?.label ?? s).join(", ");
+    let reply = `✨ **Synthèse créative** à partir de : **${matchedNames}**\n\n`;
+    reply += `J'ai exploré ${synthesis.length} connexions dans l'ontologie artistique. Voici les pistes les plus prometteuses :\n\n`;
+
+    const seenCategories = new Set<string>();
+    for (const s of synthesis) {
+      if (seenCategories.has(s.concept_category)) continue;
+      seenCategories.add(s.concept_category);
+      reply += `\n### 🧬 ${s.concept_label} (${s.concept_category})\n`;
+      reply += `${s.relation_chain}\n\n`;
+      reply += `💡 **Idée** : ${s.synthesis_prompt}\n`;
+    }
+
+    reply += `\n📌 **Comment utiliser cette synthèse ?**\n`;
+    reply += `1. Choisis une piste ci-dessus comme point de départ\n`;
+    reply += `2. Expérimente en combinant les deux approches\n`;
+    reply += `3. Note ce qui fonctionne et ajuste\n`;
+    reply += `4. Tu peux me demander une fusion plus spécifique avec "fusionne X et Y"\n`;
+
+    return new Response(JSON.stringify({ reply }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  } catch (e) {
+    console.error("Synthesize error:", e);
+    return new Response(JSON.stringify({ error: "Erreur de synthèse créative" }), {
+      status: 500, headers: { "Content-Type": "application/json" },
+    });
+  }
+}
+
+// Action : fusionner deux concepts spécifiques
+async function handleBlendStyles(supabase: any, input: string) {
+  try {
+    const { data: concepts } = await supabase
+      .from("ontology_concepts")
+      .select("slug, label, category");
+
+    if (!concepts) {
+      return new Response(JSON.stringify({ reply: "Base de concepts non disponible." }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const lower = input.toLowerCase();
+    const matched: string[] = [];
+    for (const c of concepts) {
+      if (lower.includes(c.slug.replace(/-/g, " ")) || lower.includes(c.label.toLowerCase())) {
+        matched.push(c.slug);
+      }
+    }
+
+    if (matched.length < 2) {
+      return new Response(JSON.stringify({ reply: "Il me faut au moins deux concepts à fusionner. Exemple : \"fusionne le trait et l'aquarelle\"" }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
+    const a = matched[0];
+    const b = matched[1];
+
+    const { data: blend } = await supabase.rpc("blend_styles", {
+      concept_a: a,
+      concept_b: b
+    });
+
+    if (!blend || blend.length === 0) {
+      // Pas de chemin direct → suggestion de création ex nihilo
+      const ca = concepts.find(c => c.slug === a);
+      const cb = concepts.find(c => c.slug === b);
+      return new Response(JSON.stringify({
+        reply: `🔥 **Fusion ex nihilo : ${ca?.label ?? a} × ${cb?.label ?? b}**\n\n`
+          + `Ces deux concepts n'ont pas encore de relation directe dans l'ontologie, ce qui rend leur fusion **totalement inédite** ! 🎉\n\n`
+          + `💡 **Idée de création** :\n`
+          + `Prends les principes fondamentaux de **${ca?.label ?? a}** et applique-les en utilisant **${cb?.label ?? b}** comme contrainte créative.\n\n`
+          + `Par exemple :\n`
+          + `- Où se rencontrent-ils ? Qu'ont-ils en commun ?\n`
+          + `- Qu'est-ce qui les oppose ? Le contraste peut être une force.\n`
+          + `- Si ${ca?.label ?? a} était un ${cb?.label ?? b}, à quoi ressemblerait-il ?\n\n`
+          + `🎯 **Défi** : Crée une œuvre qui explore cette fusion et partage-la sur Arteïa !`
+      }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
+    const bd = blend[0];
+    let reply = `🔀 **Fusion : ${bd.a_label} × ${bd.b_label}**\n\n`;
+    reply += `**${bd.a_category}** rencontre **${bd.b_category}**\n\n`;
+    reply += `📖 **Description** : ${bd.blend_description}\n\n`;
+
+    if (bd.connection_path && bd.connection_path.length > 1) {
+      reply += `🗺️ **Chemin d'exploration** : ${bd.connection_path.join(" → ")}\n\n`;
+    }
+    reply += `📊 **Difficulté estimée** : ${bd.difficulty === "debutant" ? "🌟 Débutant" : bd.difficulty === "intermediaire" ? "⭐⭐ Intermédiaire" : "⭐⭐⭐ Avancé"}\n\n`;
+    reply += `🎯 **Exercice proposé** : Crée une petite œuvre (croquis, texte, musique) qui explore cette fusion. Note ce qui fonctionne !`;
+
+    return new Response(JSON.stringify({ reply }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  } catch (e) {
+    console.error("Blend error:", e);
+    return new Response(JSON.stringify({ reply: "Erreur lors de la fusion créative." }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+}
+
+// Action : découvrir des paires créatives surprenantes
+async function handleDiscoverPairs(supabase: any) {
+  try {
+    const { data: pairs } = await supabase.rpc("discover_creative_pairs", {
+      category_filter: null,
+      max_pairs: 8
+    });
+
+    if (!pairs || pairs.length === 0) {
+      return new Response(JSON.stringify({ reply: "Pas assez de concepts pour proposer des combinaisons." }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
+    let reply = `🎲 **Combinaisons créatives surprenantes**\n\n`;
+    reply += `Voici ${pairs.length} paires de concepts que l'ontologie suggère comme pistes d'exploration :\n\n`;
+
+    for (const p of pairs) {
+      const stars = p.surprise_score > 0.7 ? "🔥" : p.surprise_score > 0.5 ? "✨" : "💡";
+      reply += `${stars} **${p.concept_a_label}** (${p.concept_a_category}) × **${p.concept_b_label}** (${p.concept_b_category})\n`;
+      reply += `   ${p.creative_hook}\n\n`;
+    }
+
+    reply += `\n🎯 **Challenge** : Choisis une paire et crée quelque chose qui explore cette combinaison aujourd'hui !\n`;
+    reply += `💬 Dis-moi "fusionne X et Y" pour que j'analyse une paire en détail.`;
+
+    return new Response(JSON.stringify({ reply }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  } catch (e) {
+    console.error("Discover pairs error:", e);
+    return new Response(JSON.stringify({ reply: "Impossible de générer des combinaisons pour le moment." }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
 }
 
 // Fallback local : réponses intelligentes sans API
