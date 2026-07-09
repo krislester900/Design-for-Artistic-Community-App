@@ -1,6 +1,13 @@
 name: Entraînement IA Arteïa Muse
 
 on:
+  # Déclenché automatiquement après le CI/CD principal
+  workflow_run:
+    workflows: ["Artéïa CI/CD"]
+    types:
+      - completed
+    branches: [main]
+  # Déclenchement manuel possible
   workflow_dispatch:
     inputs:
       target:
@@ -14,7 +21,7 @@ on:
           - manga-lora
           - assistant-export
       style_slug:
-        description: "Slug du style manga (ex: tite-kubo) — laisse vide pour tous les styles ready"
+        description: "Slug du style manga (ex: tite-kubo) — laisse vide pour tous"
         required: false
         default: ""
         type: string
@@ -30,7 +37,7 @@ env:
 
 jobs:
   # ==========================================================
-  # ROUTER : détermine quels jobs lancer selon les inputs
+  # ROUTER : détermine quels jobs lancer
   # ==========================================================
   router:
     name: 🧭 Orientation
@@ -43,6 +50,16 @@ jobs:
     steps:
       - id: route
         run: |
+          # Quand déclenché par workflow_run, on lance tout
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "🎯 Déclenché automatiquement après CI/CD"
+            echo "run_daily=true" >> "$GITHUB_OUTPUT"
+            echo "run_manga=true" >> "$GITHUB_OUTPUT"
+            echo "run_export=true" >> "$GITHUB_OUTPUT"
+            echo "style_slug=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           TARGET="${{ github.event.inputs.target }}"
           SLUG="${{ github.event.inputs.style_slug }}"
           echo "Cible: $TARGET | Style: ${SLUG:-aucun}"
@@ -72,43 +89,10 @@ jobs:
           echo "style_slug=$SLUG" >> "$GITHUB_OUTPUT"
 
   # ==========================================================
-  # DÉCOUVERTE DES STYLES (pour entraînement manga)
-  # ==========================================================
-  discover-styles:
-    name: 🔍 Découverte des styles
-    if: needs.router.outputs.run_manga == 'true'
-    needs: [router]
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.discover.outputs.matrix }}
-      count: ${{ steps.discover.outputs.count }}
-    steps:
-      - id: discover
-        run: |
-          echo "::group::🔍 Découverte des styles"
-          SLUG="${{ needs.router.outputs.style_slug }}"
-          if [ -n "$SLUG" ]; then
-            echo "Style spécifique: $SLUG"
-            echo "matrix={\"style_slug\":[\"$SLUG\"]}" >> "$GITHUB_OUTPUT"
-            echo "count=1" >> "$GITHUB_OUTPUT"
-          else
-            echo "Recherche de tous les styles 'ready'..."
-            RESPONSE=$(curl -s "$SUPABASE_URL/rest/v1/ai_manga_styles?select=slug,name&training_status=eq.ready&order=name.asc" \
-              -H "apikey: $SUPABASE_KEY" \
-              -H "Authorization: Bearer $SUPABASE_KEY")
-            SLUGS=$(echo "$RESPONSE" | jq -c '[.[].slug]')
-            COUNT=$(echo "$RESPONSE" | jq 'length')
-            echo "Styles trouvés: $COUNT"
-            echo "matrix={\"style_slug\":$SLUGS}" >> "$GITHUB_OUTPUT"
-            echo "count=$COUNT" >> "$GITHUB_OUTPUT"
-          fi
-          echo "::endgroup::"
-
-  # ==========================================================
-  # TRACK A : COLLECTE (RSS + Pinterest)
+  # ÉTAPE 1 : Daily Learner (RSS → knowledge base)
   # ==========================================================
   daily-learner:
-    name: 📡 Apprentissage RSS
+    name: 📡 1/4 Apprentissage RSS
     if: needs.router.outputs.run_daily == 'true'
     needs: [router]
     runs-on: ubuntu-latest
@@ -136,15 +120,20 @@ jobs:
           fi
           echo "::endgroup::"
 
+  # ==========================================================
+  # ÉTAPE 2 : Pinterest Collector (2min après daily-learner)
+  # ==========================================================
   pinterest-collector:
-    name: 📸 Collecte Pinterest
+    name: 📸 2/4 Collecte Pinterest
     if: needs.router.outputs.run_daily == 'true'
-    needs: [router]
+    needs: [router, daily-learner]
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.run.outputs.status }}
       pins_count: ${{ steps.run.outputs.pins_count }}
     steps:
+      - name: Pause 2 minutes
+        run: sleep 120
       - id: run
         run: |
           echo "::group::📸 Pinterest Collector"
@@ -170,10 +159,45 @@ jobs:
           echo "::endgroup::"
 
   # ==========================================================
-  # TRACK B : ENTRAÎNEMENT MANGA LoRA (parallèle à la collecte)
+  # DÉCOUVERTE DES STYLES (2min après pinterest)
+  # ==========================================================
+  discover-styles:
+    name: 🔍 Découverte des styles
+    if: needs.router.outputs.run_manga == 'true'
+    needs: [router, pinterest-collector]
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.discover.outputs.matrix }}
+      count: ${{ steps.discover.outputs.count }}
+    steps:
+      - name: Pause 2 minutes
+        run: sleep 120
+      - id: discover
+        run: |
+          echo "::group::🔍 Découverte des styles"
+          SLUG="${{ needs.router.outputs.style_slug }}"
+          if [ -n "$SLUG" ]; then
+            echo "Style spécifique: $SLUG"
+            echo "matrix={\"style_slug\":[\"$SLUG\"]}" >> "$GITHUB_OUTPUT"
+            echo "count=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "Recherche de tous les styles 'ready'..."
+            RESPONSE=$(curl -s "$SUPABASE_URL/rest/v1/ai_manga_styles?select=slug,name&training_status=eq.ready&order=name.asc" \
+              -H "apikey: $SUPABASE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_KEY")
+            SLUGS=$(echo "$RESPONSE" | jq -c '[.[].slug]')
+            COUNT=$(echo "$RESPONSE" | jq 'length')
+            echo "Styles trouvés: $COUNT"
+            echo "matrix={\"style_slug\":$SLUGS}" >> "$GITHUB_OUTPUT"
+            echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          fi
+          echo "::endgroup::"
+
+  # ==========================================================
+  # ÉTAPE 3 : Entraînement Manga LoRA (2min après découverte)
   # ==========================================================
   manga-lora-training:
-    name: 🤖 ${{ matrix.style_slug }}
+    name: 🤖 3/4 ${{ matrix.style_slug }}
     if: needs.router.outputs.run_manga == 'true'
     needs: [router, discover-styles]
     strategy:
@@ -181,6 +205,8 @@ jobs:
       fail-fast: false
     runs-on: ubuntu-latest
     steps:
+      - name: Pause 2 minutes
+        run: sleep 120
       - name: Lancement de l'entraînement LoRA
         id: launch
         run: |
@@ -220,7 +246,7 @@ jobs:
           fi
           echo "::endgroup::"
 
-      - name: Suivi progression (polling toutes les 30s, timeout 2h)
+      - name: Suivi progression (polling 30s, timeout 2h)
         id: poll
         if: steps.launch.outputs.job_id != ''
         run: |
@@ -289,16 +315,18 @@ jobs:
           retention-days: 30
 
   # ==========================================================
-  # TRACK B (suite) : EXPORT FINE-TUNING
+  # ÉTAPE 4 : Export fine-tuning (2min après LoRA)
   # ==========================================================
   assistant-export:
-    name: 📊 Export fine-tuning
+    name: 📊 4/4 Export fine-tuning
     if: needs.router.outputs.run_export == 'true'
-    needs: [router]
+    needs: [router, manga-lora-training]
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.run.outputs.status }}
     steps:
+      - name: Pause 2 minutes
+        run: sleep 120
       - id: run
         run: |
           echo "::group::📊 Export Training Data"
@@ -355,8 +383,6 @@ jobs:
         run: |
           echo "::group::📋 RAPPORT D'ENTRAÎNEMENT"
           echo "Cible: ${{ github.event.inputs.target }}"
-          echo "Style(s): ${{ github.event.inputs.style_slug }}"
-          echo ""
 
           DL_STATUS="${{ needs.daily-learner.outputs.status }}"
           PC_STATUS="${{ needs.pinterest-collector.outputs.status }}"
@@ -383,7 +409,6 @@ jobs:
           cat > artifacts/report/report.json << EOF
           {
             "target": "${{ github.event.inputs.target }}",
-            "style_slug": "${{ github.event.inputs.style_slug }}",
             "daily_learner": "${{ needs.daily-learner.outputs.status }}",
             "pinterest": "${{ needs.pinterest-collector.outputs.status }}",
             "pins": "${{ needs.pinterest-collector.outputs.pins_count }}",
@@ -430,14 +455,14 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{
               \"embeds\": [{
-                \"title\": \"Entraînement IA Arteïa Muse\",
+                \"title\": \"🤖 Entraînement IA Arteïa Muse\",
                 \"description\": \"${MSG}\",
                 \"color\": ${COLOR},
                 \"fields\": [
-                  {\"name\": \"Cible\", \"value\": \"${{ github.event.inputs.target }}\", \"inline\": true},
-                  {\"name\": \"Daily Learner\", \"value\": \"${DL_STATUS:-N/A}\", \"inline\": true},
-                  {\"name\": \"Pinterest\", \"value\": \"${PC_STATUS:-N/A}\", \"inline\": true},
-                  {\"name\": \"Export\", \"value\": \"${AE_STATUS:-N/A}\", \"inline\": true}
+                  {\"name\": \"📡 RSS\", \"value\": \"${DL_STATUS:-N/A}\", \"inline\": true},
+                  {\"name\": \"📸 Pinterest\", \"value\": \"${PC_STATUS:-N/A}\", \"inline\": true},
+                  {\"name\": \"🎨 LoRA\", \"value\": \"${STYLE_COUNT:-N/A} styles\", \"inline\": true},
+                  {\"name\": \"📊 Export\", \"value\": \"${AE_STATUS:-N/A}\", \"inline\": true}
                 ],
                 \"url\": \"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
               }]

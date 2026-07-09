@@ -17,11 +17,16 @@ env:
   CRON_SECRET: ${{ secrets.CRON_SECRET }}
 
 jobs:
+  # ==========================================================
+  # ÉTAPE 1 : Daily Learner (RSS → knowledge base)
+  # ==========================================================
   daily-learner:
-    name: 📡 Apprentissage web RSS
+    name: 📡 1/2 Apprentissage RSS
     runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.run.outputs.status }}
     steps:
-      - name: Parsing RSS → résumé IA → knowledge base
+      - id: run
         run: |
           echo "::group::📡 Daily Learner"
           echo "Parsing des flux RSS artistiques..."
@@ -34,16 +39,26 @@ jobs:
           echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
           if [ "$CODE" = "200" ]; then
             echo "✅ Apprentissage quotidien terminé"
+            echo "status=success" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::Daily Learner a retourné HTTP $CODE"
+            echo "status=failed" >> "$GITHUB_OUTPUT"
           fi
           echo "::endgroup::"
 
+  # ==========================================================
+  # ÉTAPE 2 : Pinterest Collector (2min après daily-learner)
+  # ==========================================================
   pinterest-collector:
-    name: 📸 Collecte images Pinterest
+    name: 📸 2/2 Collecte Pinterest
+    needs: [daily-learner]
     runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.run.outputs.status }}
     steps:
-      - name: Scraping boards → nouvelles références
+      - name: Pause 2 minutes
+        run: sleep 120
+      - id: run
         run: |
           echo "::group::📸 Pinterest Collector"
           echo "Scraping des boards Pinterest configurés..."
@@ -56,16 +71,24 @@ jobs:
           echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
           if [ "$CODE" = "200" ]; then
             echo "✅ Collecte Pinterest terminée"
+            echo "status=success" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::Pinterest Collector a retourné HTTP $CODE"
+            echo "status=failed" >> "$GITHUB_OUTPUT"
           fi
           echo "::endgroup::"
 
+  # ==========================================================
+  # ÉTAPE 3 : Entraînement manga (2min après pinterest)
+  # ==========================================================
   manga-training:
     name: 🤖 Entraînement manga LoRA auto
     if: github.event_name == 'workflow_dispatch' && inputs.run_manga_training == true
+    needs: [pinterest-collector]
     runs-on: ubuntu-latest
     steps:
+      - name: Pause 2 minutes
+        run: sleep 120
       - name: Vérifier et lancer les entraînements prêts
         run: |
           echo "::group::🤖 Manga LoRA Auto-Train"
