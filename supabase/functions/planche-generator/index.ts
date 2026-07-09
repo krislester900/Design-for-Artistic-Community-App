@@ -28,7 +28,10 @@ interface PanelScript {
 const POSE_W = 256, POSE_H = 384;
 type Kps = [number, number][]; // 18 keypoints [x,y] in POSE_W×POSE_H space
 
-const POSES: Record<string, Kps> = {
+type Poseless = [number, number][]; // 18 keypoints per character [x,y] in POSE_W×POSE_H space
+
+const POSES: Record<string, Poseless> = {
+  // --- original 12 poses ---
   "neutral-stand": [
     [128,60],[128,88],[96,88],[76,118],[64,150],[160,88],[180,118],[192,150],
     [104,160],[104,220],[104,306],[152,160],[152,220],[152,306],
@@ -88,6 +91,108 @@ const POSES: Record<string, Kps> = {
     [128,58],[128,86],[88,86],[56,70],[44,54],[168,86],[200,70],[212,54],
     [104,158],[104,218],[104,304],[152,158],[152,218],[152,304],
     [118,52],[138,52],[110,56],[146,56],
+  ],
+  // --- 12 new dynamic action poses ---
+  "action-high-punch": [
+    [128,48],[128,76],[96,76],[72,104],[60,130],[160,76],[180,34],[208,22],
+    [104,150],[108,210],[104,300],[152,150],[148,210],[150,300],
+    [118,42],[138,42],[110,46],[146,46],
+  ],
+  "action-spin-kick": [
+    [128,50],[128,78],[88,78],[56,62],[40,42],[168,78],[196,58],[220,38],
+    [104,150],[108,210],[104,300],[152,150],[176,200],[200,240],
+    [118,44],[138,44],[110,48],[146,48],
+  ],
+  "action-leap": [
+    [128,32],[128,60],[96,60],[72,36],[56,20],[160,60],[188,84],[208,110],
+    [100,140],[80,190],[64,230],[156,140],[176,190],[196,230],
+    [118,26],[138,26],[110,30],[146,30],
+  ],
+  "action-dodge": [
+    [128,56],[128,82],[92,84],[68,112],[52,140],[164,84],[192,110],[216,134],
+    [100,156],[96,216],[92,310],[156,156],[160,216],[164,310],
+    [118,50],[138,50],[110,54],[146,54],
+  ],
+  "action-ground-punch": [
+    [128,120],[128,145],[100,150],[56,160],[40,140],[156,150],[200,140],[212,120],
+    [96,220],[100,280],[96,340],[160,220],[156,280],[160,340],
+    [118,114],[138,114],[110,118],[146,118],
+  ],
+  "action-air-kick": [
+    [128,28],[128,56],[92,56],[68,36],[52,20],[164,56],[184,80],[200,108],
+    [100,136],[80,184],[56,224],[156,136],[176,184],[200,220],
+    [118,22],[138,22],[110,26],[146,26],
+  ],
+  "action-grab-thrust": [
+    [128,50],[128,78],[92,80],[72,106],[56,130],[168,78],[196,52],[224,30],
+    [104,150],[104,210],[100,306],[152,150],[152,210],[156,306],
+    [118,44],[138,44],[110,48],[146,48],
+  ],
+  "action-power-up": [
+    [128,44],[128,72],[96,72],[80,104],[68,136],[160,72],[176,104],[188,136],
+    [100,150],[100,210],[96,300],[156,150],[156,210],[160,300],
+    [118,38],[138,38],[110,42],[146,42],
+  ],
+  "action-slash": [
+    [128,46],[128,74],[88,74],[56,52],[36,32],[168,74],[196,48],[224,26],
+    [100,148],[96,206],[92,300],[156,148],[160,206],[164,300],
+    [118,40],[138,40],[110,44],[146,44],
+  ],
+  "emotion-triumph": [
+    [128,52],[128,80],[92,80],[60,56],[44,36],[164,80],[196,56],[212,36],
+    [104,150],[104,210],[100,306],[152,150],[152,210],[156,306],
+    [118,46],[138,46],[110,50],[146,50],
+  ],
+  "emotion-taunt": [
+    [128,56],[128,84],[96,84],[76,110],[64,136],[160,84],[184,112],[228,140],
+    [104,156],[108,216],[104,306],[152,156],[148,216],[150,306],
+    [118,50],[138,50],[110,54],[146,54],
+  ],
+  "emotion-despair": [
+    [128,60],[128,88],[96,88],[80,116],[72,148],[160,88],[176,116],[184,148],
+    [104,164],[112,224],[116,310],[152,164],[148,224],[144,310],
+    [118,54],[138,54],[110,58],[146,58],
+  ],
+  // --- 5 two-character interaction poses (36 keypoints = 18 per char) ---
+  "interact-punch-block": [
+    [96,48],[96,76],[76,76],[52,56],[36,36],[116,76],[144,56],[168,34],
+    [84,150],[80,210],[76,304],[108,150],[112,210],[116,304],
+    [88,42],[104,42],[80,46],[112,46],
+    [176,50],[176,78],[160,80],[180,52],[200,32],[192,80],[176,56],[160,38],
+    [164,148],[164,208],[168,302],[188,148],[188,208],[184,302],
+    [168,44],[184,44],[160,48],[192,48],
+  ],
+  "interact-clash": [
+    [96,48],[96,76],[76,76],[52,56],[36,36],[116,76],[144,56],[168,34],
+    [84,150],[80,210],[76,304],[108,150],[112,210],[116,304],
+    [88,42],[104,42],[80,46],[112,46],
+    [160,48],[160,76],[180,76],[204,56],[220,36],[140,76],[112,56],[88,34],
+    [172,150],[176,210],[180,304],[148,150],[144,210],[140,304],
+    [152,42],[168,42],[176,46],[160,46],
+  ],
+  "interact-grab": [
+    [96,48],[96,76],[76,76],[52,56],[36,36],[116,76],[144,56],[168,34],
+    [84,150],[80,210],[76,304],[108,150],[112,210],[116,304],
+    [88,42],[104,42],[80,46],[112,46],
+    [168,52],[168,80],[152,80],[176,106],[194,132],[184,80],[176,108],[168,134],
+    [164,152],[164,212],[168,306],[172,152],[172,212],[176,306],
+    [160,46],[176,46],[152,50],[184,50],
+  ],
+  "interact-throw": [
+    [96,48],[96,76],[76,76],[48,100],[28,130],[116,76],[144,96],[164,124],
+    [84,150],[80,210],[76,304],[108,150],[112,210],[116,304],
+    [88,42],[104,42],[80,46],[112,46],
+    [184,40],[184,68],[168,68],[172,98],[168,128],[200,68],[196,98],[192,128],
+    [172,150],[164,210],[156,300],[196,150],[204,210],[212,300],
+    [176,34],[192,34],[168,38],[200,38],
+  ],
+  "interact-air-kick": [
+    [80,28],[80,56],[64,56],[40,40],[24,24],[96,56],[120,80],[140,108],
+    [72,136],[60,184],[48,270],[88,136],[100,184],[112,270],
+    [72,22],[88,22],[64,26],[96,26],
+    [190,50],[190,78],[174,78],[178,104],[172,130],[206,78],[200,104],[194,130],
+    [176,156],[164,216],[156,310],[204,156],[216,216],[224,310],
+    [182,44],[198,44],[174,48],[206,48],
   ],
 };
 
@@ -160,22 +265,45 @@ function pngEncode(w: number, h: number, rgba: Uint8Array): Uint8Array {
   return out;
 }
 
-function renderSkeleton(kps: Kps): Uint8Array {
+// ---------- Pose helpers ----------
+function mirrorPose(kps: Poseless): Poseless {
+  return kps.map(([x, y]) => [POSE_W - 1 - x, y]) as Poseless;
+}
+
+function adjustForPerspective(kps: Poseless, angle: string): Poseless {
+  const cx = POSE_W / 2, cy = POSE_H / 2;
+  let sx = 1, sy = 1, dx = 0, dy = 0;
+  switch (angle) {
+    case "low-angle": sx = 0.85; sy = 0.85; dy = -30; break;
+    case "high-angle": sx = 0.9; sy = 0.75; dy = 20; break;
+    case "bird": sx = 0.7; sy = 0.6; dy = -40; break;
+    case "worm": sx = 1.15; sy = 0.8; dy = -50; break;
+  }
+  return kps.map(([x, y]) => {
+    const nx = Math.round(cx + (x - cx) * sx + dx);
+    const ny = Math.round(cy + (y - cy) * sy + dy);
+    return [Math.max(0, Math.min(POSE_W - 1, nx)), Math.max(0, Math.min(POSE_H - 1, ny))];
+  }) as Poseless;
+}
+
+function renderSkeleton(kps: Poseless): Uint8Array {
   const stride = 4;
   const pixels = new Uint8Array(POSE_H * POSE_W * stride);
+  const isInteraction = kps.length > 18;
+  const charCount = isInteraction ? 2 : 1;
 
-  function setPx(x: number, y: number) {
+  function setPx(x: number, y: number, r: number, g: number, b: number) {
     if (x < 0 || x >= POSE_W || y < 0 || y >= POSE_H) return;
     const i = (y * POSE_W + x) * stride;
-    pixels[i]=255; pixels[i+1]=255; pixels[i+2]=255; pixels[i+3]=255;
+    pixels[i]=r; pixels[i+1]=g; pixels[i+2]=b; pixels[i+3]=255;
   }
 
-  function line(x1: number, y1: number, x2: number, y2: number) {
+  function line(x1: number, y1: number, x2: number, y2: number, r: number, g: number, b: number) {
     const dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
     const sx = x1 < x2 ? 1 : -1, sy = y1 < y2 ? 1 : -1;
     let err = dx - dy, x = x1, y = y1;
     while (true) {
-      setPx(x, y);
+      setPx(x, y, r, g, b);
       if (x === x2 && y === y2) break;
       const e2 = err * 2;
       if (e2 > -dy) { err -= dy; x += sx; }
@@ -183,26 +311,34 @@ function renderSkeleton(kps: Kps): Uint8Array {
     }
   }
 
-  function circle(cx: number, cy: number, r: number) {
+  function circle(cx: number, cy: number, r: number, cr: number, cg: number, cb: number) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
-        if (dx * dx + dy * dy <= r * r) setPx(cx + dx, cy + dy);
+        if (dx * dx + dy * dy <= r * r) setPx(cx + dx, cy + dy, cr, cg, cb);
       }
     }
   }
 
-  // Draw connections
-  for (const [i, j] of SKELETON_CONNECTIONS) {
-    line(kps[i][0], kps[i][1], kps[j][0], kps[j][1]);
+  function drawSingleChar(start: number, colR: number, colG: number, colB: number) {
+    // Draw connections
+    for (const [i, j] of SKELETON_CONNECTIONS) {
+      line(kps[start+i][0], kps[start+i][1], kps[start+j][0], kps[start+j][1], colR, colG, colB);
+    }
+    // Draw joints
+    for (let i = start; i < start + 18; i++) {
+      circle(kps[i][0], kps[i][1], 4, colR, colG, colB);
+    }
+    // Draw head
+    circle(kps[start+0][0], kps[start+0][1], 12, colR, colG, colB);
   }
 
-  // Draw joints
-  for (const [x, y] of kps) {
-    circle(x, y, 4);
-  }
+  // Always draw character A in white
+  drawSingleChar(0, 255, 255, 255);
 
-  // Draw head (larger circle around nose)
-  circle(kps[0][0], kps[0][1], 12);
+  // Draw character B in light blue if interaction
+  if (isInteraction) {
+    drawSingleChar(18, 100, 180, 255);
+  }
 
   return pngEncode(POSE_W, POSE_H, pixels);
 }
@@ -514,7 +650,15 @@ async function processNextPendingPanel(supabase: any, planche: any) {
 
 async function generatePoseForPanel(supabase: any, panel: any, plancheId: string): Promise<string | null> {
   const poseKey = panel.metadata?.pose_description || "neutral-stand";
-  const kps = POSES[poseKey] || POSES["neutral-stand"];
+  let kps: Poseless = (POSES[poseKey] || POSES["neutral-stand"]);
+  // Apply perspective adjustment for single-character poses
+  if (kps.length === 18 && panel.metadata?.camera_angle) {
+    kps = adjustForPerspective(kps, panel.metadata.camera_angle);
+  }
+  // Mirror odd panels for variety
+  if (panel.panel_index % 2 === 1 && kps.length === 18) {
+    kps = mirrorPose(kps);
+  }
   const png = renderSkeleton(kps);
   const fileName = `poses/${plancheId}/${panel.panel_index}.png`;
 
@@ -642,7 +786,8 @@ async function generatePanelScripts(scene: string, characters: Character[], pane
       ).join("\n")
       : "Pas de personnages définis.";
 
-    const poseKeys = Object.keys(POSES).join(", ");
+    const poseKeys = Object.keys(POSES).filter(k => !k.startsWith("interact-")).join(", ");
+    const interactKeys = Object.keys(POSES).filter(k => k.startsWith("interact-")).join(", ");
 
     const systemPrompt = `Tu es un **scénariste et storyboarder manga** expert (style gekiga/shonen/seinen).
 Tu découpes une scène en EXACTEMENT ${panelCount} cases pour une planche de manga.
@@ -652,6 +797,9 @@ RÈGLES NARRATIVES MANGA :
 - Cases 2 à ${panelCount - 1} : montée dramatique, alterner plans larges et gros plans
 - Dernière case : climax ou cliffhanger (gros plan ou plan large poignant)
 - Utiliser le rythme : 1 case = 1 action principale
+- **Actions dynamiques** : varie les poses (saut, esquive, coup de poing, coup de pied, garde, etc.)
+- **Perspective** : utilise low-angle et worm pour des plans dramatiques et puissants; high-angle/bird pour la vulnérabilité
+- **Interactions** : si 2 personnages s'affrontent, utilise une pose d'interaction : ${interactKeys}
 
 Pour CHAQUE case, fournis ces champs :
 - scene : description visuelle du décor + action + émotion (riche, sensorielle)
@@ -661,8 +809,8 @@ Pour CHAQUE case, fournis ces champs :
 - framing : wide | medium | close-up | extreme-close-up
 - camera_angle : eye-level | high-angle | low-angle | bird | worm
 - emotion : l'émotion dominante de la case
-- action : l'action principale en 1 phrase courte
-- pose_description : choisir PARMI cette liste exacte (la plus proche de l'action) : ${poseKeys}
+- action : l'action principale en 1 phrase courte, avec verbe d'action fort
+- pose_description : choisir PARMI cette liste (la plus proche de l'action) : ${poseKeys}. Pour les combats à 2, utilise une pose d'interaction : ${interactKeys}
 
 Retourne UNIQUEMENT un JSON array valide. Exemple :
 [
@@ -676,8 +824,9 @@ ${charSection}
 
 NOMBRE DE CASES : ${panelCount}
 
-Génère un découpage narratif professionnel avec progression dramatique.
-Chaque case doit avoir un pose_description valide parmi : ${poseKeys}`;
+Génère un découpage narratif professionnel avec progression dramatique et des poses d'action variées.
+Chaque case doit avoir un pose_description valide. Pour les affrontements, utilise les poses interact-*.
+Angles de caméra dynamiques recommandés : low-angle, worm pour l'action; high-angle, bird pour la vulnérabilité.`;
 
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -1021,6 +1170,31 @@ async function compositePlanchePage(
       const lineX = bubbleX + (bubbleW - lineW) / 2;
       renderTextOnPage(processed, COMPOSITE_W, COMPOSITE_H, lines[li],
         lineX, startY + li * (lineH + 4), textScale, 0, 255);
+    }
+  }
+
+  // Apply dynamic effects for action panels
+  const actionPoses = new Set(["punch", "kick", "leap", "spin-kick", "high-punch", "dodge", "ground-punch", "air-kick", "grab-thrust",
+    "slash", "clash", "interact-punch-block", "interact-clash", "interact-throw"]);
+  for (let i = 0; i < panels.length; i++) {
+    const p = panels[i];
+    const l = layoutPanels[i];
+    if (!l) continue;
+    const poseKey = p.metadata?.pose_description || "";
+    if (![...actionPoses].some((ap) => poseKey.includes(ap))) continue;
+    const cellX = Math.round(l.x * scaleX);
+    const cellY = Math.round(l.y * scaleY);
+    const cellW = Math.round(l.w * scaleX);
+    const cellH = Math.round(l.h * scaleY);
+    const burstCx = cellX + cellW / 2;
+    const burstCy = cellY + cellH / 2;
+    // Add speed lines for striking poses
+    if (poseKey.includes("punch") || poseKey.includes("kick") || poseKey.includes("slash") || poseKey.includes("clash")) {
+      applySpeedLines(processed, COMPOSITE_W, COMPOSITE_H, burstCx, burstCy, 0.35);
+    }
+    // Add impact burst for clash / heavy hit
+    if (poseKey.includes("clash") || poseKey.includes("impact") || poseKey.includes("throw")) {
+      drawImpactBurst(processed, COMPOSITE_W, COMPOSITE_H, burstCx, burstCy, 60);
     }
   }
 
@@ -1480,6 +1654,69 @@ function applyScreentone(rgba: Uint8Array, w: number, h: number, density: number
     }
   }
   return out;
+}
+
+// ---------- Dynamic effects ----------
+function applySpeedLines(rgba: Uint8Array, w: number, h: number, cx: number, cy: number, intensity: number = 0.3): void {
+  // Draw speed lines radiating from a point (like a manga impact)
+  for (let y = 0; y < h; y += 2) {
+    for (let x = 0; x < w; x += 2) {
+      const dx = x - cx, dy = y - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 10 || dist > 600) continue;
+      const angle = Math.atan2(dy, dx);
+      // Create parallel lines aligned with the radial direction
+      const perp = dx * Math.cos(angle + Math.PI / 2) + dy * Math.sin(angle + Math.PI / 2);
+      if (Math.abs(perp) > 3) continue;
+      const i = (y * w + x) * 4;
+      const alpha = Math.min(255, Math.round(180 * intensity * (1 - dist / 600)));
+      if (alpha < 20) continue;
+      // Darken pixels along the motion line
+      rgba[i] = Math.max(0, rgba[i] - alpha);
+      rgba[i+1] = Math.max(0, rgba[i+1] - alpha);
+      rgba[i+2] = Math.max(0, rgba[i+2] - alpha);
+    }
+  }
+}
+
+function drawImpactBurst(rgba: Uint8Array, w: number, h: number, cx: number, cy: number, radius: number = 80): void {
+  // Draw a starburst impact effect (concentric jagged star shapes)
+  function setPx(x: number, y: number, r: number, g: number, b: number, a: number) {
+    if (x < 0 || x >= w || y < 0 || y >= h) return;
+    const i = (y * w + x) * 4;
+    const blend = a / 255;
+    rgba[i] = Math.round(rgba[i] * (1 - blend) + r * blend);
+    rgba[i+1] = Math.round(rgba[i+1] * (1 - blend) + g * blend);
+    rgba[i+2] = Math.round(rgba[i+2] * (1 - blend) + b * blend);
+  }
+
+  function line(x1: number, y1: number, x2: number, y2: number, colR: number, colG: number, colB: number, a: number) {
+    const dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
+    const sx = x1 < x2 ? 1 : -1, sy = y1 < y2 ? 1 : -1;
+    let err = dx - dy, x = x1, y = y1;
+    while (true) {
+      setPx(x, y, colR, colG, colB, a);
+      if (x === x2 && y === y2) break;
+      const e2 = err * 2;
+      if (e2 > -dy) { err -= dy; x += sx; }
+      if (e2 < dx) { err += dx; y += sy; }
+    }
+  }
+
+  // Draw 8 radiating spokes
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const x2 = Math.round(cx + Math.cos(angle) * radius);
+    const y2 = Math.round(cy + Math.sin(angle) * radius);
+    const innerR = radius * 0.3;
+    const x1 = Math.round(cx + Math.cos(angle + 0.15) * innerR);
+    const y1 = Math.round(cy + Math.sin(angle + 0.15) * innerR);
+    line(x1, y1, x2, y2, 0, 0, 0, 120);
+    // White highlight edge
+    const x1h = Math.round(cx + Math.cos(angle - 0.15) * innerR);
+    const y1h = Math.round(cy + Math.sin(angle - 0.15) * innerR);
+    line(x1h, y1h, Math.round(cx + Math.cos(angle) * radius * 0.7), Math.round(cy + Math.sin(angle) * radius * 0.7), 255, 255, 255, 80);
+  }
 }
 
 function getDefaultLayout(): { panels: PanelLayout[]; slug: string } {
