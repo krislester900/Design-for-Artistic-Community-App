@@ -293,7 +293,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
             children: [
               _suggestionChip('💡 Donne-moi une idée'),
               _suggestionChip('🔥 Un défi créatif'),
-              _suggestionChip('🎨 Conseil artistique'),
+              _suggestionChip('🎨 Génère une image manga'),
+              _suggestionChip('📖 Crée une planche 4 cases'),
+              _suggestionChip('🤖 Entraîne un style manga'),
               _suggestionChip('❓ Fonctionnalités'),
             ],
           ),

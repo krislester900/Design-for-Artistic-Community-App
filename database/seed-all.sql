@@ -232,7 +232,15 @@ INSERT INTO ai_web_sources (name, url, category, language) VALUES
 ('Open Culture Art', 'https://www.openculture.com/category/art/feed', 'general', 'en'),
 ('Poetry Magazine', 'https://www.poetryfoundation.org/feeds/poetrymagazine', 'writing', 'en'),
 ('Guitar World', 'https://www.guitarworld.com/feed', 'music', 'en'),
-('ARTnews', 'https://www.artnews.com/feed/', 'visual', 'en')
+('ARTnews', 'https://www.artnews.com/feed/', 'visual', 'en'),
+('9ème Art', 'https://www.9emeart.fr/feed', 'comics', 'fr'),
+('ActuSF', 'https://www.actusf.com/spip.php?page=backend', 'writing', 'fr'),
+('Bubble BD', 'https://www.bubblebd.com/feed/', 'comics', 'fr'),
+('Koreus Art', 'https://www.koreus.com/feed/', 'visual', 'fr'),
+('Designspiration', 'https://www.designspiration.com/feed/', 'visual', 'en'),
+('Ignant', 'https://www.ignant.com/feed/', 'visual', 'en'),
+('Cloudinary Blog', 'https://www.cloudinary.com/blog/feed', 'technique', 'en'),
+('CSS Art', 'https://css-art.com/feed/', 'technique', 'en')
 ON CONFLICT (url) DO NOTHING;
 
 -- 7. Afficher le résumé

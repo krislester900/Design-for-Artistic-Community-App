@@ -5,6 +5,7 @@ import Parser from "https://esm.sh/rss-parser@3.13.0";
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 
 const RSS_FEEDS: Array<{ url: string; name: string; category: string; language: string }> = [
+  // Anglais
   { url: "https://www.thisiscolossal.com/feed/", name: "Colossal", category: "visual", language: "en" },
   { url: "https://www.creativeboom.com/feed/", name: "Creative Boom", category: "visual", language: "en" },
   { url: "https://booooooom.com/feed/", name: "Booooooom", category: "visual", language: "en" },
@@ -13,6 +14,16 @@ const RSS_FEEDS: Array<{ url: string; name: string; category: string; language: 
   { url: "https://www.poetryfoundation.org/feeds/poetrymagazine", name: "Poetry Magazine", category: "writing", language: "en" },
   { url: "https://www.guitarworld.com/feed", name: "Guitar World", category: "music", language: "en" },
   { url: "https://www.artnews.com/feed/", name: "ARTnews", category: "visual", language: "en" },
+  // Français
+  { url: "https://www.9emeart.fr/feed", name: "9ème Art", category: "comics", language: "fr" },
+  { url: "https://www.actusf.com/spip.php?page=backend", name: "ActuSF", category: "writing", language: "fr" },
+  { url: "https://www.bubblebd.com/feed/", name: "Bubble BD", category: "comics", language: "fr" },
+  { url: "https://www.koreus.com/feed/", name: "Koreus Art", category: "visual", language: "fr" },
+  { url: "https://www.designspiration.com/feed/", name: "Designspiration", category: "visual", language: "en" },
+  { url: "https://www.ignant.com/feed/", name: "Ignant", category: "visual", language: "en" },
+  // Technique
+  { url: "https://www.cloudinary.com/blog/feed", name: "Cloudinary Blog", category: "technique", language: "en" },
+  { url: "https://css-art.com/feed/", name: "CSS Art", category: "technique", language: "en" },
 ];
 
 serve(async (req) => {
@@ -36,7 +47,8 @@ serve(async (req) => {
 
     const results: string[] = [];
 
-    const selectedFeeds = RSS_FEEDS.sort(() => Math.random() - 0.5).slice(0, 2);
+    // === PARTIE 1 : RSS ===
+    const selectedFeeds = RSS_FEEDS.sort(() => Math.random() - 0.5).slice(0, 3);
 
     for (const feed of selectedFeeds) {
       try {
@@ -56,16 +68,16 @@ serve(async (req) => {
           const content = article.contentSnippet ?? article.content ?? "";
           const link = article.link ?? "";
 
-          if (!title || !content || content.length < 100) continue;
+          if (!title || !content || content.length < 50) continue;
 
           const { data: existing } = await supabase
             .from("ai_knowledge_base")
-            .select("id, title")
+            .select("id")
             .ilike("title", `%${title.substring(0, 50)}%`)
             .limit(1);
 
           if (existing && existing.length > 0) {
-            results.push(`⏭️ ${feed.name}: déjà existant - "${title.substring(0, 60)}..."`);
+            results.push(`⏭️ ${feed.name}: déjà existant`);
             continue;
           }
 
@@ -73,7 +85,7 @@ serve(async (req) => {
 
           if (groqKey) {
             try {
-              knowledgeArticle = await summarizeWithGroq(groqKey, title, content, feed.category);
+              knowledgeArticle = await summarizeWithGroq(groqKey, title, content, feed.category, feed.language);
             } catch {
               knowledgeArticle = fallbackTransform(title, content, feed.category);
             }
@@ -115,6 +127,16 @@ serve(async (req) => {
       }
     }
 
+    // === PARTIE 2 : Synthèse depuis conversations utilisateur ===
+    if (groqKey) {
+      try {
+        const synthResult = await synthesizeFromConversations(supabase, groqKey);
+        results.push(...synthResult);
+      } catch (e) {
+        results.push(`⚠️ Synthèse conversations: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+
     return new Response(JSON.stringify({ ok: true, results }), {
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
@@ -124,19 +146,26 @@ serve(async (req) => {
   }
 });
 
-async function summarizeWithGroq(apiKey: string, title: string, content: string, defaultCategory: string): Promise<{ category: string; title: string; content: string; tags: string[] } | null> {
+async function summarizeWithGroq(apiKey: string, title: string, content: string, defaultCategory: string, language: string): Promise<{ category: string; title: string; content: string; tags: string[] } | null> {
+  const langInstruction = language === "fr"
+    ? "Garde l'article en français si possible. Génère la fiche en français."
+    : "Translate to French if needed. Generate the knowledge card in French.";
+
   const prompt = `Tu es un expert artistique qui transforme des articles web en fiches de connaissance.
 
-Article original : "${title}"
+Titre original : "${title}"
 Contenu : ${content.substring(0, 3000)}
+Langue source : ${language}
 
-Génère une fiche de connaissance en français avec :
-1. Un TITRE clair et concis
-2. Un CONTENU structuré (points clés, techniques, conseils pratiques)
+${langInstruction}
+
+Génère une fiche de connaissance avec :
+1. Un TITRE clair et concis en français
+2. Un CONTENU structuré : points clés, techniques, conseils pratiques (maximum 200 mots)
 3. Une CATÉGORIE parmi : visual, music, writing, comics, technique, general
-4. Des TAGS (3-5 mots-clés, en français)
+4. Des TAGS (3-5 mots-clés en français)
 
-Format JSON :
+Format JSON uniquement :
 {"title": "...", "content": "...", "category": "...", "tags": ["...", "..."]}`;
 
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -181,4 +210,91 @@ function fallbackTransform(title: string, content: string, category: string): { 
     category,
     tags: [category],
   };
+}
+
+async function synthesizeFromConversations(supabase: any, groqKey: string): Promise<string[]> {
+  const results: string[] = [];
+
+  // Récupérer les paires Q/A approuvées des 7 derniers jours
+  const { data: recentPairs } = await supabase
+    .from("ai_training_data")
+    .select("question, answer, category")
+    .gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString())
+    .limit(15);
+
+  if (!recentPairs || recentPairs.length < 3) {
+    results.push(`⏭️ Synthèse: pas assez de données (${recentPairs?.length ?? 0} paires trouvées, minimum 3)`);
+    return results;
+  }
+
+  // Grouper par catégorie
+  const byCategory: Record<string, { questions: string[]; answers: string[] }> = {};
+  for (const pair of recentPairs) {
+    const cat = pair.category || "general";
+    if (!byCategory[cat]) byCategory[cat] = { questions: [], answers: [] };
+    byCategory[cat].questions.push(pair.question);
+    byCategory[cat].answers.push(pair.answer);
+  }
+
+  for (const [category, data] of Object.entries(byCategory)) {
+    if (data.questions.length < 2) continue;
+
+    // Vérifier si un article similaire existe déjà
+    const sampleQuestion = data.questions[0].substring(0, 60);
+    const { data: existing } = await supabase
+      .from("ai_knowledge_base")
+      .select("id")
+      .ilike("title", `%${sampleQuestion.substring(0, 40)}%`)
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      results.push(`⏭️ Synthèse ${category}: article similaire existe déjà`);
+      continue;
+    }
+
+    const prompt = `Tu es un expert artistique. À partir de questions d'utilisateurs et de leurs réponses, crée une fiche de connaissance utile.
+
+Questions posées :
+${data.questions.map((q, i) => `${i + 1}. ${q}`).join("\n")}
+
+Réponses données :
+${data.answers.map((a, i) => `${i + 1}. ${a.substring(0, 300)}`).join("\n")}
+
+Génère une fiche de connaissance synthétique en français qui répond au besoin commun derrière ces questions.
+Format JSON :
+{"title": "...", "content": "...", "tags": ["tag1", "tag2", "tag3"]}
+Le contenu doit être pratique, structuré (points clés, conseils). Maximum 200 mots.`;
+
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${groqKey}` },
+      body: JSON.stringify({
+        model: "llama3-70b-8192",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 1024,
+        temperature: 0.5,
+      }),
+    });
+
+    if (!response.ok) continue;
+
+    const raw = (await response.json()).choices?.[0]?.message?.content ?? "";
+    if (!raw) continue;
+
+    try {
+      const parsed = JSON.parse(raw);
+      await supabase.from("ai_knowledge_base").insert({
+        category,
+        title: parsed.title || `FAQ: ${sampleQuestion}`,
+        content: parsed.content,
+        tags: Array.isArray(parsed.tags) ? parsed.tags.slice(0, 5) : [category],
+        source: "synthesis:conversations",
+      });
+      results.push(`✅ Synthèse ${category}: ajouté "${parsed.title}"`);
+    } catch {
+      results.push(`⚠️ Synthèse ${category}: erreur parsing JSON`);
+    }
+  }
+
+  return results;
 }

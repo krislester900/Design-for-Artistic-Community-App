@@ -180,6 +180,8 @@ jobs:
             "database/schema-music-studio.sql"
             "database/schema-migration-safe.sql"
             "database/schema-add-missing-tables.sql"
+            "database/schema-planches.sql",
+            "database/schema-knowledge-contrib.sql"
           )
           TOTAL=${#SCHEMAS[@]}
           OK=0
@@ -242,6 +244,7 @@ jobs:
             "manga-generator"
             "create-payment-intent"
             "send-invitation-email"
+            "planche-generator"
           )
           for fn in "${FUNCTIONS[@]}"; do
             NAME=$(echo "$fn" | awk '{print $1}')
@@ -318,11 +321,11 @@ jobs:
             ### ✅ Tests & Validation
             - Tests Flutter (73+ unitaires)
             - Analyse statique Dart
-            - 23 migrations SQL appliquées
+            - 24 migrations SQL appliquées
             
             ### 🚀 Déploiement
             - 🌐 Flutter Web (Vercel)
-            - ⚡ 7 Edge Functions Supabase
+            - ⚡ 8 Edge Functions Supabase
             - 📱 APK Android (build automatique)
             
             ### 🤖 IA & Entraînement

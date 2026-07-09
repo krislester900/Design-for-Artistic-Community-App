@@ -13,8 +13,7 @@ import '../pages/writing_page.dart';
 import '../pages/comics_upload_page.dart';
 import '../pages/auth_page.dart';
 import '../pages/ai_assistant_page.dart';
-import '../pages/manga_generator_page.dart';
-import '../pages/manga_training_page.dart';
+
 import 'arteia_logo.dart';
 
 class AppDrawer extends StatelessWidget {
@@ -95,14 +94,7 @@ class AppDrawer extends StatelessWidget {
           onClose();
           Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage()));
         }),
-        _drawerItem(Icons.brush, 'Générateur Manga 🎨', () {
-          onClose();
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const MangaGeneratorPage()));
-        }),
-        _drawerItem(Icons.model_training, 'Entraînement Manga', () {
-          onClose();
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const MangaTrainingPage()));
-        }),
+
         const Divider(),
         _drawerItem(Icons.notifications_outlined, 'Notifications', () {
           appState.resetNotifications();

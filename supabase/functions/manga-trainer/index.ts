@@ -180,8 +180,6 @@ serve(async (req) => {
           started_at: new Date().toISOString(),
         }).eq("id", job.id);
 
-        pollAndUpdate(supabase, job.id, style.id, replicateJobId, style.slug);
-
         return new Response(JSON.stringify({
           status: "training_started",
           job_id: job.id,
@@ -198,6 +196,41 @@ serve(async (req) => {
       }
     }
 
+    if (action === "test_download") {
+      const { data: refs } = await supabase
+        .from("ai_manga_references")
+        .select("image_url")
+        .eq("style_id", style.id)
+        .limit(10);
+
+      if (!refs || refs.length === 0) {
+        return new Response(JSON.stringify({ ok: false, error: "Aucune image de référence", refs: 0 }), {
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        });
+      }
+
+      const images = refs.map((r, i) => ({ url: r.image_url, index: i }));
+      const dlResults = await Promise.allSettled(
+        images.map((img) =>
+          fetch(img.url).then(async (r) => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const buf = await r.arrayBuffer();
+            return { index: img.index, size: buf.byteLength, ext: img.url.match(/\.(png|jpg|jpeg|webp)/i)?.[1] ?? "jpg", ok: true };
+          })
+        )
+      );
+
+      let ok = 0, fail = 0;
+      for (const res of dlResults) {
+        if (res.status === "fulfilled" && res.value.ok) ok++;
+        else fail++;
+      }
+
+      return new Response(JSON.stringify({ ok: true, downloaded: ok, failed: fail, total: refs.length }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
     if (action === "status") {
       const { data: latestJob } = await supabase
         .from("ai_training_jobs")
@@ -205,12 +238,56 @@ serve(async (req) => {
         .eq("style_id", style.id)
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
+
+      // Lazy polling Replicate : si job en cours avec replicate_job_id, on check et update
+      if (latestJob && latestJob.status === "training" && latestJob.replicate_job_id) {
+        try {
+          const res = await fetch(`${REPLICATE_BASE}/trainings/${latestJob.replicate_job_id}`, {
+            headers: { Authorization: `Bearer ${REPLICATE_API_KEY}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.status === "succeeded") {
+              const versionId = data.output?.version;
+              if (versionId) {
+                await supabase.from("ai_manga_styles").update({
+                  model_version: versionId,
+                  training_status: "ready",
+                  lora_url: `replicate://arteia/sdxl-manga-${style.slug}`,
+                }).eq("id", style.id);
+                await supabase.from("ai_training_jobs").update({
+                  status: "completed", lora_url: `replicate://arteia/sdxl-manga-${style.slug}`,
+                  completed_at: new Date().toISOString(), progress: 1.0,
+                }).eq("id", latestJob.id);
+              }
+            } else if (data.status === "failed") {
+              await supabase.from("ai_training_jobs").update({
+                status: "failed", error_message: data.error ?? "Échec Replicate",
+              }).eq("id", latestJob.id);
+              await supabase.from("ai_manga_styles").update({ training_status: "failed" }).eq("id", style.id);
+            } else if (data.status === "processing") {
+              await supabase.from("ai_training_jobs").update({ progress: 0.5 }).eq("id", latestJob.id);
+            }
+          }
+        } catch {
+          // silencieux — retry au prochain appel
+        }
+      }
+
+      // Re-read after potential update
+      const { data: refreshedJob } = await supabase
+        .from("ai_training_jobs")
+        .select("*")
+        .eq("style_id", style.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       return new Response(JSON.stringify({
         training_status: style.training_status,
         reference_count: style.reference_count,
-        job: latestJob ?? null,
+        job: refreshedJob ?? null,
         lora_url: style.lora_url,
       }), {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
@@ -224,42 +301,3 @@ serve(async (req) => {
   }
 });
 
-async function pollAndUpdate(supabase: any, jobId: number, styleId: number, replicateJobId: string, slug: string) {
-  for (let i = 0; i < 60; i++) {
-    await new Promise((r) => setTimeout(r, 15000));
-    try {
-      const res = await fetch(`${REPLICATE_BASE}/trainings/${replicateJobId}`, {
-        headers: { Authorization: `Bearer ${REPLICATE_API_KEY}` },
-      });
-      if (!res.ok) continue;
-      const data = await res.json();
-
-      if (data.status === "succeeded") {
-        const versionId = data.output?.version;
-        if (versionId) {
-          await supabase.from("ai_manga_styles").update({
-            model_version: versionId,
-            training_status: "ready",
-            lora_url: `replicate://arteia/sdxl-manga-${slug}`,
-          }).eq("id", styleId);
-          await supabase.from("ai_training_jobs").update({
-            status: "completed", lora_url: `replicate://arteia/sdxl-manga-${slug}`, completed_at: new Date().toISOString(), progress: 1.0,
-          }).eq("id", jobId);
-        }
-        return;
-      }
-
-      if (data.status === "failed") {
-        await supabase.from("ai_training_jobs").update({ status: "failed", error_message: data.error ?? "Échec" }).eq("id", jobId);
-        await supabase.from("ai_manga_styles").update({ training_status: "failed" }).eq("id", styleId);
-        return;
-      }
-
-      await supabase.from("ai_training_jobs").update({ progress: Math.min(0.95, (i + 1) / 40) }).eq("id", jobId);
-    } catch {
-      continue;
-    }
-  }
-  await supabase.from("ai_training_jobs").update({ status: "failed", error_message: "Timeout polling" }).eq("id", jobId);
-  await supabase.from("ai_manga_styles").update({ training_status: "failed" }).eq("id", styleId);
-}

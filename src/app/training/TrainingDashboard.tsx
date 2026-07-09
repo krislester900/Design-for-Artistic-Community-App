@@ -42,12 +42,24 @@ type TrainingDataStat = {
   avg_quality: number;
 };
 
+type KnowledgeProposal = {
+  id: number;
+  category: string;
+  title: string;
+  content: string;
+  tags: string[];
+  status: string;
+  admin_notes: string | null;
+  created_at: string;
+};
+
 export function TrainingDashboard() {
-  const [tab, setTab] = useState<"manga" | "knowledge" | "assistant">("manga");
+  const [tab, setTab] = useState<"manga" | "knowledge" | "assistant" | "contribute">("manga");
   const [jobs, setJobs] = useState<TrainingJob[]>([]);
   const [styles, setStyles] = useState<MangaStyle[]>([]);
   const [knowledgeStats, setKnowledgeStats] = useState<KnowledgeStat | null>(null);
   const [trainingStats, setTrainingStats] = useState<TrainingDataStat | null>(null);
+  const [proposals, setProposals] = useState<KnowledgeProposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,6 +97,14 @@ export function TrainingDashboard() {
           avg_quality: d.length > 0 ? d.reduce((s, r) => s + (r.quality_score ?? 0), 0) / d.length : 0,
         });
       }
+
+      // Propositions de l'utilisateur
+      const { data: userProposals } = await supabase
+        .from("ai_knowledge_proposals")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (userProposals) setProposals(userProposals);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue");
     } finally {
@@ -127,7 +147,7 @@ export function TrainingDashboard() {
 
       <div className="max-w-6xl mx-auto px-6 py-6">
         <div className="flex gap-2 mb-6">
-          {(["manga", "knowledge", "assistant"] as const).map((t) => (
+          {(["manga", "knowledge", "assistant", "contribute"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -135,7 +155,7 @@ export function TrainingDashboard() {
                 tab === t ? "bg-primary text-primary-foreground" : "bg-card/50 text-muted-foreground hover:bg-card/80"
               }`}
             >
-              {{ manga: "Manga LoRA", knowledge: "Base de connaissances", assistant: "Assistant Fine-Tuning" }[t]}
+              {{ manga: "Manga LoRA", knowledge: "Connaissances", assistant: "Fine-Tuning", contribute: "Ma contribution" }[t]}
             </button>
           ))}
         </div>
@@ -143,6 +163,7 @@ export function TrainingDashboard() {
         {tab === "manga" && <MangaTrainingPanel styles={styles} jobs={jobs} />}
         {tab === "knowledge" && <KnowledgePanel stats={knowledgeStats} />}
         {tab === "assistant" && <AssistantPanel stats={trainingStats} />}
+        {tab === "contribute" && <ContributionPanel proposals={proposals} onPropose={() => loadData()} />}
       </div>
     </div>
   );
@@ -322,6 +343,162 @@ function AssistantPanel({ stats }: { stats: TrainingDataStat | null }) {
           <li>Déployer le modèle fine-tuné dans l'Edge Function</li>
         </ol>
       </div>
+    </div>
+  );
+}
+
+function ContributionPanel({ proposals, onPropose }: { proposals: KnowledgeProposal[]; onPropose: () => void }) {
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [category, setCategory] = useState("visual");
+  const [tagsInput, setTagsInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !content.trim()) {
+      setMessage({ type: "error", text: "Titre et contenu requis." });
+      return;
+    }
+    setSubmitting(true);
+    setMessage(null);
+
+    const tags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const { error: insertError } = await supabase.from("ai_knowledge_proposals").insert({
+      user_id: user?.id,
+      category,
+      title: title.trim(),
+      content: content.trim(),
+      tags: tags.length > 0 ? tags : [category],
+    });
+
+    setSubmitting(false);
+    if (insertError) {
+      setMessage({ type: "error", text: `Erreur : ${insertError.message}` });
+    } else {
+      setMessage({ type: "success", text: "Proposition envoyée ! Elle sera examinée par l'équipe." });
+      setTitle("");
+      setContent("");
+      setTagsInput("");
+      onPropose();
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <StatCard label="Mes propositions" value={proposals.length} />
+        <StatCard label="Approuvées" value={proposals.filter((p) => p.status === "approved").length} color="emerald" />
+        <StatCard label="En attente" value={proposals.filter((p) => p.status === "pending").length} />
+      </div>
+
+      {/* Formulaire */}
+      <form onSubmit={handleSubmit} className="rounded-2xl bg-card/50 border border-border/30 p-6 space-y-4">
+        <h3 className="text-lg font-semibold">Proposer un article de connaissance</h3>
+        <p className="text-sm text-muted-foreground">
+          Partage ton expertise ! Propose un article qui sera ajouté à la base de connaissances d'Arteïa Muse.
+        </p>
+
+        <div>
+          <label className="text-sm font-medium mb-1 block">Catégorie</label>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl bg-background border border-border/30 text-sm"
+          >
+            <option value="visual">Art visuel</option>
+            <option value="music">Musique</option>
+            <option value="writing">Écriture</option>
+            <option value="comics">BD/Manga</option>
+            <option value="technique">Technique</option>
+            <option value="style">Style</option>
+            <option value="general">Général</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="text-sm font-medium mb-1 block">Titre</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Ex: Les bases du lettering en BD"
+            className="w-full px-3 py-2 rounded-xl bg-background border border-border/30 text-sm"
+            maxLength={200}
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium mb-1 block">Contenu</label>
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="Explique le concept, donne des conseils pratiques, des exemples..."
+            className="w-full px-3 py-2 rounded-xl bg-background border border-border/30 text-sm min-h-[160px] resize-y"
+            maxLength={5000}
+          />
+          <p className="text-xs text-muted-foreground mt-1">{content.length}/5000 caractères</p>
+        </div>
+
+        <div>
+          <label className="text-sm font-medium mb-1 block">Tags (séparés par des virgules)</label>
+          <input
+            type="text"
+            value={tagsInput}
+            onChange={(e) => setTagsInput(e.target.value)}
+            placeholder="lettering, typographie, bd, conseils"
+            className="w-full px-3 py-2 rounded-xl bg-background border border-border/30 text-sm"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={submitting}
+          className="px-6 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+        >
+          {submitting ? "Envoi..." : "Proposer l'article"}
+        </button>
+
+        {message && (
+          <p className={`text-sm ${message.type === "success" ? "text-emerald-600" : "text-red-500"}`}>
+            {message.text}
+          </p>
+        )}
+      </form>
+
+      {/* Historique */}
+      {proposals.length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold mb-3">Mes propositions</h3>
+          <div className="space-y-2">
+            {proposals.map((p) => (
+              <div key={p.id} className="p-4 rounded-xl bg-card/50 border border-border/30">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-medium text-sm">{p.title}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                    p.status === "approved" ? "bg-emerald-500/20 text-emerald-600" :
+                    p.status === "rejected" ? "bg-red-500/20 text-red-600" :
+                    "bg-yellow-500/20 text-yellow-600"
+                  }`}>
+                    {p.status === "approved" ? "Approuvé" : p.status === "rejected" ? "Refusé" : "En attente"}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {p.category} · {new Date(p.created_at).toLocaleDateString("fr-FR")}
+                  {p.tags?.length > 0 && ` · ${p.tags.join(", ")}`}
+                </p>
+                {p.admin_notes && (
+                  <p className="text-xs text-muted-foreground mt-2 italic">Note : {p.admin_notes}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

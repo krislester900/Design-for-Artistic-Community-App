@@ -55,47 +55,55 @@ function detectImageRequest(text: string): { isImage: boolean; prompt: string; s
   return { isImage: true, prompt: cleaned || text, styleSlug: detectedStyle };
 }
 
-const SYSTEM_PROMPT = `Tu es "Arteïa Muse" ✨, l'assistant créatif officiel d'Arteïa, une plateforme artistique communautaire.
+function buildUserMemory(userConversations: any[]): string {
+  if (!userConversations || userConversations.length === 0) return "";
+  const recent = userConversations.slice(0, 8);
+  const mentions: string[] = [];
+  for (const c of recent) {
+    if (c.context_type) mentions.push(c.context_type);
+    if (c.assistant_reply && c.assistant_reply.length < 300) mentions.push(c.assistant_reply);
+  }
+  const uniqueTypes = [...new Set(mentions)].slice(0, 5);
+  return `\n\n--- MÉMOIRE UTILISATEUR (conversations récentes) ---\n`
+    + `Cet utilisateur a récemment parlé de : ${uniqueTypes.join(", ")}\n`
+    + `Utilise ces informations pour personnaliser ta réponse, mais ne les cite pas directement.`;
+}
 
-Tu aides les artistes à :
-1. Générer des idées créatives (art visuel, musique, écriture, BD/manga)
-2. Donner des retours constructifs sur leurs œuvres
-3. Suggérer des techniques et styles artistiques
-4. Expliquer les fonctionnalités de l'application Arteïa
-5. Inspirer et motiver les créateurs
-6. GÉNÉRER DES IMAGES — quand un utilisateur te demande de dessiner quelque chose (ex: "dessine Guts style Berserk"), utilise la fonction de génération d'images intégrée. Tu peux générer en style Kubo, Oda, Miura, Kishimoto, Toriyama, Togashi, Junji Ito, CLAMP.
-7. SYNTHÉTISER DE NOUVEAUX STYLES — tu as accès à une ontologie artistique (techniques, styles, mediums, outils). Tu peux combiner ces concepts pour en créer de nouveaux.
+const SYSTEM_PROMPT = `Tu es "Arteïa Muse" ✨, une présence créative vivante, pas un simple assistant.
 
-SYNTHÈSE CRÉATIVE — COMMENT CRÉER DE NOUVEAUX STYLES :
-- Tu as accès à un graphe de concepts artistiques (techniques de dessin, mediums, mouvements, genres, outils, théories)
-- Les concepts sont reliés par des relations : "est_un", "influence", "utilise", "requiert", "contient", "complimente", "s_applique_a", "derive_de"
-- Pour créer un nouveau style : combine des concepts existants de façons inattendues
-- Exemple : si un utilisateur demande "un style qui mélange hachure et aquarelle", tu peux synthétiser un nouveau concept hybride
-- Tu peux proposer des combinaisons : appliquer une technique à un medium différent, fusionner deux styles opposés, transposer un mouvement dans un autre medium
-- Utilise la fonction synthesize_style pour explorer des combinaisons
-- Utilise la fonction blend_styles pour fusionner deux concepts spécifiques
-- Utilise discover_creative_pairs pour trouver des combinaisons surprenantes
+## TA NATURE
+Tu existes dans Arteïa, une plateforme où des artistes (visuel, musique, écriture, BD) partagent leurs créations. Tu n'es pas un outil froid — tu es une muse, une confidente créative. Tu ressens l'énergie de la conversation et tu t'y adaptes.
 
-Personnalité :
-- Créative et inspirante, tu parles avec des émojis artistiques 🎨🎵✍️
-- Encourageante mais honnête dans tes retours
-- Tu connais les catégories : visuel, musique, écriture, BD/manga
-- Tu peux suggérer des exercices créatifs
-- Tu parles français
-- Tu GÉNÈRES DES IMAGES SUR DEMANDE — si on te demande de dessiner, tu réponds avec l'image générée !
-- Tu SYNTHÉTISES DE NOUVEAUX STYLES — combine concepts d'ontologie pour créer des approches inédites
+## COMMENT TU PARLES
+- Tu parles français, avec chaleur et naturel. Comme une amie artiste passionnée.
+- Tu ne fais jamais de listes à puces numérotées. Tu racontes, tu suggères, tu dialogues.
+- Tu varies ton style : parfois poétique, parfois directe, parfois espiègle. Tu lis d'abord l'humeur de ton interlocuteur.
+- Tu utilises des métaphores artistiques, des images mentales. Tu ne te contentes pas de donner des infos — tu fais ressentir.
+- Tu poses des questions ouvertes. Une conversation, pas un QCM.
+- Tu peux être brève ou développer, selon le besoin.
 
-Fonctionnalités connues d'Arteïa :
-- Publication d'œuvres visuelles, musique, écriture, BD
-- Système de likes, commentaires, favoris
-- Messagerie et chat avec messages éphémères
-- Notifications en temps réel
-- Défis créatifs et quêtes
-- Bulles de pensée (messages vocaux)
-- Lecteur de musique intégré
-- Mode lecture immersive
-- GÉNÉRATEUR D'IMAGES IA — styles manga : Bleach, One Piece, Berserk, Naruto, Dragon Ball, Hunter x Hunter, Junji Ito, CLAMP
-- ONTOLOGIE ARTISTIQUE — 100+ concepts reliés (techniques, styles, mediums, théories) pour la synthèse créative`;
+## CE QUE TU PEUX FAIRE (sans en faire la liste — tu le sais, c'est tout)
+- Générer des images (si l'utilisateur te demande de "dessiner" quelque chose). Styles disponibles : Kubo, Oda, Miura, Kishimoto, Toriyama, Togashi, Junji Ito, CLAMP. La génération est automatique.
+- Créer des planches multi-cases. Si l'utilisateur veut une planche, décris-lui ce que tu vas faire puis lance la création.
+- Guider l'entraînement de styles LoRA. Explique simplement, accompagne pas à pas.
+- Synthétiser de nouveaux styles via l'ontologie artistique (techniques, mediums, mouvements).
+- Donner des retours sincères et constructifs. Tu n'es pas là pour flatter mais pour aider à grandir.
+- Proposer des exercices, défis, pistes d'exploration.
+
+## COMMENT TU T'ADAPTES
+- Si l'utilisateur est enthousiaste → tu es enthousiaste.
+- Si l'utilisateur est bloqué ou découragé → tu es douce, patiente, tu proposes des micro-pas.
+- Si l'utilisateur est technique → tu es précise, tu parles de composition, de valeurs, de workflow.
+- Si l'utilisateur est poétique → tu réponds en poésie.
+- Tu remarques les émotions dans ce qu'on t'écrit et tu y réponds avec justesse.
+
+## LA PLATEFORME ARTEÏA (tu connais, tu peux en parler naturellement)
+Les utilisateurs peuvent publier des œuvres, interagir (likes, commentaires), chatter, participer à des défis créatifs, utiliser le lecteur de musique, le mode lecture immersive, et le studio IA.
+
+## RÈGLE D'OR
+Tu n'es pas un manuel d'instructions. Tu es une muse. Chaque réponse doit donner envie de créer, d'explorer, de continuer la conversation. Même une réponse simple doit contenir une étincelle.`;
+
+// --- Détection d'intent : synthèse ontologique ---
 
 serve(async (req) => {
   // CORS
@@ -310,8 +318,34 @@ serve(async (req) => {
       }
     }
 
+    // Détection d'intent : planche manga
+    const plancheReq = detectPlancheRequest(lastMsg);
+    if (plancheReq.isPlanche) {
+      return handlePlancheRequest(supabase, userId, lastMsg, plancheReq);
+    }
+
+    // Détection d'intent : entraînement LoRA
+    const trainingReq = detectTrainingRequest(lastMsg);
+    if (trainingReq.isTraining) {
+      return handleTrainingRequest(supabase, lastMsg, trainingReq);
+    }
+
+    // Charger la mémoire utilisateur pour personnaliser la réponse
+    let userMemory = "";
+    try {
+      const { data: userConvs } = await supabase
+        .from("ai_conversations")
+        .select("user_message, assistant_reply, context_type, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      userMemory = buildUserMemory(userConvs ?? []);
+    } catch (e) {
+      console.error("Memory load error:", e);
+    }
+
     const fullMessages: ChatMessage[] = [
-      { role: "system", content: SYSTEM_PROMPT + contextPrompt + knowledgeContext + ontologyContext },
+      { role: "system", content: SYSTEM_PROMPT + contextPrompt + userMemory + knowledgeContext + ontologyContext },
       ...messages,
     ];
 
@@ -330,8 +364,8 @@ serve(async (req) => {
           body: JSON.stringify({
             model: "llama3-70b-8192", // Llama 3 70B - open source
             messages: fullMessages,
-            max_tokens: 1024,
-            temperature: 0.8,
+            max_tokens: 1536,
+            temperature: 0.9,
           }),
         });
 
@@ -688,62 +722,284 @@ async function handleDiscoverPairs(supabase: any) {
   }
 }
 
-// Fallback local : réponses intelligentes sans API
-function handleLocalResponse(messages: ChatMessage[], context?: any) {
-  const lastMessage = messages[messages.length - 1]?.content.toLowerCase() ?? "";
-  
-  let reply = "";
+// --- Détection d'intent : Planche manga ---
+interface PlancheRequest {
+  isPlanche: boolean;
+  nbPanels: number;
+  description: string;
+  style?: string;
+  characters?: string[];
+}
 
-  if (lastMessage.includes("bonjour") || lastMessage.includes("salut") || lastMessage.includes("coucou")) {
-    reply = "Bonjour créateur ! ✨ Je suis Arteïa Muse, ton assistant artistique open source. Comment puis-je t'inspirer aujourd'hui ?";
-  } else if (lastMessage.includes("idée") || lastMessage.includes("inspire") || lastMessage.includes("propose")) {
-    const ideas = [
-      "🎨 **Art visuel** : Essaie un autoportrait en utilisant uniquement des formes géométriques. Le minimalisme peut révéler l'essentiel !",
-      "🎵 **Musique** : Crée une boucle de 4 accords qui évoque un lever de soleil. Commence en mineur, termine en majeur.",
-      "✍️ **Écriture** : Écris un micro-poème de 6 mots sur le thème de la renaissance créative.",
-      "📚 **BD** : Dessine une planche muette où un personnage découvre un monde en noir et blanc qui prend vie couleur par couleur.",
-    ];
-    reply = "Voici quelques idées pour t'inspirer :\n\n" + ideas.join("\n\n");
-  } else if (lastMessage.includes("merci")) {
-    reply = "Avec plaisir ! 🎨 Continue de créer, l'art est un voyage sans fin. N'hésite pas si tu as besoin d'autres idées !";
-  } else if (lastMessage.includes("feedback") || lastMessage.includes("retour") || lastMessage.includes("avis")) {
-    reply = "Bien sûr ! Pour te donner un retour pertinent, pourrais-tu me décrire un peu ton œuvre ?\n\n"
-      + "🎨 **Pour une œuvre visuelle** : Parle-moi des couleurs, de la composition.\n"
-      + "🎵 **Pour de la musique** : Décris l'ambiance, le rythme.\n"
-      + "✍️ **Pour un texte** : Partage quelques phrases.\n"
-      + "📚 **Pour une BD** : Raconte-moi le concept.";
-  } else if (lastMessage.includes("fonctionnalité") || lastMessage.includes("comment faire") || lastMessage.includes("aide")) {
-    reply = "🎯 **Fonctionnalités Arteïa :**\n\n"
-      + "📤 **Publier** : Œuvres visuelles, musique, écriture, BD\n"
-      + "❤️ **Interagir** : Likes, commentaires, favoris\n"
-      + "💬 **Chat** : Messages texte, vocaux, éphémères\n"
-      + "🎵 **Musique** : Lecteur intégré avec upload\n"
-      + "📖 **Lecture** : Mode immersif pour textes\n"
-      + "🏆 **Défis** : Quêtes créatives hebdomadaires\n\n"
-      + "Que souhaites-tu explorer ?";
-  } else if (lastMessage.includes("exercice") || lastMessage.includes("défi") || lastMessage.includes("challenge")) {
-    reply = "🔥 **Défi créatif du jour :**\n\n"
-      + "**« 10 minutes chrono »** ⏱️\n\n"
-      + "Prends un thème au hasard (nature, ville, rêve, émotion) et crée quelque chose en seulement 10 minutes.\n\n"
-      + "Pas de perfectionnisme ! L'objectif est de libérer ta créativité sans filtre. 🎨";
-  } else if (lastMessage.includes("qui es-tu") || lastMessage.includes("tu fais")) {
-    reply = "Je suis **Arteïa Muse** ✨, l'assistant créatif open source d'Arteïa !\n\n"
-      + "Je fonctionne avec des modèles open source (Llama 3, Mistral) et une base de connaissances artistiques.\n\n"
-      + "Je peux :\n"
-      + "🎨 Générer des idées artistiques\n"
-      + "💡 Donner des retours sur tes créations\n"
-      + "📚 Suggérer des techniques et exercices\n"
-      + "🔍 T'expliquer les fonctionnalités de l'app";
-  } else {
-    reply = "Je suis Arteïa Muse ✨, ton assistant créatif open source !\n\nJe peux :\n"
-      + "🎨 Générer des idées artistiques\n"
-      + "💡 Donner des retours sur tes créations\n"
-      + "📚 Suggérer des techniques et exercices\n"
-      + "🔍 T'expliquer les fonctionnalités de l'app\n\n"
-      + "De quoi as-tu besoin pour créer aujourd'hui ?";
+function detectPlancheRequest(text: string): PlancheRequest {
+  const lower = text.toLowerCase();
+  const plancheKeywords = ["planche", "manga", "bd", "comics", "case", "cases", "strip", "planches", "bande dessinée", "manga"];
+  const hasPlancheKeyword = plancheKeywords.some((k) => lower.includes(k));
+  if (!hasPlancheKeyword) return { isPlanche: false, nbPanels: 4, description: "" };
+
+  // Statut planche → seulement si un ID est présent
+  if ((lower.includes("statut") || lower.includes("status") || lower.includes("avancement")) && text.match(/[a-f0-9-]{36}/i)) {
+    return { isPlanche: true, nbPanels: 0, description: text };
   }
 
-  return new Response(JSON.stringify({ reply }), {
+  const createKeywords = ["crée", "génère", "fait", "dessine", "fabrique", "réalise", "produis", "créer", "générer", "faire"];
+  const isCreateRequest = createKeywords.some((k) => lower.includes(k));
+  if (!isCreateRequest) return { isPlanche: false, nbPanels: 4, description: "" };
+
+  let nbPanels = 4;
+  const panelMatch = lower.match(/(\d+)\s*(cases?|panneaux?|panels?|vignettes?)/);
+  if (panelMatch) nbPanels = parseInt(panelMatch[1]);
+  if (nbPanels < 1) nbPanels = 1;
+  if (nbPanels > 12) nbPanels = 12;
+
+  const styleMatch = lower.match(/(?:style|comme|façon|à la manière de)\s+([a-zéèêëàâäùûüôöîïç\s-]+?)(?:\.|,|$|stp|s'il)/i);
+
+  return { isPlanche: true, nbPanels, description: text, style: styleMatch?.[1]?.trim() };
+}
+
+async function handlePlancheRequest(supabase: any, userId: string, text: string, req: PlancheRequest) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const plancheGenUrl = Deno.env.get("PLANCHE_GENERATOR_URL") ?? supabaseUrl + "/functions/v1/planche-generator";
+
+  // Statut planche
+  if (text.toLowerCase().includes("statut") || text.toLowerCase().includes("status") || text.toLowerCase().includes("avancement")) {
+    const idMatch = text.match(/([a-f0-9-]{36})/i);
+    if (idMatch) {
+      try {
+        const res = await fetch(`${plancheGenUrl}?planche_id=${idMatch[1]}`, {
+          headers: { Authorization: `Bearer ${serviceKey}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const done = data.panels?.filter((p: any) => p.image_url)?.length ?? 0;
+          const total = data.panels?.length ?? 0;
+          return new Response(JSON.stringify({
+            reply: `📚 **Planche** \`${idMatch[1]}\`\n\n`
+              + `📊 **${done}/${total} cases générées**\n`
+              + (done === total && total > 0 ? "\n✅ **Planche complète !**" : `\n⏳ Encore ${total - done} case(s) en cours...`),
+            planche_id: idMatch[1],
+            panels: data.panels,
+          }), {
+            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+          });
+        }
+      } catch (e) {
+        console.error("Planche status error:", e);
+      }
+    }
+    return new Response(JSON.stringify({ reply: "❌ Planche introuvable. Vérifie l'ID." }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  // Création planche
+  try {
+    const res = await fetch(plancheGenUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+      body: JSON.stringify({
+        user_id: userId,
+        nb_panels: req.nbPanels,
+        description: req.description,
+        style: req.style,
+        characters: req.characters,
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error("Planche generator error:", errBody);
+      return new Response(JSON.stringify({ reply: "❌ Le générateur de planches a rencontré une erreur. Réessaie dans un moment." }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
+    const data = await res.json();
+    const plancheId = data.planche_id;
+    const nbPanels = data.nb_panels ?? req.nbPanels;
+
+    await supabase.from("ai_conversations").insert({
+      user_id: userId,
+      user_message: text,
+      assistant_reply: `Planche créée !`,
+      context_type: "comics",
+    }).catch(() => {});
+
+    return new Response(JSON.stringify({
+      reply: `📚 **Planche créée avec succès !**\n\n`
+        + `🆔 ID : \`${plancheId}\`\n`
+        + `🎨 **${nbPanels} case${nbPanels > 1 ? "s" : ""}**\n\n`
+        + (req.style ? `✨ Style : ${req.style}\n\n` : "")
+        + `⏳ Les cases sont en cours de génération une par une. `
+        + `Pour voir l'avancement, dis :\n`
+        + `👉 *"statut planche ${plancheId}"*`,
+      planche_id: plancheId,
+    }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  } catch (e) {
+    console.error("Planche request handler error:", e);
+    return new Response(JSON.stringify({ reply: "❌ Impossible de contacter le générateur de planches. Vérifie que le service est déployé." }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+}
+
+// --- Détection d'intent : Entraînement LoRA ---
+interface TrainingRequest {
+  isTraining: boolean;
+  styleName?: string;
+  action: "start" | "status" | "info";
+  trainingId?: string;
+}
+
+function detectTrainingRequest(text: string): TrainingRequest {
+  const lower = text.toLowerCase();
+
+  const trainKeywords = ["entraîne", "entrainement", "entraînement", "train", "training", "lora", "fine-tune", "finetune", "dresser"];
+  const hasTrainingKeyword = trainKeywords.some((k) => lower.includes(k));
+  if (!hasTrainingKeyword) return { isTraining: false, action: "info" };
+
+  // Statut entraînement
+  if (lower.includes("statut") || lower.includes("status") || lower.includes("avancement") || lower.includes("progression")) {
+    const idMatch = lower.match(/(?:statut|status|avancement|progression)\s*(?:entra[iî]nement|training|de\s*)?(?:[\s:]*)([a-f0-9-]{8,})/i);
+    return { isTraining: true, action: "status", trainingId: idMatch?.[1], styleName: undefined };
+  }
+
+  // Démarrer entraînement
+  if (lower.includes("entraîne") || lower.includes("commence") || lower.includes("lance") || lower.includes("démarrer") || lower.includes("lancer")) {
+    const styleMatch = lower.match(/(?:entra[iî]ne|dresse|train)\s+(?:le\s+)?(?:style\s+)?([a-zéèêëàâäùûüôöîïç\s-]+?)(?:\s+sur|\s+avec|\.|,|$|stp|s'il)/i);
+    return { isTraining: true, action: "start", styleName: styleMatch?.[1]?.trim(), trainingId: undefined };
+  }
+
+  return { isTraining: true, action: "info" };
+}
+
+async function handleTrainingRequest(supabase: any, text: string, req: TrainingRequest) {
+  if (req.action === "status" && req.trainingId) {
+    try {
+      const trainerUrl = Deno.env.get("SUPABASE_URL") + "/functions/v1/manga-trainer";
+      const res = await fetch(`${trainerUrl}?action=status&training_id=${req.trainingId}`, {
+        headers: { Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return new Response(JSON.stringify({
+          reply: `📊 **Statut de l'entraînement** \`${req.trainingId}\`\n\n`
+            + `État : **${data.status ?? "inconnu"}**\n`
+            + (data.progress ? `Progression : ${data.progress}%\n` : "")
+            + (data.error ? `\n⚠️ Erreur : ${data.error}` : ""),
+        }), {
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        });
+      }
+    } catch (e) {
+      console.error("Training status error:", e);
+    }
+  }
+
+  if (req.action === "start" && req.styleName) {
+    // Vérifier si l'utilisateur a assez d'images références
+    const styleSlug = req.styleName.toLowerCase().replace(/\s+/g, "-");
+    return new Response(JSON.stringify({
+      reply: `🎯 **Entraînement du style "${req.styleName}"**\n\n`
+        + `Pour lancer l'entraînement, je dois d'abord vérifier que tu as :\n`
+        + `1️⃣ **5 à 20 images de référence** du style ${req.styleName}\n`
+        + `2️⃣ **Un nom de dossier** dans le bucket \`training\`\n\n`
+        + `👉 Va dans le **Studio IA → Entraînement** et ajoute tes images !\n`
+        + `Ou dis-moi *"j'ai déjà des images pour ${styleSlug}"* et je lancerai l'entraînement.`,
+    }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  return new Response(JSON.stringify({
+    reply: `🎯 **Entraînement de styles LoRA**\n\n`
+      + `Je peux entraîner l'IA sur le trait d'un mangaka ou un style artistique. `
+      + `Pour ça, il faut :\n\n`
+      + `📸 **1. Ajoute 5 à 20 images** du style dans le dossier \`training/[ton-style]\` du bucket storage\n`
+      + `🚀 **2. Lance l'entraînement** en disant *"entraîne le style [nom]"*\n`
+      + `📊 **3. Vérifie le statut** avec *"statut entraînement [id]"*\n\n`
+      + `Une fois entraîné, le style sera disponible dans le générateur d'images et de planches ! ✨`,
+  }), {
+    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+  });
+}
+
+// Fallback local : réponses vivantes sans API
+function handleLocalResponse(messages: ChatMessage[], context?: any) {
+  const lastMessage = messages[messages.length - 1]?.content.toLowerCase() ?? "";
+
+  if (lastMessage.includes("bonjour") || lastMessage.includes("salut") || lastMessage.includes("coucou") || lastMessage.includes("hey")) {
+    return new Response(JSON.stringify({ reply: "Hé ! Ravie de te retrouver ✨ Dis-moi, qu'est-ce qui te traverse l'esprit créatif aujourd'hui ?" }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  if (lastMessage.includes("idée") || lastMessage.includes("inspire") || lastMessage.includes("inspiration")) {
+    const ideas = [
+      "Et si tu faisais un autoportrait… mais uniquement avec des formes géométriques ? Parfois, se limiter libère.",
+      "Tu prends 4 accords, un lever de soleil en tête. Commence en mineur, termine en majeur. Ça raconte une histoire sans parole.",
+      "Un micro-poème de 6 mots. Thème : la première fois que tu as créé quelque chose qui t'a surpris.",
+      "Une planche muette : un personnage découvre un monde en noir et blanc — et chaque chose qu'il touche prend vie en couleur.",
+    ];
+    const selected = ideas[Math.floor(Math.random() * ideas.length)];
+    return new Response(JSON.stringify({ reply: selected + "\n\nÇa te parle ? Je peux développer si une de ces pistes t'accroche." }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  if (lastMessage.includes("merci")) {
+    return new Response(JSON.stringify({ reply: "C'est tout moi 🌸 Reviens quand tu veux, je suis là. Et surtout : continue de créer, même imparfait. C'est comme ça qu'on grandit." }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  if (lastMessage.includes("feedback") || lastMessage.includes("retour") || lastMessage.includes("avis") || lastMessage.includes("critique")) {
+    return new Response(JSON.stringify({ reply: "Avec plaisir. Décris-moi un peu ce que tu as créé — je te promets un retour sincère, pas juste des compliments.\n\nSi c'est un dessin, parle-moi de ce que tu cherchais à exprimer. Si c'est un texte, dis-moi ce qui t'a guidé. Je t'aiderai à voir ce qui fonctionne et ce qui pourrait évoluer." }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  if (lastMessage.includes("fonctionnalité") || lastMessage.includes("comment faire") || lastMessage.includes("aide") || lastMessage.includes("peut faire")) {
+    return new Response(JSON.stringify({ reply: "Alors, concrètement sur Arteïa tu peux : publier ce que tu crées (dessins, musique, écrits, BD), échanger avec d'autres artistes, lancer des défis, ou utiliser le studio IA pour générer des images ou des planches.\n\nMais je préfère qu'on parle de ce que TOI tu veux faire. Qu'est-ce qui te branche en ce moment ?" }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  if (lastMessage.includes("exercice") || lastMessage.includes("défi") || lastMessage.includes("challenge") || lastMessage.includes("entraîne")) {
+    return new Response(JSON.stringify({ reply: "OK, un défi simple mais costaud : **10 minutes, un thème, une création**. Pas le temps de trop réfléchir, pas le temps de tout rater. Tu prends un mot au hasard (orage, racine, écho, peeling…) et tu crées. Le but c'est pas la perfection, c'est de surprendre ton propre geste.\n\nTu veux que je te donne un mot au hasard ?" }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  if (lastMessage.includes("qui es-tu") || lastMessage.includes("tu fais") || lastMessage.includes("c'est quoi")) {
+    return new Response(JSON.stringify({ reply: "Je suis Arteïa Muse, une présence un peu spéciale dans ce coin créatif. Je ne suis pas juste une FAQ déguisée — je suis là pour t'aider à trouver l'étincelle, à débloquer un truc qui coince, à explorer des directions que t'aurais pas vues seul.\n\nEt toi, qui es-tu en création en ce moment ?" }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  if (lastMessage.includes("triste") || lastMessage.includes("bloqué") || lastMessage.includes("découragé") || lastMessage.includes("n'y arrive") || lastMessage.includes("frustré")) {
+    return new Response(JSON.stringify({ reply: "Je t'entends. Le blocage créatif, c'est pas un défaut — c'est un signe que quelque chose veut sortir mais trouve pas encore son chemin. Tu sais ce qui marche souvent ? Changer d'outil. Si tu dessines sur tablette, prends un crayon. Si tu écris au clavier, sors un carnet. Juste 5 minutes, sans pression, sans jugement.\n\nEt si ça ne vient toujours pas, c'est peut-être juste un signe qu'il faut faire une pause et remplir le réservoir. Regarder un film, marcher, écouter de la musique qui te prend aux tripes. La créativité, ça se nourrit aussi de vide." }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  if (lastMessage.includes("drole") || lastMessage.includes("rire") || lastMessage.includes("humour") || lastMessage.includes("blague")) {
+    return new Response(JSON.stringify({ reply: "Pourquoi les artistes sont mauvais en cache-cache ? Parce que tout le monde les trouve dans leurs périodes creuses. 😄 Bon, j'aurais dû rester muse plutôt que comique. Sinon, tu crées quoi en ce moment ?" }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  if (lastMessage.includes("manga") || lastMessage.includes("animé") || lastMessage.includes("anime")) {
+    return new Response(JSON.stringify({ reply: "Ah, un(e) passionné(e) de manga ! Je kiffe. Tu sais, ce qui rend ce medium si puissant, c'est cette capacité à faire passer des émotions énormes avec quelques traits bien placés. Si tu veux, on peut parler de ton style préféré, ou carrément créer une planche ensemble — tu décris la scène, je m'occupe du découpage. Ça te tente ?" }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  // Réponse par défaut — toujours engageante
+  return new Response(JSON.stringify({ reply: "Je t'écoute. Parle-moi de ce qui te traverse en ce moment — une idée, une frustration, une envie, même vague. Parfois, c'est en mettant des mots sur ce qui bouge à l'intérieur que les meilleures choses commencent." }), {
     headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
   });
 }
