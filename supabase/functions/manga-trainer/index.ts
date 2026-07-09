@@ -42,8 +42,23 @@ serve(async (req) => {
     const body = await req.json();
     const { action, style_slug, image_url, image_urls } = body;
 
-    if (!action || !style_slug) {
-      return new Response(JSON.stringify({ error: "action et style_slug requis" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    if (!action) {
+      return new Response(JSON.stringify({ error: "action requis" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+
+    if (action === "list_ready") {
+      const { data: styles } = await supabase
+        .from("ai_manga_styles")
+        .select("slug, name")
+        .eq("training_status", "ready")
+        .order("name", { ascending: true });
+      return new Response(JSON.stringify(styles ?? []), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
+    if (!style_slug) {
+      return new Response(JSON.stringify({ error: "style_slug requis" }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
 
     const { data: style } = await supabase

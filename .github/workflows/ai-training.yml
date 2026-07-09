@@ -182,11 +182,19 @@ jobs:
             echo "count=1" >> "$GITHUB_OUTPUT"
           else
             echo "Recherche de tous les styles 'ready'..."
-            RESPONSE=$(curl -s "$SUPABASE_URL/rest/v1/ai_manga_styles?select=slug,name&training_status=eq.ready&order=name.asc" \
-              -H "apikey: $SUPABASE_KEY" \
-              -H "Authorization: Bearer $SUPABASE_KEY")
-            SLUGS=$(echo "$RESPONSE" | jq -c '[.[].slug]')
-            COUNT=$(echo "$RESPONSE" | jq 'length')
+            HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/manga-trainer" \
+              -H "Authorization: Bearer $SUPABASE_KEY" \
+              -H "x-cron-secret: $CRON_SECRET" \
+              -H "Content-Type: application/json" \
+              -d '{"action":"list_ready"}')
+            BODY=$(echo "$HTTP_RESPONSE" | head -n -1)
+            CODE=$(echo "$HTTP_RESPONSE" | tail -n 1)
+            if [ "$CODE" != "200" ]; then
+              echo "::error::Erreur HTTP $CODE — $BODY"
+              exit 1
+            fi
+            SLUGS=$(echo "$BODY" | jq -c '[.[].slug]')
+            COUNT=$(echo "$BODY" | jq 'length')
             echo "Styles trouvés: $COUNT"
             echo "matrix={\"style_slug\":$SLUGS}" >> "$GITHUB_OUTPUT"
             echo "count=$COUNT" >> "$GITHUB_OUTPUT"
