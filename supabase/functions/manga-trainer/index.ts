@@ -49,8 +49,9 @@ serve(async (req) => {
     if (action === "list_ready") {
       const { data: styles } = await supabase
         .from("ai_manga_styles")
-        .select("slug, name")
+        .select("slug, name, reference_count")
         .eq("training_status", "ready")
+        .gte("reference_count", 5)
         .order("name", { ascending: true });
       return new Response(JSON.stringify(styles ?? []), {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },

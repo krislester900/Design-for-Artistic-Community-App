@@ -231,8 +231,13 @@ jobs:
             REF_COUNT=$(echo "$STATUS_BODY" | jq -r '.reference_count // 0')
             echo "📊 Images de référence: $REF_COUNT"
             if [ "$REF_COUNT" -lt 5 ]; then
-              echo "::warning::⚠️ Moins de 5 images disponibles. L'entraînement risque d'échouer."
+              echo "::warning::⚠️ Moins de 5 images — style ${{ matrix.style_slug }} ignoré"
+              echo "skipped=true" >> "$GITHUB_OUTPUT"
+              echo "::endgroup::"
+              exit 0
             fi
+          else
+            echo "::warning::Status HTTP $STATUS_CODE — tentative de lancement quand même..."
           fi
           echo "Lancement de l'entraînement..."
           HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTIONS_URL/manga-trainer" \
@@ -244,7 +249,7 @@ jobs:
           CODE=$(echo "$HTTP_RESPONSE" | tail -n 1)
           echo "$BODY" | jq .
           if [ "$CODE" != "200" ]; then
-            echo "::error::Échec lancement (HTTP $CODE)"
+            echo "::error::Échec lancement ${{ matrix.style_slug }} (HTTP $CODE)"
             exit 1
           fi
           JOB_ID=$(echo "$BODY" | jq -r '.job_id // empty')
@@ -327,7 +332,7 @@ jobs:
   # ==========================================================
   assistant-export:
     name: 📊 4/4 Export fine-tuning
-    if: needs.router.outputs.run_export == 'true'
+    if: always() && needs.router.outputs.run_export == 'true'
     needs: [router, manga-lora-training]
     runs-on: ubuntu-latest
     outputs:
