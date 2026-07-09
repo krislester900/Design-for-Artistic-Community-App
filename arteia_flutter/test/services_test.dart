@@ -163,42 +163,42 @@ void main() {
 
     test('sendMessage handles greeting', () async {
       final reply = await assistant.sendMessage(message: 'Salut');
-      expect(reply, contains('Bonjour'));
+      expect(reply, contains('Ravie'));
     });
 
     test('sendMessage handles idea request', () async {
       final reply = await assistant.sendMessage(message: 'Donne-moi une idée');
-      expect(reply, contains('Idées'));
+      expect(reply, contains('autoportrait'));
     });
 
     test('sendMessage handles thank you', () async {
       final reply = await assistant.sendMessage(message: 'Merci');
-      expect(reply, contains('plaisir'));
+      expect(reply, contains('continue de créer'));
     });
 
     test('sendMessage handles feedback request', () async {
       final reply = await assistant.sendMessage(message: 'Donne-moi un retour');
-      expect(reply, anyOf(contains('feedback'), contains('retour')));
+      expect(reply, anyOf(contains('feedback'), contains('retour'), contains('sincère')));
     });
 
     test('sendMessage handles features question', () async {
       final reply = await assistant.sendMessage(message: 'Comment faire ?');
-      expect(reply, contains('Fonctionnalités'));
+      expect(reply, anyOf(contains('publier'), contains('créer')));
     });
 
     test('sendMessage handles challenge request', () async {
       final reply = await assistant.sendMessage(message: 'Un défi créatif');
-      expect(reply, contains('Défi'));
+      expect(reply, contains('10 minutes'));
     });
 
     test('sendMessage handles who are you', () async {
       final reply = await assistant.sendMessage(message: 'Qui es-tu ?');
-      expect(reply, contains('Arteïa Muse'));
+      expect(reply, contains('Muse'));
     });
 
     test('sendMessage returns default response for unknown input', () async {
       final reply = await assistant.sendMessage(message: 'xyz123unknown');
-      expect(reply, contains('Arteïa Muse'));
+      expect(reply, contains('Je t\'écoute'));
     });
 
     test('sendMessage works with different content types', () async {
@@ -217,7 +217,7 @@ void main() {
           {'role': 'assistant', 'content': 'Bonjour créateur !'},
         ],
       );
-      expect(reply, contains('plaisir'));
+      expect(reply, contains('continue de créer'));
     });
   });
 

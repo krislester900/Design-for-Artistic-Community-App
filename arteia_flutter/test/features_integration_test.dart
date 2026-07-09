@@ -115,19 +115,19 @@ void main() {
 
       // Greeting
       final greeting = await assistant.sendMessage(message: 'Bonjour');
-      expect(greeting, contains('Bonjour'));
+      expect(greeting, contains('Ravie'));
 
       // Ideas
       final ideas = await assistant.sendMessage(message: 'idée');
-      expect(ideas, anyOf(contains('Idées'), contains('idée')));
+      expect(ideas, anyOf(contains('autoportrait'), contains('pistes')));
 
       // Features
       final features = await assistant.sendMessage(message: 'fonctionnalité');
-      expect(features, contains('Fonctionnalités'));
+      expect(features, contains('publier'));
 
       // Challenge
       final challenge = await assistant.sendMessage(message: 'défi');
-      expect(challenge, contains('Défi'));
+      expect(challenge, contains('défi'));
     });
 
     test('FavoritesService has required methods', () {

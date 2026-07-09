@@ -120,6 +120,26 @@ class AiAssistantService {
           'pas juste des compliments. Parle-moi de ce que tu cherchais à exprimer.';
     }
 
+    if (m.contains('fonctionnalité') || m.contains('comment faire') || m.contains('aide') || m.contains('peut faire')) {
+      return 'Alors, concrètement sur Arteïa tu peux : publier ce que tu crées (dessins, musique, écrits, BD), '
+          'échanger avec d\'autres artistes, lancer des défis, ou utiliser le studio IA. '
+          'Mais je préfère qu\'on parle de ce que TOI tu veux faire. Qu\'est-ce qui te branche ?';
+    }
+
+    if (m.contains('exercice') || m.contains('défi') || m.contains('challenge') || m.contains('entraîne')) {
+      return 'OK, un défi simple mais costaud : 10 minutes, un thème, une création. '
+          'Tu prends un mot au hasard et tu crées. Pas le temps de trop réfléchir. '
+          'Le but c\'est pas la perfection, c\'est de surprendre ton propre geste. '
+          'Tu veux que je te donne un mot au hasard ?';
+    }
+
+    if (m.contains('qui es-tu') || m.contains('tu fais') || m.contains('c\'est quoi')) {
+      return 'Je suis Arteïa Muse, une présence un peu spéciale dans ce coin créatif. '
+          'Je ne suis pas juste une FAQ déguisée — je suis là pour t\'aider à trouver l\'étincelle, '
+          'à débloquer un truc qui coince, à explorer des directions que t\'aurais pas vues seul. '
+          'Et toi, qui es-tu en création en ce moment ?';
+    }
+
     if (m.contains('triste') || m.contains('bloqué') || m.contains('découragé') || m.contains('frustré')) {
       return 'Je t\'entends. Le blocage créatif, c\'est pas un défaut — c\'est un signe que quelque chose '
           'veut sortir mais trouve pas son chemin. Change d\'outil : si tu dessines sur tablette, '
