@@ -2,7 +2,9 @@
 // Exécuter : deno run --allow-write database/seed-manga-100plus.ts
 // Cela génère seed-manga-100plus.sql à copier dans Supabase SQL Editor
 
-const MODEL = "'39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b'";
+const MODEL_OWNER = "'rocketdigitalai'";
+const MODEL_NAME = "'animagine-xl-4.0'";
+const MODEL_VERSION = "'7af46ee494f1cf196d49a8592737f4eb789e34a5a995751b23a869d19f5dc2ba'";
 const W = 1024;
 const H_DEFAULT = 1024;
 
@@ -221,7 +223,7 @@ function generateSQL(): string {
     `-- Seed: ${STYLES.length} styles manga pour l'entraînement IA`,
     `-- Généré le ${new Date().toISOString()}`,
     "",
-    "INSERT INTO ai_manga_styles (name, slug, mangaka, description, model_version, prompt_template, negative_prompt, width, height, style_tags, training_status) VALUES",
+    "INSERT INTO ai_manga_styles (name, slug, mangaka, description, model_owner, model_name, model_version, prompt_template, negative_prompt, width, height, style_tags, training_status) VALUES",
   ];
 
   for (let i = 0; i < STYLES.length; i++) {
@@ -230,7 +232,7 @@ function generateSQL(): string {
     const tags = s.tags.map((t) => `'${t}'`).join(", ");
     const comma = i < STYLES.length - 1 ? "," : "";
 
-    lines.push(`  ('${s.name}', '${s.slug}', '${s.mangaka}', '${s.desc}', ${MODEL}, '${s.prompt}', '${s.neg}', ${W}, ${h}, ARRAY[${tags}], 'ready')${comma}`);
+    lines.push(`  ('${s.name}', '${s.slug}', '${s.mangaka}', '${s.desc}', ${MODEL_OWNER}, ${MODEL_NAME}, ${MODEL_VERSION}, '${s.prompt}', '${s.neg}', ${W}, ${h}, ARRAY[${tags}], 'ready')${comma}`);
   }
 
   lines.push("");

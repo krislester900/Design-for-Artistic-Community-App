@@ -6,7 +6,7 @@ const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-const SDXL = { owner: "stability-ai", name: "sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b" };
+const SDXL = { owner: "rocketdigitalai", name: "animagine-xl-4.0", version: "7af46ee494f1cf196d49a8592737f4eb789e34a5a995751b23a869d19f5dc2ba" };
 const DENOISE_STRENGTH = 0.55;
 
 interface PanelLayout { x: number; y: number; w: number; h: number; label: string; }
@@ -293,20 +293,19 @@ async function processNextPendingPanel(supabase: any, planche: any) {
 async function generateCharacterRef(ch: Character, style: any): Promise<string | null> {
   if (!REPLICATE_API_KEY) return null;
 
-  const prompt = [
-    style.prompt_template.replace("{prompt}", `close-up portrait of ${ch.name}, ${ch.appearance}`),
-    "manga character portrait, clean lineart, neutral expression, bust up, front facing",
-    "highly detailed face, distinct facial features, recognizable character design",
-  ].join(", ");
+  const qualityTags = "masterpiece, best quality, absurdres, highres";
+  const prompt = `${qualityTags}, ${
+    style.prompt_template.replace("{prompt}", `close-up portrait of ${ch.name}, ${ch.appearance}`)
+  }, manga character portrait, clean lineart, neutral expression, bust up, front facing, highly detailed face, distinct facial features, recognizable character design`;
 
   const input = {
     prompt,
-    negative_prompt: style.negative_prompt || "photorealistic, 3d, ugly, deformed, blurry",
+    negative_prompt: style.negative_prompt || "lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, fewer digits, cropped, worst quality, low quality, low score, bad score, average score, signature, watermark, username, blurry, ugly, deformed, photorealistic, 3d",
     width: 768,
     height: 768,
-    num_inference_steps: 30,
-    guidance_scale: 7.5,
-    scheduler: "DPMSolverMultistep",
+    num_inference_steps: 25,
+    guidance_scale: 6,
+    scheduler: "Euler a",
     num_outputs: 1,
   };
 
@@ -484,14 +483,19 @@ function buildPanelPrompt(script: PanelScript, style: any, characters: Character
 async function generateSdxlImage(prompt: string, style: any, refImageUrl: string | null): Promise<string | null> {
   if (!REPLICATE_API_KEY) return null;
 
+  const qualityTags = "masterpiece, best quality, absurdres, highres";
+  const animNeg = "lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, fewer digits, cropped, worst quality, low quality, low score, bad score, average score, signature, watermark, username, blurry, ugly, deformed";
+  const finalPrompt = `${qualityTags}, ${prompt}`;
+  const negPrompt = style.negative_prompt ? `${animNeg}, ${style.negative_prompt}` : animNeg;
+
   const input: Record<string, any> = {
-    prompt,
-    negative_prompt: style.negative_prompt || "photorealistic, 3d, ugly, deformed, bad anatomy, blurry, low quality",
+    prompt: finalPrompt,
+    negative_prompt: negPrompt,
     width: style.width || 1024,
     height: style.height || 1024,
     num_inference_steps: 25,
-    guidance_scale: Number(style.guidance_scale) || 7,
-    scheduler: "DPMSolverMultistep",
+    guidance_scale: Number(style.guidance_scale) || 6,
+    scheduler: "Euler a",
     num_outputs: 1,
   };
 

@@ -230,8 +230,8 @@ jobs:
           if [ "$STATUS_CODE" = "200" ]; then
             REF_COUNT=$(echo "$STATUS_BODY" | jq -r '.reference_count // 0')
             echo "📊 Images de référence: $REF_COUNT"
-            if [ "$REF_COUNT" -lt 5 ]; then
-              echo "::warning::⚠️ Moins de 5 images — style ${{ matrix.style_slug }} ignoré"
+            if [ "$REF_COUNT" -lt 200 ]; then
+              echo "::warning::⚠️ Moins de 200 images — style ${{ matrix.style_slug }} ignoré"
               echo "skipped=true" >> "$GITHUB_OUTPUT"
               echo "::endgroup::"
               exit 0

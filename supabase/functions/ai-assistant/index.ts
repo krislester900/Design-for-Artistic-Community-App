@@ -28,15 +28,17 @@ interface RequestBody {
 
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 const REPLICATE_KEY = Deno.env.get("REPLICATE_API_KEY") ?? "";
+const ANIM_MODEL = "rocketdigitalai/animagine-xl-4.0";
+const ANIM_VERSION = "7af46ee494f1cf196d49a8592737f4eb789e34a5a995751b23a869d19f5dc2ba";
 const STYLES: Record<string, { slug: string; model: string; version: string; prompt: string; neg: string }> = {
-  "kubo": { slug: "tite-kubo", model: "stability-ai/sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", prompt: "bleach manga style by tite kubo, sharp bold ink lines, {prompt}, dynamic pose, dramatic composition", neg: "photorealistic, 3d, western comic" },
-  "oda": { slug: "eiichiro-oda", model: "stability-ai/sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", prompt: "one piece manga style by eiichiro oda, extremely expressive, {prompt}, bold outlines, shonen", neg: "realistic proportions, dark gritty" },
-  "miura": { slug: "kentaro-miura", model: "stability-ai/sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", prompt: "berserk manga style by kentaro miura, incredibly detailed cross-hatching, dark medieval fantasy, {prompt}, heavy ink work", neg: "bright colors, cartoon, simple lines, chibi" },
-  "kishimoto": { slug: "masashi-kishimoto", model: "stability-ai/sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", prompt: "naruto manga style by masashi kishimoto, dynamic ninja action, {prompt}, hand signs, strong expressions", neg: "realistic, muted colors" },
-  "toriyama": { slug: "akira-toriyama", model: "stability-ai/sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", prompt: "dragon ball manga style by akira toriyama, clean bold lines, {prompt}, vibrant colors, energy aura", neg: "realistic, horror, soft shading" },
-  "togashi": { slug: "yoshihiro-togashi", model: "stability-ai/sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", prompt: "hunter x hunter manga style by yoshihiro togashi, unique design, {prompt}, expressive, detailed textures", neg: "simple art, mecha, romantic" },
-  "junji ito": { slug: "junji-ito", model: "stability-ai/sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", prompt: "junji ito manga art style, meticulous detail, unsettling horror, {prompt}, intricate patterns", neg: "happy, bright colors, cartoon, cute" },
-  "clamp": { slug: "clamp", model: "stability-ai/sdxl", version: "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b", prompt: "clamp manga art style, elegant character design, long flowing limbs, {prompt}, delicate linework, shojo", neg: "rough sketch, thick messy lines, action shonen" },
+  "kubo": { slug: "tite-kubo", model: ANIM_MODEL, version: ANIM_VERSION, prompt: "bleach manga style by tite kubo, sharp bold ink lines, {prompt}, dynamic pose, dramatic composition", neg: "photorealistic, 3d, western comic" },
+  "oda": { slug: "eiichiro-oda", model: ANIM_MODEL, version: ANIM_VERSION, prompt: "one piece manga style by eiichiro oda, extremely expressive, {prompt}, bold outlines, shonen", neg: "realistic proportions, dark gritty" },
+  "miura": { slug: "kentaro-miura", model: ANIM_MODEL, version: ANIM_VERSION, prompt: "berserk manga style by kentaro miura, incredibly detailed cross-hatching, dark medieval fantasy, {prompt}, heavy ink work", neg: "bright colors, cartoon, simple lines, chibi" },
+  "kishimoto": { slug: "masashi-kishimoto", model: ANIM_MODEL, version: ANIM_VERSION, prompt: "naruto manga style by masashi kishimoto, dynamic ninja action, {prompt}, hand signs, strong expressions", neg: "realistic, muted colors" },
+  "toriyama": { slug: "akira-toriyama", model: ANIM_MODEL, version: ANIM_VERSION, prompt: "dragon ball manga style by akira toriyama, clean bold lines, {prompt}, vibrant colors, energy aura", neg: "realistic, horror, soft shading" },
+  "togashi": { slug: "yoshihiro-togashi", model: ANIM_MODEL, version: ANIM_VERSION, prompt: "hunter x hunter manga style by yoshihiro togashi, unique design, {prompt}, expressive, detailed textures", neg: "simple art, mecha, romantic" },
+  "junji ito": { slug: "junji-ito", model: ANIM_MODEL, version: ANIM_VERSION, prompt: "junji ito manga art style, meticulous detail, unsettling horror, {prompt}, intricate patterns", neg: "happy, bright colors, cartoon, cute" },
+  "clamp": { slug: "clamp", model: ANIM_MODEL, version: ANIM_VERSION, prompt: "clamp manga art style, elegant character design, long flowing limbs, {prompt}, delicate linework, shojo", neg: "rough sketch, thick messy lines, action shonen" },
 };
 
 const IMAGE_KEYWORDS = ["dessine", "génère", "crée", "illustre", "imagine", "représente", "draw", "generate", "create", "manga de", "image de", "illustration"];
@@ -275,7 +277,10 @@ serve(async (req) => {
       try {
         const styleEntry = imgReq.styleSlug ? Object.values(STYLES).find((s) => s.slug === imgReq.styleSlug) : null;
         const style = styleEntry ?? STYLES["miura"];
-        const finalPrompt = style.prompt.replace("{prompt}", imgReq.prompt);
+        const qualityTags = "masterpiece, best quality, absurdres, highres";
+        const animNeg = "lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, fewer digits, cropped, worst quality, low quality, low score, bad score, average score, signature, watermark, username, blurry, ugly, deformed";
+        const finalPrompt = `${qualityTags}, ${style.prompt.replace("{prompt}", imgReq.prompt)}`;
+        const negPrompt = style.neg ? `${animNeg}, ${style.neg}` : animNeg;
 
         const replicateRes = await fetch(
           `https://api.replicate.com/v1/models/${style.model}/predictions`,
@@ -284,7 +289,7 @@ serve(async (req) => {
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${REPLICATE_KEY}` },
             body: JSON.stringify({
               version: style.version,
-              input: { prompt: finalPrompt, negative_prompt: style.neg, num_inference_steps: 30, guidance_scale: 7, scheduler: "DPMSolverMultistep", num_outputs: 1 },
+              input: { prompt: finalPrompt, negative_prompt: negPrompt, num_inference_steps: 25, guidance_scale: 6, scheduler: "Euler a", num_outputs: 1 },
             }),
           }
         );

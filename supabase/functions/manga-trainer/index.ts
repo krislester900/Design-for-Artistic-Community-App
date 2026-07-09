@@ -51,7 +51,7 @@ serve(async (req) => {
         .from("ai_manga_styles")
         .select("slug, name, reference_count")
         .eq("training_status", "ready")
-        .gte("reference_count", 5)
+        .gte("reference_count", 200)
         .order("name", { ascending: true });
       return new Response(JSON.stringify(styles ?? []), {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
@@ -83,7 +83,7 @@ serve(async (req) => {
       const { count } = await supabase.from("ai_manga_references").select("*", { count: "exact", head: true }).eq("style_id", style.id);
       await supabase.from("ai_manga_styles").update({
         reference_count: count ?? 0,
-        training_status: count != null && count >= 20 ? "ready" : "collecting",
+        training_status: count != null && count >= 200 ? "ready" : "collecting",
       }).eq("id", style.id);
       return new Response(JSON.stringify({ ok: true, reference_count: count }), {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
@@ -99,16 +99,14 @@ serve(async (req) => {
         .from("ai_manga_references")
         .select("image_url")
         .eq("style_id", style.id)
-        .limit(50);
+        .limit(500);
 
       if (!refs || refs.length < 5) {
         return new Response(JSON.stringify({ error: `Minimum 5 images requises (${refs?.length ?? 0}/5)` }), { status: 400, headers: { "Content-Type": "application/json" } });
       }
 
-      // Prompt descriptif pour l'entraînement LoRA
-      // Utilise le nom + mangaka pour un instance_prompt riche
-      // qui exploite les 2 encodeurs texte de SDXL
-      const instancePrompt = `${style.name} manga art style by ${style.mangaka}`;
+      const artistTags = style.style_tags?.join(", ") ?? "";
+      const instancePrompt = `masterpiece, best quality, ${style.name} manga art style by ${style.mangaka}, ${artistTags}`;
 
       const { data: job, error: jobError } = await supabase.from("ai_training_jobs").insert({
         style_id: style.id,
@@ -144,7 +142,7 @@ serve(async (req) => {
             const { index, buffer, ext } = res.value;
             const fname = `${String(index).padStart(3, "0")}.${ext}`;
             zip.file(fname, buffer);
-            captionLines.push(`{"image": "${fname}", "caption": "${style.slug}-artwork style manga panel"}`);
+            captionLines.push(`{"image": "${fname}", "caption": "masterpiece, best quality, ${style.slug} manga panel art style by ${style.mangaka}, manga panel, monochrome, lineart, screentone"}`);
             addedCount++;
           }
         }
@@ -173,11 +171,12 @@ serve(async (req) => {
             destination: `arteia/sdxl-manga-${style.slug}`,
             input: {
               instance_prompt: instancePrompt,
-              class_prompt: "manga artwork, anime comic art, japanese illustration style",
+              class_prompt: "manga artwork, anime comic art, japanese illustration style, monochrome, lineart",
               train_data: publicUrl,
-              max_train_steps: 2000,
-              learning_rate: 1e-4,
+              max_train_steps: 5000,
+              learning_rate: 5e-5,
               resolution: 1024,
+              lora_rank: 64,
             },
           }),
         });

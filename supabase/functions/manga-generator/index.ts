@@ -38,7 +38,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { prompt, style_slug } = body;
+    const { prompt, style_slug, pose_image, seed } = body;
 
     if (!prompt || !style_slug) {
       return new Response(JSON.stringify({ error: "prompt et style_slug requis" }), { status: 400, headers: { "Content-Type": "application/json" } });
@@ -59,28 +59,44 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "REPLICATE_API_KEY non configurée" }), { status: 500, headers: { "Content-Type": "application/json" } });
     }
 
-    const finalPrompt = style.prompt_template.replace("{prompt}", prompt);
+    const qualityTags = "masterpiece, best quality, absurdres, highres";
+    const animatedNeg = "lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, fewer digits, cropped, worst quality, low quality, low score, bad score, average score, signature, watermark, username, blurry, ugly, deformed, mutated";
+    const rawPrompt = style.prompt_template.replace("{prompt}", prompt);
+    const finalPrompt = `${qualityTags}, ${rawPrompt}`;
+    const negPrompt = style.negative_prompt ? `${animatedNeg}, ${style.negative_prompt}` : animatedNeg;
 
-    const sdxlInput: Record<string, any> = {
+    const modelInput: Record<string, any> = {
       prompt: finalPrompt,
-      negative_prompt: style.negative_prompt,
+      negative_prompt: negPrompt,
       width: style.width,
       height: style.height,
-      num_inference_steps: style.num_inference_steps,
-      guidance_scale: Number(style.guidance_scale),
-      scheduler: "DPMSolverMultistep",
+      num_inference_steps: style.num_inference_steps ?? 25,
+      guidance_scale: Number(style.guidance_scale ?? 6),
+      scheduler: "Euler a",
       num_outputs: 1,
     };
 
+    if (seed != null) {
+      modelInput.seed = seed;
+    }
+
     if (style.lora_url) {
-      sdxlInput.lora_urls = [style.lora_url];
-      sdxlInput.lora_scale = Number(style.lora_scale ?? 0.8);
+      modelInput.lora_urls = [style.lora_url];
+      modelInput.lora_scales = [Number(style.lora_scale ?? 0.8)];
+    }
+
+    if (pose_image) {
+      modelInput.controlnet_units = [{
+        controlnet_model: "thibaud/controlnet-openpose-sdxl-1.0",
+        controlnet_image: pose_image,
+        controlnet_weight: 0.8,
+      }];
     }
 
     const replicateRes = await fetch(`${REPLICATE_BASE}/models/${style.model_owner}/${style.model_name}/predictions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${REPLICATE_API_KEY}` },
-      body: JSON.stringify({ version: style.model_version, input: sdxlInput }),
+      body: JSON.stringify({ version: style.model_version, input: modelInput }),
     });
 
     if (!replicateRes.ok) {
@@ -101,12 +117,12 @@ serve(async (req) => {
         style_id: style.id,
         prompt: prompt,
         image_url: imageUrl,
-        metadata: { fullPrompt: finalPrompt, model: `${style.model_owner}/${style.model_name}` },
+        metadata: { fullPrompt: finalPrompt, negativePrompt: negPrompt, model: `${style.model_owner}/${style.model_name}`, seed: seed ?? null },
       });
 
       await supabase.from("ai_manga_styles").update({ generation_count: style.generation_count + 1 }).eq("id", style.id);
 
-      return new Response(JSON.stringify({ status: "completed", image_url: imageUrl, prediction_id: predId }), {
+      return new Response(JSON.stringify({ status: "completed", image_url: imageUrl, prediction_id: predId, seed: seed ?? null }), {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
       });
     }
