@@ -105,12 +105,12 @@ jobs:
           java-version: '17'
 
       - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK components (platform 36, build-tools, NDK)
         run: |
-          ANDROID_SDK=/usr/local/lib/android/sdk
-          echo "ANDROID_HOME=$ANDROID_SDK" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK" >> $GITHUB_ENV
-          $ANDROID_SDK/tools/bin/sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;27.0.12077973" 2>&1 | tail -5 || true
-          yes | $ANDROID_SDK/tools/bin/sdkmanager --licenses 2>/dev/null || true
+          yes | sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;27.0.12077973" 2>&1 | tail -10
+          yes | sdkmanager --licenses 2>/dev/null || true
 
       - name: Setup Flutter ${{ env.FLUTTER_VERSION }}
         uses: subosito/flutter-action@v2
