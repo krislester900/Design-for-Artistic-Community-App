@@ -9,7 +9,7 @@ const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SDXL = { owner: "rocketdigitalai", name: "animagine-xl-4.0", version: "7af46ee494f1cf196d49a8592737f4eb789e34a5a995751b23a869d19f5dc2ba" };
 const DENOISE_STRENGTH = 0.55;
 
-interface PanelLayout { x: number; y: number; w: number; h: number; label: string; }
+interface PanelLayout { x: number; y: number; w: number; h: number; label: string; breakFrame?: boolean; }
 
 interface PanelScript {
   panel_index: number;
@@ -487,7 +487,7 @@ async function handleCreate(req: Request): Promise<Response> {
     if (authError || !user) throw new Error("Utilisateur non trouvé");
 
     const body = await req.json();
-    const { scene, style_slug, characters, layout_type, title, page_number, total_pages } = body;
+    const { scene, style_slug, characters, layout_type, panel_count, title, page_number, total_pages } = body;
 
     if (!scene || !style_slug) {
       return new Response(
@@ -510,23 +510,10 @@ async function handleCreate(req: Request): Promise<Response> {
       );
     }
 
-    let layoutData: { panels: PanelLayout[]; slug: string };
+    const { panels: layoutPanels, slug: layoutSlug, gutter: layoutGutter } = selectLayout(layout_type || undefined, panel_count);
+    const layoutData = { panels: layoutPanels, slug: layoutSlug };
 
-    if (layout_type) {
-      const { data: layout } = await supabase
-        .from("ai_planche_layouts")
-        .select("*")
-        .eq("slug", layout_type)
-        .limit(1)
-        .single();
-      layoutData = layout
-        ? { panels: layout.layout_data.panels, slug: layout.slug }
-        : getDefaultLayout();
-    } else {
-      layoutData = getDefaultLayout();
-    }
-
-    const panelCount = layoutData.panels.length;
+    const panelCount = layoutPanels.length;
     const charList: Character[] = Array.isArray(characters) ? characters : [];
 
     const panelScripts = await generatePanelScripts(scene, charList, panelCount);
@@ -541,7 +528,7 @@ async function handleCreate(req: Request): Promise<Response> {
       scene_prompt: scene,
       characters: charList,
       status: "generating",
-      metadata: { panel_count: panelCount, char_ref_map: {} },
+      metadata: { panel_count: panelCount, char_ref_map: {}, gutter: layoutGutter },
     }).select().single();
 
     if (insertError || !planche) {
@@ -732,17 +719,25 @@ async function processNextPendingPanel(supabase: any, planche: any) {
         .limit(1)
         .single();
       const currentMeta = freshPlanche?.metadata ?? planche.metadata ?? {};
+      const gutter = currentMeta.gutter ?? 3;
 
+      // Try DB layout, fall back to selectLayout by slug
+      let layoutPanels: PanelLayout[] | undefined;
       const { data: layoutRow } = await supabase
         .from("ai_planche_layouts")
         .select("layout_data")
         .eq("slug", planche.layout_slug)
         .limit(1)
         .single();
-      const layoutPanels = layoutRow?.layout_data?.panels as PanelLayout[] | undefined;
+      if (layoutRow?.layout_data?.panels) {
+        layoutPanels = layoutRow.layout_data.panels as PanelLayout[];
+      } else {
+        const layout = selectLayout(planche.layout_slug);
+        layoutPanels = layout.panels;
+      }
       let compositeUrl: string | null = null;
       if (layoutPanels && layoutPanels.length > 0) {
-        compositeUrl = await compositePlanchePage(supabase, planche.id, allPanels, layoutPanels, style);
+        compositeUrl = await compositePlanchePage(supabase, planche.id, allPanels, layoutPanels, style, gutter);
       }
       const updateData: Record<string, any> = { status: "completed" };
       if (compositeUrl) {
@@ -1099,7 +1094,6 @@ async function generateSdxlImage(prompt: string, style: any, refImageUrl: string
 
 const COMPOSITE_W = 2400;
 const COMPOSITE_H = 3400;
-const BORDER_PX = 3;
 
 async function pngDecode(buf: ArrayBuffer): Promise<{width: number; height: number; rgba: Uint8Array}> {
   const b = new Uint8Array(buf);
@@ -1183,10 +1177,12 @@ function bilinearResize(src: Uint8Array, sw: number, sh: number, dw: number, dh:
 }
 
 async function compositePlanchePage(
-  supabase: any, plancheId: string, panels: any[], layoutPanels: PanelLayout[], style: any
+  supabase: any, plancheId: string, panels: any[], layoutPanels: PanelLayout[], style: any, gutter: number = 3
 ): Promise<string | null> {
   const scaleX = COMPOSITE_W / 100, scaleY = COMPOSITE_H / 100;
   const page = new Uint8Array(COMPOSITE_W * COMPOSITE_H * 4).fill(255);
+
+  // First pass: draw all panel images
   for (let i = 0; i < panels.length; i++) {
     const p = panels[i];
     if (!p.image_url || p.status !== "completed") continue;
@@ -1196,39 +1192,71 @@ async function compositePlanchePage(
     try { imgBuf = await (await fetch(p.image_url)).arrayBuffer(); } catch { continue; }
     let srcRgba: Uint8Array, srcW: number, srcH: number;
     try { const dec = await pngDecode(imgBuf); srcRgba = dec.rgba; srcW = dec.width; srcH = dec.height; } catch { continue; }
+
+    // Detect break-frame : action intense + angle dynamique
+    const poseKey = p.metadata?.pose_description || "";
+    const camAngle = p.metadata?.camera_angle || "";
+    const isBreakFrame = l.breakFrame === true || (
+      (poseKey.includes("punch") || poseKey.includes("clash") || poseKey.includes("slash") || poseKey.includes("kick")) &&
+      (camAngle === "worm" || camAngle === "low-angle")
+    );
+
     const cellX = Math.round(l.x * scaleX);
     const cellY = Math.round(l.y * scaleY);
     const cellW = Math.round(l.w * scaleX);
     const cellH = Math.round(l.h * scaleY);
-    if (cellW <= BORDER_PX*2 || cellH <= BORDER_PX*2) continue;
-    const drawW = cellW - BORDER_PX * 2;
-    const drawH = cellH - BORDER_PX * 2;
-    const scaled = bilinearResize(srcRgba, srcW, srcH, drawW, drawH);
-    for (let y = 0; y < drawH; y++) {
-      const rowOff = (cellY + BORDER_PX + y) * COMPOSITE_W + cellX + BORDER_PX;
-      for (let x = 0; x < drawW; x++) {
-        const si = (y * drawW + x) * 4;
-        const di = (rowOff + x) * 4;
-        if (scaled[si+3] > 0) { page[di]=scaled[si];page[di+1]=scaled[si+1];page[di+2]=scaled[si+2];page[di+3]=255; }
+    if (cellW <= gutter*2 || cellH <= gutter*2) continue;
+
+    if (isBreakFrame) {
+      // Draw 12% oversized, centered, no border
+      const overW = Math.round(cellW * 1.12);
+      const overH = Math.round(cellH * 1.12);
+      const drawX2 = cellX + Math.round((cellW - overW) / 2);
+      const drawY2 = cellY + Math.round((cellH - overH) / 2);
+      const overScaled = bilinearResize(srcRgba, srcW, srcH, overW, overH);
+      for (let y = 0; y < overH; y++) {
+        const rowOff = (drawY2 + y) * COMPOSITE_W + drawX2;
+        for (let x = 0; x < overW; x++) {
+          const si = (y * overW + x) * 4;
+          const di = (rowOff + x) * 4;
+          if (di >= 0 && di + 3 < page.length && overScaled[si+3] > 0) {
+            page[di]=overScaled[si];page[di+1]=overScaled[si+1];page[di+2]=overScaled[si+2];page[di+3]=255;
+          }
+        }
       }
-    }
-    for (let by = 0; by < BORDER_PX; by++) {
-      for (let bx = cellX; bx < cellX + cellW; bx++) {
-        let di = ((cellY + by) * COMPOSITE_W + bx) * 4;
-        page[di]=0;page[di+1]=0;page[di+2]=0;page[di+3]=255;
-        di = ((cellY + cellH - 1 - by) * COMPOSITE_W + bx) * 4;
-        page[di]=0;page[di+1]=0;page[di+2]=0;page[di+3]=255;
+    } else {
+      // Normal rendering with gutter
+      const drawW = cellW - gutter * 2;
+      const drawH = cellH - gutter * 2;
+      const scaled = bilinearResize(srcRgba, srcW, srcH, drawW, drawH);
+      for (let y = 0; y < drawH; y++) {
+        const rowOff = (cellY + gutter + y) * COMPOSITE_W + cellX + gutter;
+        for (let x = 0; x < drawW; x++) {
+          const si = (y * drawW + x) * 4;
+          const di = (rowOff + x) * 4;
+          if (scaled[si+3] > 0) { page[di]=scaled[si];page[di+1]=scaled[si+1];page[di+2]=scaled[si+2];page[di+3]=255; }
+        }
       }
-    }
-    for (let by = 0; by < BORDER_PX; by++) {
-      for (let bx = cellY; bx < cellY + cellH; bx++) {
-        let di = (bx * COMPOSITE_W + (cellX + by)) * 4;
-        page[di]=0;page[di+1]=0;page[di+2]=0;page[di+3]=255;
-        di = (bx * COMPOSITE_W + (cellX + cellW - 1 - by)) * 4;
-        page[di]=0;page[di+1]=0;page[di+2]=0;page[di+3]=255;
+      // Draw black borders
+      for (let by = 0; by < gutter; by++) {
+        for (let bx = cellX; bx < cellX + cellW; bx++) {
+          let di = ((cellY + by) * COMPOSITE_W + bx) * 4;
+          page[di]=0;page[di+1]=0;page[di+2]=0;page[di+3]=255;
+          di = ((cellY + cellH - 1 - by) * COMPOSITE_W + bx) * 4;
+          page[di]=0;page[di+1]=0;page[di+2]=0;page[di+3]=255;
+        }
+      }
+      for (let by = 0; by < gutter; by++) {
+        for (let bx = cellY; bx < cellY + cellH; bx++) {
+          let di = (bx * COMPOSITE_W + (cellX + by)) * 4;
+          page[di]=0;page[di+1]=0;page[di+2]=0;page[di+3]=255;
+          di = (bx * COMPOSITE_W + (cellX + cellW - 1 - by)) * 4;
+          page[di]=0;page[di+1]=0;page[di+2]=0;page[di+3]=255;
+        }
       }
     }
   }
+
   // Step 5: Apply post-processing pipeline — lineart cleanup → screentone → speech bubbles
   let processed = applyLineartCleanup(page, COMPOSITE_W, COMPOSITE_H);
   processed = applyScreentone(processed, COMPOSITE_W, COMPOSITE_H, 0.18);
@@ -1266,10 +1294,8 @@ async function compositePlanchePage(
     const bubbleH = Math.max(textBlockH + pad * 2, 40);
     const bubbleX = cellX + (cellW - bubbleW) / 2;
     const bubbleY = cellY + pad;
-    // Draw bubble shape once (ellipse + tail, no text)
     drawMangaSpeechBubble(processed, COMPOSITE_W, COMPOSITE_H,
       bubbleX, bubbleY, bubbleW, bubbleH, "", "bottom", textScale);
-    // Render each text line centered within the bubble
     const startY = bubbleY + (bubbleH - textBlockH) / 2;
     for (let li = 0; li < lines.length; li++) {
       const lineW = textWidth(lines[li], textScale);
@@ -1294,14 +1320,12 @@ async function compositePlanchePage(
     const cellH = Math.round(l.h * scaleY);
     const burstCx = cellX + cellW / 2;
     const burstCy = cellY + cellH / 2;
-    // Add flow lines for striking poses (direction radiale depuis le centre de la page)
     if (poseKey.includes("punch") || poseKey.includes("kick") || poseKey.includes("slash") || poseKey.includes("clash")) {
       const pageCx = COMPOSITE_W / 2, pageCy = COMPOSITE_H / 2;
       const flowEndX = burstCx + (burstCx - pageCx) * 0.6;
       const flowEndY = burstCy + (burstCy - pageCy) * 0.5;
       drawFlowLines(processed, COMPOSITE_W, COMPOSITE_H, burstCx, burstCy, flowEndX, flowEndY, 0.35);
     }
-    // Add impact burst for clash / heavy hit
     if (poseKey.includes("clash") || poseKey.includes("impact") || poseKey.includes("throw")) {
       drawImpactBurst(processed, COMPOSITE_W, COMPOSITE_H, burstCx, burstCy, 60);
     }
@@ -1317,7 +1341,6 @@ async function compositePlanchePage(
       // Step 6: Upscale the composite image
       const upscaledUrl = await upscaleImage(publicUrl);
       if (upscaledUrl) {
-        // Upload upscaled version
         const upscaledFileName = `composites/${plancheId}_upscaled.png`;
         try {
           const upscaledBuf = await (await fetch(upscaledUrl)).arrayBuffer();
@@ -1881,14 +1904,160 @@ function drawImpactBurst(rgba: Uint8Array, w: number, h: number, cx: number, cy:
   }
 }
 
-function getDefaultLayout(): { panels: PanelLayout[]; slug: string } {
-  return {
-    slug: "4-panel",
-    panels: [
-      { x: 0, y: 0, w: 50, h: 50, label: "Case 1" },
-      { x: 50, y: 0, w: 50, h: 50, label: "Case 2" },
-      { x: 0, y: 50, w: 50, h: 50, label: "Case 3" },
-      { x: 50, y: 50, w: 50, h: 50, label: "Case 4" },
-    ],
-  };
+// ---------- Moteur de layout cinématique ----------
+interface LayoutTemplate {
+  slug: string;
+  vibe: string;
+  gutter: number;
+  panels: PanelLayout[];
+}
+
+const LAYOUT_LIBRARY: LayoutTemplate[] = [
+  // === 4 panneaux ===
+  { slug: "4-equal", vibe: "calm", gutter: 3, panels: [
+    { x: 0, y: 0, w: 50, h: 50, label: "Case 1" },
+    { x: 50, y: 0, w: 50, h: 50, label: "Case 2" },
+    { x: 0, y: 50, w: 50, h: 50, label: "Case 3" },
+    { x: 50, y: 50, w: 50, h: 50, label: "Case 4" },
+  ]},
+  { slug: "4-story", vibe: "story", gutter: 4, panels: [
+    { x: 0, y: 0, w: 100, h: 55, label: "Case 1" },
+    { x: 0, y: 55, w: 50, h: 22, label: "Case 2" },
+    { x: 50, y: 55, w: 50, h: 22, label: "Case 3" },
+    { x: 0, y: 77, w: 100, h: 23, label: "Case 4" },
+  ]},
+  { slug: "4-action", vibe: "action", gutter: 3, panels: [
+    { x: 0, y: 0, w: 55, h: 60, label: "Case 1" },
+    { x: 55, y: 0, w: 45, h: 35, label: "Case 2" },
+    { x: 55, y: 35, w: 45, h: 25, label: "Case 3" },
+    { x: 0, y: 60, w: 100, h: 40, label: "Case 4" },
+  ]},
+  { slug: "4-climax", vibe: "climax", gutter: 6, panels: [
+    { x: 0, y: 0, w: 100, h: 35, label: "Case 1" },
+    { x: 0, y: 35, w: 30, h: 30, label: "Case 2" },
+    { x: 30, y: 35, w: 40, h: 30, label: "Case 3" },
+    { x: 70, y: 35, w: 30, h: 30, label: "Case 4" },
+  ]},
+  { slug: "4-drama", vibe: "drama", gutter: 5, panels: [
+    { x: 0, y: 0, w: 50, h: 35, label: "Case 1" },
+    { x: 50, y: 0, w: 50, h: 35, label: "Case 2" },
+    { x: 0, y: 35, w: 50, h: 65, label: "Case 3" },
+    { x: 50, y: 35, w: 50, h: 65, label: "Case 4" },
+  ]},
+  { slug: "4-vertical", vibe: "action", gutter: 3, panels: [
+    { x: 0, y: 0, w: 100, h: 40, label: "Case 1" },
+    { x: 0, y: 40, w: 48, h: 30, label: "Case 2" },
+    { x: 52, y: 40, w: 48, h: 30, label: "Case 3" },
+    { x: 0, y: 70, w: 100, h: 30, label: "Case 4" },
+  ]},
+  // === 5 panneaux ===
+  { slug: "5-story", vibe: "story", gutter: 4, panels: [
+    { x: 0, y: 0, w: 100, h: 40, label: "Case 1" },
+    { x: 0, y: 40, w: 50, h: 30, label: "Case 2" },
+    { x: 50, y: 40, w: 50, h: 30, label: "Case 3" },
+    { x: 0, y: 70, w: 50, h: 30, label: "Case 4" },
+    { x: 50, y: 70, w: 50, h: 30, label: "Case 5" },
+  ]},
+  { slug: "5-action", vibe: "action", gutter: 3, panels: [
+    { x: 0, y: 0, w: 40, h: 50, label: "Case 1" },
+    { x: 40, y: 0, w: 60, h: 30, label: "Case 2" },
+    { x: 40, y: 30, w: 60, h: 20, label: "Case 3" },
+    { x: 0, y: 50, w: 50, h: 50, label: "Case 4" },
+    { x: 50, y: 50, w: 50, h: 50, label: "Case 5" },
+  ]},
+  { slug: "5-drama", vibe: "drama", gutter: 5, panels: [
+    { x: 0, y: 0, w: 50, h: 35, label: "Case 1" },
+    { x: 50, y: 0, w: 50, h: 35, label: "Case 2" },
+    { x: 0, y: 35, w: 100, h: 30, label: "Case 3" },
+    { x: 0, y: 65, w: 50, h: 35, label: "Case 4" },
+    { x: 50, y: 65, w: 50, h: 35, label: "Case 5" },
+  ]},
+  // === 6 panneaux ===
+  { slug: "6-grid", vibe: "calm", gutter: 3, panels: [
+    { x: 0, y: 0, w: 33, h: 50, label: "Case 1" },
+    { x: 33, y: 0, w: 34, h: 50, label: "Case 2" },
+    { x: 67, y: 0, w: 33, h: 50, label: "Case 3" },
+    { x: 0, y: 50, w: 33, h: 50, label: "Case 4" },
+    { x: 33, y: 50, w: 34, h: 50, label: "Case 5" },
+    { x: 67, y: 50, w: 33, h: 50, label: "Case 6" },
+  ]},
+  { slug: "6-action", vibe: "action", gutter: 3, panels: [
+    { x: 0, y: 0, w: 50, h: 35, label: "Case 1" },
+    { x: 50, y: 0, w: 50, h: 35, label: "Case 2" },
+    { x: 0, y: 35, w: 33, h: 30, label: "Case 3" },
+    { x: 33, y: 35, w: 34, h: 30, label: "Case 4" },
+    { x: 67, y: 35, w: 33, h: 30, label: "Case 5" },
+    { x: 0, y: 65, w: 100, h: 35, label: "Case 6" },
+  ]},
+  { slug: "6-story", vibe: "story", gutter: 4, panels: [
+    { x: 0, y: 0, w: 100, h: 30, label: "Case 1" },
+    { x: 0, y: 30, w: 50, h: 25, label: "Case 2" },
+    { x: 50, y: 30, w: 50, h: 25, label: "Case 3" },
+    { x: 0, y: 55, w: 33, h: 22, label: "Case 4" },
+    { x: 33, y: 55, w: 34, h: 22, label: "Case 5" },
+    { x: 67, y: 55, w: 33, h: 22, label: "Case 6" },
+  ]},
+  // === 7 panneaux ===
+  { slug: "7-story", vibe: "story", gutter: 3, panels: [
+    { x: 0, y: 0, w: 100, h: 30, label: "Case 1" },
+    { x: 0, y: 30, w: 33, h: 25, label: "Case 2" },
+    { x: 33, y: 30, w: 34, h: 25, label: "Case 3" },
+    { x: 67, y: 30, w: 33, h: 25, label: "Case 4" },
+    { x: 0, y: 55, w: 33, h: 22, label: "Case 5" },
+    { x: 33, y: 55, w: 34, h: 22, label: "Case 6" },
+    { x: 67, y: 55, w: 33, h: 22, label: "Case 7" },
+  ]},
+  { slug: "7-action", vibe: "action", gutter: 3, panels: [
+    { x: 0, y: 0, w: 40, h: 40, label: "Case 1" },
+    { x: 40, y: 0, w: 60, h: 25, label: "Case 2" },
+    { x: 40, y: 25, w: 60, h: 15, label: "Case 3" },
+    { x: 0, y: 40, w: 50, h: 30, label: "Case 4" },
+    { x: 50, y: 40, w: 50, h: 30, label: "Case 5" },
+    { x: 0, y: 70, w: 50, h: 30, label: "Case 6" },
+    { x: 50, y: 70, w: 50, h: 30, label: "Case 7" },
+  ]},
+  // === 8 panneaux ===
+  { slug: "8-grid", vibe: "calm", gutter: 3, panels: [
+    { x: 0, y: 0, w: 25, h: 50, label: "Case 1" },
+    { x: 25, y: 0, w: 25, h: 50, label: "Case 2" },
+    { x: 50, y: 0, w: 25, h: 50, label: "Case 3" },
+    { x: 75, y: 0, w: 25, h: 50, label: "Case 4" },
+    { x: 0, y: 50, w: 25, h: 50, label: "Case 5" },
+    { x: 25, y: 50, w: 25, h: 50, label: "Case 6" },
+    { x: 50, y: 50, w: 25, h: 50, label: "Case 7" },
+    { x: 75, y: 50, w: 25, h: 50, label: "Case 8" },
+  ]},
+  { slug: "8-action", vibe: "action", gutter: 3, panels: [
+    { x: 0, y: 0, w: 33, h: 35, label: "Case 1" },
+    { x: 33, y: 0, w: 34, h: 35, label: "Case 2" },
+    { x: 67, y: 0, w: 33, h: 35, label: "Case 3" },
+    { x: 0, y: 35, w: 33, h: 30, label: "Case 4" },
+    { x: 33, y: 35, w: 34, h: 30, label: "Case 5" },
+    { x: 67, y: 35, w: 33, h: 30, label: "Case 6" },
+    { x: 0, y: 65, w: 50, h: 35, label: "Case 7" },
+    { x: 50, y: 65, w: 50, h: 35, label: "Case 8" },
+  ]},
+];
+
+function selectLayout(layoutSlug?: string, panelCount?: number): { panels: PanelLayout[]; slug: string; gutter: number } {
+  // Exact slug match
+  if (layoutSlug) {
+    const found = LAYOUT_LIBRARY.find(l => l.slug === layoutSlug);
+    if (found) return { panels: found.panels, slug: found.slug, gutter: found.gutter };
+  }
+
+  // Filter by panel count (default 4)
+  const target = panelCount || 4;
+  const exact = LAYOUT_LIBRARY.filter(l => l.panels.length === target);
+  if (exact.length > 0) {
+    const chosen = exact[Math.floor(Math.random() * exact.length)];
+    return { panels: chosen.panels, slug: chosen.slug, gutter: chosen.gutter };
+  }
+
+  // Fallback: closest count
+  const sorted = [...LAYOUT_LIBRARY].sort((a, b) =>
+    Math.abs(a.panels.length - target) - Math.abs(b.panels.length - target)
+  );
+  const fallback = sorted[0];
+  return { panels: fallback.panels, slug: fallback.slug, gutter: fallback.gutter };
 }
