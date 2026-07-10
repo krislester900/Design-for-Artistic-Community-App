@@ -737,7 +737,7 @@ async function processNextPendingPanel(supabase: any, planche: any) {
       }
       let compositeUrl: string | null = null;
       if (layoutPanels && layoutPanels.length > 0) {
-        compositeUrl = await compositePlanchePage(supabase, planche.id, allPanels, layoutPanels, style, gutter);
+        compositeUrl = await compositePlanchePage(supabase, planche.id, allPanels, layoutPanels, style, gutter, planche.page_number ?? 1);
       }
       const updateData: Record<string, any> = { status: "completed" };
       if (compositeUrl) {
@@ -1177,7 +1177,7 @@ function bilinearResize(src: Uint8Array, sw: number, sh: number, dw: number, dh:
 }
 
 async function compositePlanchePage(
-  supabase: any, plancheId: string, panels: any[], layoutPanels: PanelLayout[], style: any, gutter: number = 3
+  supabase: any, plancheId: string, panels: any[], layoutPanels: PanelLayout[], style: any, gutter: number = 3, pageNumber: number = 1
 ): Promise<string | null> {
   const scaleX = COMPOSITE_W / 100, scaleY = COMPOSITE_H / 100;
   const page = new Uint8Array(COMPOSITE_W * COMPOSITE_H * 4).fill(255);
@@ -1257,9 +1257,26 @@ async function compositePlanchePage(
     }
   }
 
-  // Step 5: Apply post-processing pipeline — lineart cleanup → screentone → speech bubbles
+  // Step 5: Apply post-processing pipeline — lineart cleanup → per-panel screentone → speech bubbles → SFX → numbering
   let processed = applyLineartCleanup(page, COMPOSITE_W, COMPOSITE_H);
-  processed = applyScreentone(processed, COMPOSITE_W, COMPOSITE_H, 0.18);
+
+  // Per-panel screentone based on emotion
+  for (let i = 0; i < panels.length; i++) {
+    const p = panels[i];
+    const l = layoutPanels[i];
+    if (!l) continue;
+    const emotion = p.metadata?.emotion || "";
+    const st = getScreentoneForEmotion(emotion);
+    const cellX = Math.round(l.x * scaleX);
+    const cellY = Math.round(l.y * scaleY);
+    const cellW = Math.round(l.w * scaleX);
+    const cellH = Math.round(l.h * scaleY);
+    // Skip gutters: shrink region by gutter/2
+    const gHalf = Math.round(gutter / 2);
+    processed = applyScreentoneRegion(processed, COMPOSITE_W, COMPOSITE_H,
+      cellX + gHalf, cellY + gHalf, cellW - gutter, cellH - gutter,
+      st.density, st.angle, st.type);
+  }
 
   // Draw speech bubbles for panels with dialogue
   for (let i = 0; i < panels.length; i++) {
@@ -1305,7 +1322,7 @@ async function compositePlanchePage(
     }
   }
 
-  // Apply dynamic effects for action panels
+  // Apply dynamic effects + SFX for action panels
   const actionPoses = new Set(["punch", "kick", "leap", "spin-kick", "high-punch", "dodge", "ground-punch", "air-kick", "grab-thrust",
     "slash", "clash", "interact-punch-block", "interact-clash", "interact-throw"]);
   for (let i = 0; i < panels.length; i++) {
@@ -1320,15 +1337,59 @@ async function compositePlanchePage(
     const cellH = Math.round(l.h * scaleY);
     const burstCx = cellX + cellW / 2;
     const burstCy = cellY + cellH / 2;
+    // Flow lines
     if (poseKey.includes("punch") || poseKey.includes("kick") || poseKey.includes("slash") || poseKey.includes("clash")) {
       const pageCx = COMPOSITE_W / 2, pageCy = COMPOSITE_H / 2;
       const flowEndX = burstCx + (burstCx - pageCx) * 0.6;
       const flowEndY = burstCy + (burstCy - pageCy) * 0.5;
       drawFlowLines(processed, COMPOSITE_W, COMPOSITE_H, burstCx, burstCy, flowEndX, flowEndY, 0.35);
     }
+    // Impact burst
     if (poseKey.includes("clash") || poseKey.includes("impact") || poseKey.includes("throw")) {
       drawImpactBurst(processed, COMPOSITE_W, COMPOSITE_H, burstCx, burstCy, 60);
     }
+    // SFX onomatopée
+    const sfxWord = SFX_MAP[Object.keys(SFX_MAP).find(k => poseKey.includes(k)) || ""];
+    if (sfxWord) {
+      const sfxScale = Math.max(6, Math.min(14, Math.round(cellW / 20)));
+      // Place SFX above the action center
+      const sfxCy = Math.max(cellY + 20, burstCy - cellH * 0.15);
+      const isInverted = p.metadata?.camera_angle === "worm" || p.metadata?.camera_angle === "low-angle";
+      renderSFX(processed, COMPOSITE_W, COMPOSITE_H, sfxWord, burstCx, sfxCy, sfxScale, isInverted);
+    }
+  }
+
+  // Numbering
+  for (let i = 0; i < panels.length; i++) {
+    const l = layoutPanels[i];
+    if (!l) continue;
+    const cellX = Math.round(l.x * scaleX);
+    const cellY = Math.round(l.y * scaleY);
+    const cellW = Math.round(l.w * scaleX);
+    const numScale = Math.max(2, Math.min(5, Math.round(cellW / 60)));
+    renderPanelNumber(processed, COMPOSITE_W, COMPOSITE_H, i + 1,
+      cellX + numScale * 4, cellY + numScale * 4, numScale);
+  }
+  // Page number
+  const pageNumText = plancheId.slice(0, 6) === "PAGE " ? plancheId.slice(5) : "";
+  if (pageNumText || true) {
+    // Draw page number at bottom-right
+    const pgScale = 4;
+    const pgText = `P.${plancheId.slice(0, 4)}`;
+    const pgTw = textWidth(pgText, pgScale);
+    const pgTh = textHeight(pgScale);
+    const pgX = COMPOSITE_W - pgTw - 16;
+    const pgY = COMPOSITE_H - pgTh - 8;
+    // Black background box
+    for (let dy = -2; dy <= pgTh + 2; dy++) {
+      for (let dx = -2; dx <= pgTw + 2; dx++) {
+        const x = pgX + dx, y = pgY + dy;
+        if (x < 0 || x >= COMPOSITE_W || y < 0 || y >= COMPOSITE_H) continue;
+        const i = (y * COMPOSITE_W + x) * 4;
+        page[i] = 0; page[i+1] = 0; page[i+2] = 0; page[i+3] = 255;
+      }
+    }
+    renderTextOnPage(processed, COMPOSITE_W, COMPOSITE_H, pgText, pgX + 2, pgY + 2, pgScale, 255, 0);
   }
 
   const png = pngEncode(COMPOSITE_W, COMPOSITE_H, processed);
@@ -1590,7 +1651,7 @@ function renderTextOnPage(page: Uint8Array, pw: number, ph: number, text: string
             page[i] = fg;
             page[i+1] = fg;
             page[i+2] = fg;
-            page[i+3] = (fg === 255) ? 255 : fg;
+            page[i+3] = 255;
           }
         }
       }
@@ -1788,7 +1849,105 @@ function applyScreentone(rgba: Uint8Array, w: number, h: number, density: number
   return out;
 }
 
-// ---------- Lignes de flux vectorielles + impact ----------
+// ---------- Screentone par ambiance ----------
+function getScreentoneForEmotion(emotion: string): { type: string; density: number; angle: number } {
+  const e = (emotion || "").toLowerCase();
+  if (["calm","peace","romance","tenderness","melancholy","sad","tristesse"].some(k => e.includes(k)))
+    return { type: "dot", density: 0.10, angle: Math.PI / 4 };
+  if (["action","fury","anger","rage","combat","battle"].some(k => e.includes(k)))
+    return { type: "dot", density: 0.25, angle: Math.PI / 5 };
+  if (["horror","fear","tension","anxiety","dread","peur","angoisse"].some(k => e.includes(k)))
+    return { type: "line", density: 0.30, angle: 0 };
+  if (["flashback","memory","past","souvenir","nostalgia"].some(k => e.includes(k)))
+    return { type: "dot", density: 0.06, angle: Math.PI / 3 };
+  return { type: "dot", density: 0.18, angle: Math.PI / 6 };
+}
+
+function applyScreentoneRegion(rgba: Uint8Array, w: number, h: number,
+  rx: number, ry: number, rw: number, rh: number,
+  density: number, angle: number, type: string): Uint8Array {
+  const out = new Uint8Array(rgba.length);
+  out.set(rgba);
+  const period = type === "line" ? 8 : 12;
+  const cosA = Math.cos(angle), sinA = Math.sin(angle);
+  const x1 = Math.max(0, rx), y1 = Math.max(0, ry);
+  const x2 = Math.min(w, rx + rw), y2 = Math.min(h, ry + rh);
+  for (let y = y1; y < y2; y++) {
+    for (let x = x1; x < x2; x++) {
+      const i = (y * w + x) * 4;
+      const lum = (rgba[i] * 77 + rgba[i+1] * 150 + rgba[i+2] * 29) >> 8;
+      let dotVal: number;
+      if (type === "line") {
+        const proj = x * cosA + y * sinA;
+        const band = ((proj % period) + period) % period;
+        dotVal = band / period;
+      } else {
+        const u = x * cosA + y * sinA;
+        const v = -x * sinA + y * cosA;
+        const du = ((u % period) + period) % period;
+        const dv = ((v % period) + period) % period;
+        const dist = Math.sqrt((du - period/2) ** 2 + (dv - period/2) ** 2);
+        dotVal = Math.min(1, dist / (period/2 + 1));
+      }
+      const tone = Math.max(0, Math.min(255, lum));
+      const dotRadius = Math.max(0, Math.min(1, 1 - tone / 255 - density));
+      const outputLum = dotVal < dotRadius
+        ? Math.max(0, tone - 40)
+        : Math.min(255, tone + 30);
+      const blend = 0.7;
+      const finalLum = Math.round(lum * (1 - blend) + outputLum * blend);
+      out[i] = finalLum; out[i+1] = finalLum; out[i+2] = finalLum;
+    }
+  }
+  return out;
+}
+
+// ---------- SFX (onomatopées) ----------
+const SFX_MAP: Record<string, string> = {
+  "punch": "BAM!", "high-punch": "SMASH!", "kick": "WHAM!",
+  "spin-kick": "CRACK!", "air-kick": "BAM!", "slash": "SWISH!",
+  "clash": "CLANG!", "grab-thrust": "THUD!", "leap": "SOAR!",
+  "ground-punch": "CRASH!", "dodge": "SWISH!", "throw": "FLING!",
+  "power-up": "SURGE!", "punch-block": "SMASH!", "impact": "BOOM!",
+};
+
+function renderSFX(page: Uint8Array, pw: number, ph: number, word: string,
+  cx: number, cy: number, scale: number, inverted: boolean): void {
+  const tw = textWidth(word, scale);
+  const th = textHeight(scale);
+  const px = Math.round(cx - tw / 2);
+  const py = Math.round(cy - th / 2);
+  const off = 2;
+  for (let ox = -off; ox <= off; ox += off) {
+    for (let oy = -off; oy <= off; oy += off) {
+      renderTextOnPage(page, pw, ph, word, px + ox, py + oy, scale, inverted ? 255 : 0, 0);
+    }
+  }
+  renderTextOnPage(page, pw, ph, word, px, py, scale, inverted ? 0 : 255, 0);
+}
+
+// ---------- Numérotation ----------
+function renderPanelNumber(page: Uint8Array, pw: number, ph: number,
+  num: number, cx: number, cy: number, scale: number): void {
+  const txt = String(num);
+  const tw = textWidth(txt, scale);
+  const th = textHeight(scale);
+  const pad = scale * 2;
+  const r = Math.max(tw, th) / 2 + pad;
+  const px = Math.round(cx - tw / 2);
+  const py = Math.round(cy - th / 2);
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx*dx + dy*dy > r*r) continue;
+      const x = Math.round(cx + dx);
+      const y = Math.round(cy + dy);
+      if (x < 0 || x >= pw || y < 0 || y >= ph) continue;
+      const i = (y * pw + x) * 4;
+      page[i]=0; page[i+1]=0; page[i+2]=0; page[i+3]=255;
+    }
+  }
+  renderTextOnPage(page, pw, ph, txt, px, py, scale, 255, 0);
+}
 function drawThickLine(rgba: Uint8Array, w: number, h: number,
   x1: number, y1: number, x2: number, y2: number,
   r: number, g: number, b: number, alpha: number, thickness: number = 1): void {
