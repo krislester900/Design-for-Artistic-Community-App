@@ -47,13 +47,24 @@ serve(async (req) => {
     }
 
     if (action === "list_ready") {
-      const { data: styles } = await supabase
+      // Styles with ≥50 references (reduced from 200 for bootstrap)
+      const { data: refStyles } = await supabase
         .from("ai_manga_styles")
-        .select("slug, name, reference_count")
-        .eq("training_status", "ready")
-        .gte("reference_count", 200)
+        .select("slug, name, reference_count, generation_count, training_status")
+        .or(`training_status.eq.ready,training_status.eq.untrained,training_status.eq.collecting`)
+        .or(`reference_count.gte.50,generation_count.gte.100`)
         .order("name", { ascending: true });
-      return new Response(JSON.stringify(styles ?? []), {
+
+      const ready = (refStyles ?? []).filter((s: any) => {
+        // Ready if: status=ready, OR (status!=training and has enough refs or generations)
+        if (s.training_status === "training") return false;
+        if (s.training_status === "ready") return true;
+        if (s.reference_count >= 50) return true;
+        if ((s.generation_count ?? 0) >= 100) return true;
+        return false;
+      });
+
+      return new Response(JSON.stringify(ready), {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
       });
     }
@@ -81,11 +92,12 @@ serve(async (req) => {
         user_id: userId, style_id: style.id, image_url, source: "upload",
       });
       const { count } = await supabase.from("ai_manga_references").select("*", { count: "exact", head: true }).eq("style_id", style.id);
+      const isReady = count != null && (count >= 50 || (style.generation_count ?? 0) >= 100);
       await supabase.from("ai_manga_styles").update({
         reference_count: count ?? 0,
-        training_status: count != null && count >= 200 ? "ready" : "collecting",
+        training_status: isReady ? "ready" : "collecting",
       }).eq("id", style.id);
-      return new Response(JSON.stringify({ ok: true, reference_count: count }), {
+      return new Response(JSON.stringify({ ok: true, reference_count: count, ready: isReady }), {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
       });
     }
@@ -209,6 +221,63 @@ serve(async (req) => {
         await supabase.from("ai_manga_styles").update({ training_status: "failed" }).eq("id", style.id);
         return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { "Content-Type": "application/json" } });
       }
+    }
+
+    if (action === "add_composite_refs") {
+      // Improvement loop: add successfully generated panel images as references
+      if (!image_urls || !Array.isArray(image_urls) || image_urls.length === 0) {
+        return new Response(JSON.stringify({ error: "image_urls[] requis" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+
+      // Count existing refs for this style
+      const { count: existingCount } = await supabase
+        .from("ai_manga_references")
+        .select("*", { count: "exact", head: true })
+        .eq("style_id", style.id);
+
+      const remaining = Math.max(0, 500 - (existingCount ?? 0));
+      const toInsert = image_urls.slice(0, Math.min(remaining, image_urls.length));
+
+      if (toInsert.length === 0) {
+        return new Response(JSON.stringify({ ok: true, added: 0, total: existingCount ?? 0 }), {
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        });
+      }
+
+      // Deduplicate against existing
+      const existingUrls = new Set<string>();
+      for (let i = 0; i < toInsert.length; i += 50) {
+        const chunk = toInsert.slice(i, i + 50);
+        const { data: existing } = await supabase
+          .from("ai_manga_references")
+          .select("image_url")
+          .in("image_url", chunk);
+        if (existing) for (const row of existing) existingUrls.add(row.image_url);
+      }
+
+      let added = 0;
+      for (const url of toInsert) {
+        if (existingUrls.has(url)) continue;
+        await supabase.from("ai_manga_references").insert({
+          style_id: style.id,
+          image_url: url,
+          source: "generated",
+          caption: `generated-${style.slug}`,
+        });
+        added++;
+      }
+
+      const newTotal = (existingCount ?? 0) + added;
+      const isReady = newTotal >= 50 || (style.generation_count ?? 0) >= 100;
+      await supabase.from("ai_manga_styles").update({
+        reference_count: newTotal,
+        generation_count: (style.generation_count ?? 0) + 1,
+        training_status: isReady ? "ready" : "collecting",
+      }).eq("id", style.id);
+
+      return new Response(JSON.stringify({ ok: true, added, total: newTotal, ready: isReady }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
     }
 
     if (action === "test_download") {

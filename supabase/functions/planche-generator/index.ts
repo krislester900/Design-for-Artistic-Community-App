@@ -794,6 +794,57 @@ async function processNextPendingPanel(supabase: any, planche: any) {
       if (compositeUrl) {
         updateData.image_url = compositeUrl;
         updateData.metadata = { ...currentMeta, composite: { width: !!spreadWithId ? SPREAD_W : COMPOSITE_W, height: SPREAD_H } };
+
+        // Improvement loop: add successful panel images as references for style training
+        const panelUrls = allPanels
+          ?.filter((p: any) => p.image_url && p.status === "completed")
+          ?.slice(0, 8)
+          ?.map((p: any) => p.image_url) ?? [];
+        if (panelUrls.length > 0) {
+          try {
+            const trainerRes = await fetch(`${SUPABASE_URL}/functions/v1/manga-trainer`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_KEY}` },
+              body: JSON.stringify({
+                action: "add_composite_refs",
+                style_slug: planche.style_slug,
+                image_urls: panelUrls,
+              }),
+            });
+            if (trainerRes.ok) {
+              const trainerData = await trainerRes.json();
+              // If style just became "ready", trigger training workflow
+              if (trainerData.ready) {
+                const ghToken = Deno.env.get("GITHUB_TOKEN");
+                if (ghToken) {
+                  try {
+                    await fetch(`https://api.github.com/repos/krislester900/Design-for-Artistic-Community-App/dispatches`, {
+                      method: "POST",
+                      headers: { "Accept": "application/vnd.github+json", Authorization: `Bearer ${ghToken}` },
+                      body: JSON.stringify({
+                        event_type: "trigger-training",
+                        client_payload: { style_slug: planche.style_slug },
+                      }),
+                    });
+                  } catch { /* webhook silencieux */ }
+                }
+              }
+            }
+          } catch { /* amélioration silencieuse */ }
+        }
+
+        // Increment generation_count (direct SQL increment via RPC or raw update)
+        try {
+          const { data: curStyle } = await supabase
+            .from("ai_manga_styles")
+            .select("generation_count")
+            .eq("slug", planche.style_slug)
+            .limit(1)
+            .maybeSingle();
+          await supabase.from("ai_manga_styles").update({
+            generation_count: ((curStyle as any)?.generation_count ?? 0) + 1,
+          }).eq("slug", planche.style_slug);
+        } catch { /* silencieux */ }
       }
       await supabase.from("ai_planches").update(updateData).eq("id", planche.id);
     } else {
