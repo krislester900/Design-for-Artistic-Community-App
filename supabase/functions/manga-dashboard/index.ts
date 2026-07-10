@@ -23,16 +23,19 @@ pre { background:#0d1117; padding:0.75rem; border-radius:4px; overflow-x:auto; f
 `;
 
 async function serveDashboard(): Promise<Response> {
-  const [styleRes, plancheRes, logRes, refRes] = await Promise.all([
-    supabase.from("manga_styles").select("slug, status, reference_count, training_status, generation_count, updated_at").order("slug"),
-    supabase.from("planches").select("id, status, style_slug, created_at").order("created_at", { ascending: false }).limit(20),
-    supabase.from("ai_logs").select("*").order("created_at", { ascending: false }).limit(50),
-    supabase.from("manga_styles").select("slug, status, reference_count").not("reference_count", "eq", 0),
+  const [styleRes, plancheRes, refRes] = await Promise.all([
+    supabase.from("ai_manga_styles").select("slug, status, reference_count, training_status, generation_count, updated_at").order("slug"),
+    supabase.from("ai_planches").select("id, status, style_slug, created_at").order("created_at", { ascending: false }).limit(20),
+    supabase.from("ai_manga_styles").select("slug, status, reference_count").not("reference_count", "eq", 0),
   ]);
+  let logs: any[] = [];
+  try {
+    const logRes = await supabase.from("ai_logs").select("*").order("created_at", { ascending: false }).limit(50);
+    if (logRes.data) logs = logRes.data;
+  } catch { /* ai_logs table may not exist yet */ }
 
   const styles = styleRes.data ?? [];
   const planches = plancheRes.data ?? [];
-  const logs = logRes.data ?? [];
   const refs = refRes.data ?? [];
 
   const totalSources = refs.reduce((s: number, r: any) => s + (r.reference_count || 0), 0);
