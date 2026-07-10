@@ -6,8 +6,72 @@ const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-const SDXL = { owner: "rocketdigitalai", name: "animagine-xl-4.0", version: "7af46ee494f1cf196d49a8592737f4eb789e34a5a995751b23a869d19f5dc2ba" };
+const SDXL       = { owner: "rocketdigitalai", name: "animagine-xl-4.0", version: "7af46ee494f1cf196d49a8592737f4eb789e34a5a995751b23a869d19f5dc2ba" };
+const SDXL_FALLBACK = { owner: "stability-ai", name: "stable-diffusion-xl-1024-aesthetic", version: "8f5584faab4dbb876f1a7fce6d98700abc9aeff489caa59336a0753989440cad" };
 const DENOISE_STRENGTH = 0.55;
+
+// Logger structuré
+function makeLogger(source: string, supabase?: any) {
+  const start = Date.now();
+  return {
+    info: (msg: string, meta?: any) => logToSupabase(supabase, "info", source, msg, meta, Date.now() - start),
+    warn: (msg: string, meta?: any) => logToSupabase(supabase, "warn", source, msg, meta, Date.now() - start),
+    error: (msg: string, meta?: any) => logToSupabase(supabase, "error", source, msg, meta, Date.now() - start),
+    time: () => Date.now() - start,
+  };
+}
+
+async function logToSupabase(supabase: any, level: string, source: string, message: string, metadata?: any, durationMs?: number) {
+  if (!supabase) return;
+  try {
+    await supabase.rpc("insert_ai_log", {
+      p_level: level, p_source: source, p_function_name: source,
+      p_message: message, p_metadata: metadata ? JSON.stringify(metadata) : "{}",
+      p_duration_ms: durationMs ?? null, p_style_slug: metadata?.style_slug ?? null,
+      p_planche_id: metadata?.planche_id ?? null,
+    });
+  } catch { /* log silencieux */ }
+}
+
+// Retry avec backoff exponentiel
+async function withRetry<T>(fn: () => Promise<T>, label: string, maxRetries = 3): Promise<T | null> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt === maxRetries) return null;
+      const delay = Math.min(1000 * Math.pow(2, attempt), 15000);
+      console.warn(`[${label}] tentative ${attempt + 1}/${maxRetries + 1} échouée, retry dans ${delay}ms`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  return null;
+}
+
+async function replicatePredict(model: {owner: string; name: string; version: string}, input: any, label: string): Promise<string | null> {
+  // Primary model
+  const url = `https://api.replicate.com/v1/models/${SDXL.owner}/${SDXL.name}/predictions`;
+  const primaryRes = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${REPLICATE_API_KEY}` },
+    body: JSON.stringify({ version: SDXL.version, input }),
+  });
+  if (primaryRes.ok) {
+    const pred = await primaryRes.json();
+    return pollReplicate(pred.id, label);
+  }
+  // Fallback model
+  console.warn(`[${label}] fallback vers SDXL standard`);
+  const fbUrl = `https://api.replicate.com/v1/models/${SDXL_FALLBACK.owner}/${SDXL_FALLBACK.name}/predictions`;
+  const fbRes = await fetch(fbUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${REPLICATE_API_KEY}` },
+    body: JSON.stringify({ version: SDXL_FALLBACK.version, input }),
+  });
+  if (!fbRes.ok) return null;
+  const fbPred = await fbRes.json();
+  return pollReplicate(fbPred.id, `${label}-fallback`);
+}
 
 interface PanelLayout { x: number; y: number; w: number; h: number; label: string; breakFrame?: boolean; }
 
@@ -474,12 +538,19 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: "POST requis" }), { status: 405, headers: { "Content-Type": "application/json" } });
   }
 
-  return handleCreate(req);
+  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const log = makeLogger("serve", supabase);
+  const result = await handleCreate(req);
+  if (result.status >= 400) {
+    log.warn(`Requête POST échouée HTTP ${result.status}`, { path: url.pathname });
+  }
+  return result;
 });
 
 async function handleCreate(req: Request): Promise<Response> {
+  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const log = makeLogger("handleCreate", supabase);
   try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
     const authHeader = req.headers.get("Authorization")?.replace("Bearer ", "");
     if (!authHeader) throw new Error("Non authentifié");
 
@@ -572,6 +643,7 @@ async function handleCreate(req: Request): Promise<Response> {
       );
     }
 
+    log.info("Planche créée", { planche_id: planche.id, style_slug, panel_count: panelCount });
     return new Response(JSON.stringify({
       planche_id: planche.id,
       status: "generating",
@@ -585,6 +657,7 @@ async function handleCreate(req: Request): Promise<Response> {
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
+    log.error("Erreur handleCreate", { error: msg });
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
@@ -593,9 +666,9 @@ async function handleCreate(req: Request): Promise<Response> {
 }
 
 async function handleGetStatus(plancheId: string): Promise<Response> {
+  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const log = makeLogger("handleGetStatus", supabase);
   try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
     const { data: planche } = await supabase
       .from("ai_planches")
       .select("*")
@@ -633,6 +706,7 @@ async function handleGetStatus(plancheId: string): Promise<Response> {
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
+    log.error("Erreur handleGetStatus", { planche_id: plancheId, error: msg });
     return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 }
@@ -950,15 +1024,7 @@ async function generateCharacterRefs(ch: Character, style: any): Promise<Record<
       input.lora_scale = Number(style.lora_scale ?? 0.8);
     }
 
-    const res = await fetch(`https://api.replicate.com/v1/models/${SDXL.owner}/${SDXL.name}/predictions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${REPLICATE_API_KEY}` },
-      body: JSON.stringify({ version: SDXL.version, input }),
-    });
-
-    if (!res.ok) continue;
-    const prediction = await res.json();
-    const url = await pollReplicate(prediction.id, `${ch.name}-${viewName}`);
+    const url = await withRetry(() => replicatePredict(SDXL, input, `${ch.name}-${viewName}`), `${ch.name}-${viewName}`, 2);
     if (url) result[viewName] = url;
   }
 
@@ -967,20 +1033,28 @@ async function generateCharacterRefs(ch: Character, style: any): Promise<Record<
 
 async function pollReplicate(predictionId: string, label: string): Promise<string | null> {
   for (let i = 0; i < 60; i++) {
-    const res = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
-      headers: { Authorization: `Bearer ${REPLICATE_API_KEY}` },
-    });
-    if (!res.ok) break;
-    const data = await res.json();
-    if (data.status === "succeeded") return data.output?.[0] || null;
-    if (data.status === "failed") return null;
+    try {
+      const res = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
+        headers: { Authorization: `Bearer ${REPLICATE_API_KEY}` },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.status === "succeeded") return data.output?.[0] || null;
+      if (data.status === "failed") return null;
+    } catch {
+      // Network error transitoire — on réessaie
+    }
     await new Promise((r) => setTimeout(r, 3000));
   }
   return null;
 }
 
 async function generatePanelScripts(scene: string, characters: Character[], panelCount: number): Promise<PanelScript[]> {
-  if (!GROQ_API_KEY) return generateFallbackScripts(scene, panelCount);
+  const log = makeLogger("generatePanelScripts");
+  if (!GROQ_API_KEY) {
+    log.warn("GROQ_API_KEY manquante, fallback scripts");
+    return generateFallbackScripts(scene, panelCount);
+  }
 
   try {
     const charSection = characters.length > 0
@@ -1031,26 +1105,28 @@ Génère un découpage narratif professionnel avec progression dramatique et des
 Chaque case doit avoir un pose_description valide. Pour les affrontements, utilise les poses interact-*.
 Angles de caméra dynamiques recommandés : low-angle, worm pour l'action; high-angle, bird pour la vulnérabilité.`;
 
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${GROQ_API_KEY}` },
-      body: JSON.stringify({
-        model: "llama3-70b-8192",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 4000,
-      }),
-    });
+    const groqBody = {
+      model: "mixtral-8x7b-32768",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.8,
+      max_tokens: 4096,
+    };
+    const res = await withRetry(async () => {
+      const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${GROQ_API_KEY}` },
+        body: JSON.stringify(groqBody),
+      });
+      if (!r.ok) throw new Error(`GROQ HTTP ${r.status}`);
+      return r;
+    }, "groq", 2);
 
-    const data = await res.json();
-    const content = data.choices?.[0]?.message?.content ?? "";
-
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+    if (!res) {
+      log.error("GROQ échoué après retry, fallback scripts");
+      return generateFallbackScripts(scene, panelCount);
     }
   } catch {
     // fallback silencieux
@@ -1142,7 +1218,11 @@ function buildPanelPrompt(script: PanelScript, style: any, characters: Character
 }
 
 async function generateSdxlImage(prompt: string, style: any, refImageUrl: string | null, poseImageUrl: string | null = null): Promise<string | null> {
-  if (!REPLICATE_API_KEY) return null;
+  const log = makeLogger("generateSdxlImage");
+  if (!REPLICATE_API_KEY) {
+    log.warn("REPLICATE_API_KEY manquante");
+    return null;
+  }
 
   const qualityTags = "masterpiece, best quality, absurdres, highres";
   const animNeg = "lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, fewer digits, cropped, worst quality, low quality, low score, bad score, average score, signature, watermark, username, blurry, ugly, deformed";
@@ -1179,15 +1259,9 @@ async function generateSdxlImage(prompt: string, style: any, refImageUrl: string
     }];
   }
 
-  const res = await fetch(`https://api.replicate.com/v1/models/${SDXL.owner}/${SDXL.name}/predictions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${REPLICATE_API_KEY}` },
-    body: JSON.stringify({ version: SDXL.version, input }),
-  });
-
-  if (!res.ok) return null;
-  const prediction = await res.json();
-  return pollReplicate(prediction.id, "panel");
+  const result = await withRetry(() => replicatePredict(SDXL, input, "panel"), "panel", 2);
+  if (!result) log.error("Échec génération image après retry+fallback", { prompt: prompt.slice(0, 80) });
+  return result;
 }
 
 // ============================================================
@@ -1281,6 +1355,8 @@ function bilinearResize(src: Uint8Array, sw: number, sh: number, dw: number, dh:
 async function compositePlanchePage(
   supabase: any, plancheId: string, panels: any[], layoutPanels: PanelLayout[], style: any, gutter: number = 3, pageNumber: number = 1
 ): Promise<string | null> {
+  const log = makeLogger("compositePlanchePage", supabase);
+  log.info(`Composition planche ${plancheId} — ${panels.length} panels`, { planche_id: plancheId, panel_count: panels.length, style_slug: style?.slug });
   const scaleX = COMPOSITE_W / 100, scaleY = COMPOSITE_H / 100;
   const page = new Uint8Array(COMPOSITE_W * COMPOSITE_H * 4).fill(255);
 
@@ -1513,6 +1589,7 @@ async function compositePlanchePage(
     const { data, error } = await supabase.storage.from("planche-assets").upload(fileName, png, { contentType: "image/png", upsert: true });
     if (!error && data) {
       const { data: { publicUrl } } = supabase.storage.from("planche-assets").getPublicUrl(fileName);
+      log.info("Composite uploadé, upscale en cours", { planche_id: plancheId });
 
       // Step 6: Upscale the composite image
       const upscaledUrl = await upscaleImage(publicUrl);
@@ -1522,14 +1599,19 @@ async function compositePlanchePage(
           const upscaledBuf = await (await fetch(upscaledUrl)).arrayBuffer();
           await supabase.storage.from("planche-assets").upload(upscaledFileName, new Uint8Array(upscaledBuf), { contentType: "image/png", upsert: true });
           const { data: { publicUrl: upscaledPublicUrl } } = supabase.storage.from("planche-assets").getPublicUrl(upscaledFileName);
+          log.info("Composite upscalé terminé", { planche_id: plancheId });
           return upscaledPublicUrl;
         } catch {
+          log.warn("Échec téléchargement upscaled, retour original", { planche_id: plancheId });
           return publicUrl;
         }
       }
       return publicUrl;
     }
-  } catch {}
+  } catch {
+    log.error("Échec upload composite", { planche_id: plancheId });
+  }
+  log.error("Composite abandonné — aucun résultat", { planche_id: plancheId });
   return null;
 }
 
@@ -1660,15 +1742,23 @@ async function compositeDoublePageSpread(supabase: any, plancheIds: string[],
 const UPSCALER = { owner: "nightmareai", name: "real-esrgan", version: "42fed1c4974146d4d2414e2be2c5277c7fcf05fcc3a73abf41610695738c1d7b" };
 
 async function upscaleImage(imageUrl: string): Promise<string | null> {
-  if (!REPLICATE_API_KEY) return null;
-  const res = await fetch(`https://api.replicate.com/v1/models/${UPSCALER.owner}/${UPSCALER.name}/predictions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${REPLICATE_API_KEY}` },
-    body: JSON.stringify({ version: UPSCALER.version, input: { image: imageUrl, scale: 2, face_enhance: false } }),
-  });
-  if (!res.ok) return null;
-  const pred = await res.json();
-  return pollReplicate(pred.id, "upscale");
+  const log = makeLogger("upscaleImage");
+  if (!REPLICATE_API_KEY) {
+    log.warn("REPLICATE_API_KEY manquante");
+    return null;
+  }
+  const result = await withRetry(async () => {
+    const res = await fetch(`https://api.replicate.com/v1/models/${UPSCALER.owner}/${UPSCALER.name}/predictions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${REPLICATE_API_KEY}` },
+      body: JSON.stringify({ version: UPSCALER.version, input: { image: imageUrl, scale: 2, face_enhance: false } }),
+    });
+    if (!res.ok) return null;
+    const pred = await res.json();
+    return pollReplicate(pred.id, "upscale");
+  }, "upscale", 2);
+  if (!result) log.error("Upscale échoué après retry");
+  return result;
 }
 
 // ============================================================

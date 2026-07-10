@@ -468,22 +468,25 @@ async function saveConversation(supabase: any, userId: string, messages: ChatMes
 
 // Export des données d'entraînement au format JSONL
 async function handleExportTrainingData(supabase: any, format: string) {
-  const { data: conversations } = await supabase
-    .from("ai_conversations")
-    .select("user_message, assistant_reply, context_type, created_at")
-    .order("created_at", { ascending: false })
-    .limit(500);
+  try {
+    const [convRes, tdRes] = await Promise.all([
+      supabase.from("ai_conversations")
+        .select("user_message, assistant_reply, context_type, created_at")
+        .order("created_at", { ascending: false })
+        .limit(500),
+      supabase.from("ai_training_data")
+        .select("question, answer, category, quality_score, is_approved")
+        .eq("is_approved", true)
+        .limit(200),
+    ]);
 
-  const { data: trainingData } = await supabase
-    .from("ai_training_data")
-    .select("question, answer, category, quality_score, is_approved")
-    .eq("is_approved", true)
-    .limit(200);
+    const conversations = convRes.data ?? [];
+    const trainingData = tdRes.data ?? [];
 
-  const lines: string[] = [];
+    const lines: string[] = [];
 
-  if (conversations) {
     for (const c of conversations) {
+      if (!c.user_message || !c.assistant_reply) continue;
       lines.push(JSON.stringify({
         messages: [
           { role: "system", content: "Tu es Arteïa Muse, assistant créatif artistique." },
@@ -492,10 +495,9 @@ async function handleExportTrainingData(supabase: any, format: string) {
         ],
       }));
     }
-  }
 
-  if (trainingData) {
     for (const d of trainingData) {
+      if (!d.question || !d.answer) continue;
       lines.push(JSON.stringify({
         messages: [
           { role: "system", content: "Tu es Arteïa Muse, assistant créatif artistique." },
@@ -505,27 +507,43 @@ async function handleExportTrainingData(supabase: any, format: string) {
         metadata: { category: d.category, quality_score: d.quality_score },
       }));
     }
+
+    const output = lines.join("\n");
+    const today = new Date().toISOString().split("T")[0];
+    const filename = `artieia-training-${today}.jsonl`;
+
+    // Upload to storage instead of returning raw file
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(output);
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from("planche-assets")
+      .upload(`training-exports/${filename}`, bytes, {
+        contentType: "application/jsonl",
+        upsert: true,
+      });
+
+    const fileUrl = uploadData
+      ? `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/planche-assets/training-exports/${filename}`
+      : null;
+
+    return new Response(JSON.stringify({
+      success: !uploadError,
+      filename,
+      entry_count: lines.length,
+      conversation_count: conversations.length,
+      training_count: trainingData.length,
+      file_url: fileUrl,
+      format,
+    }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ success: false, error: msg }), {
+      status: 500,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
   }
-
-  const output = lines.join("\n");
-  const filename = `artieia-training-${new Date().toISOString().split("T")[0]}.jsonl`;
-
-  // Stocker l'export dans la table ai_training_data
-  await supabase.from("ai_training_data").insert({
-    category: "export",
-    question: `Export ${format} du ${new Date().toISOString()}`,
-    answer: `Export JSONL avec ${lines.length} entrées`,
-    quality_score: 5,
-    is_approved: true,
-  }).catch(() => {});
-
-  return new Response(output, {
-    headers: {
-      "Content-Type": "application/jsonl",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      "Access-Control-Allow-Origin": "*",
-    },
-  });
 }
 
 // ============================================================

@@ -180,10 +180,11 @@ jobs:
             "database/schema-music-studio.sql"
             "database/schema-migration-safe.sql"
             "database/schema-add-missing-tables.sql"
-            "database/schema-planches.sql",
+            "database/schema-planches.sql"
             "database/migration-planche-panels-metadata.sql"
             "database/migration-phase4-postprocessing.sql"
             "database/schema-knowledge-contrib.sql"
+            "database/schema-monitoring-logs.sql"
           )
           TOTAL=${#SCHEMAS[@]}
           OK=0
@@ -247,6 +248,7 @@ jobs:
             "create-payment-intent"
             "send-invitation-email"
             "planche-generator"
+            "manga-dashboard --no-verify-jwt"
           )
           for fn in "${FUNCTIONS[@]}"; do
             NAME=$(echo "$fn" | awk '{print $1}')
