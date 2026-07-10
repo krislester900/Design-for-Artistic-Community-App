@@ -20,7 +20,7 @@ class RiveLoading extends StatefulWidget {
 }
 
 class _RiveLoadingState extends State<RiveLoading> {
-  Artboard? _artboard;
+  RiveWidgetController? _controller;
   bool _isLoaded = false;
 
   @override
@@ -38,16 +38,16 @@ class _RiveLoadingState extends State<RiveLoading> {
 
   Future<void> _loadRive() async {
     try {
-      final file = await RiveFile.asset(widget.riveAsset);
-      final artboard = file.mainArtboard;
+      final file = await File.asset(widget.riveAsset, riveFactory: Factory.rive);
+      if (file == null) { if (mounted) { widget.onComplete(); } return; }
+      final controller = RiveWidgetController(file);
       if (mounted) {
         setState(() {
-          _artboard = artboard;
+          _controller = controller;
           _isLoaded = true;
         });
       }
     } catch (e) {
-      // Fallback: just show a dark screen and complete
       if (mounted) {
         widget.onComplete();
       }
@@ -59,13 +59,13 @@ class _RiveLoadingState extends State<RiveLoading> {
     return Container(
       color: const Color(0xFF0a0a0a),
       child: Center(
-        child: _isLoaded && _artboard != null
+        child: _isLoaded && _controller != null
             ? SizedBox(
                 width: 300,
                 height: 300,
-                child: Rive(
-                  artboard: _artboard!,
-                  fit: BoxFit.contain,
+                child: RiveWidget(
+                  controller: _controller!,
+                  fit: Fit.contain,
                 ),
               )
             : const CircularProgressIndicator(

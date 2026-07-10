@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:rive/rive.dart';
 import 'utils/app_constants.dart';
 import 'services/supabase_service.dart';
 import 'services/theme_service.dart';
@@ -58,6 +59,12 @@ Future<void> main() async {
     );
   } catch (e) {
     debugPrint('⚠️ Supabase initialization failed (app will work offline): $e');
+  }
+
+  try {
+    await RiveNative.init();
+  } catch (e) {
+    debugPrint('⚠️ RiveNative init failed: $e');
   }
 
   // Initialize word predictor
