@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../services/cloudinary_service.dart';
+import '../services/toast_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/category_themes.dart';
@@ -99,7 +100,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> with TickerProviderSt
 
   Future<void> _startRecording() async {
     if (!await _requestPermission()) {
-      _showSnackBar('Permission microphone refusée');
+      ToastService.instance.show(message: 'Permission microphone refusée', type: ToastType.warning);
       return;
     }
 
@@ -135,7 +136,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> with TickerProviderSt
       debugPrint('🎙️ Recording started: $_currentRecordingPath');
     } catch (e) {
       debugPrint('❌ Error starting recording: $e');
-      _showSnackBar('Erreur lors de l\'enregistrement');
+      ToastService.instance.show(message: 'Erreur lors de l\'enregistrement', type: ToastType.error);
     }
   }
 
@@ -161,22 +162,22 @@ class _MusicStudioPageState extends State<MusicStudioPage> with TickerProviderSt
 
     final user = _supabase.currentUser;
     if (user == null) {
-      _showSnackBar('Connecte-toi pour sauvegarder');
+      ToastService.instance.show(message: 'Connecte-toi pour sauvegarder', type: ToastType.warning);
       return;
     }
 
     try {
       final file = File(_currentRecordingPath!);
       if (!await file.exists()) {
-        _showSnackBar('Fichier introuvable');
+        ToastService.instance.show(message: 'Fichier introuvable', type: ToastType.error);
         return;
       }
 
-      _showSnackBar('Sauvegarde en cours...');
+      ToastService.instance.show(message: 'Sauvegarde en cours...', type: ToastType.info);
 
       final cloudinaryUrl = await _cloudinary.uploadImage(file, folder: 'music_tracks');
       if (cloudinaryUrl == null) {
-        _showSnackBar('Erreur lors de l\'upload');
+        ToastService.instance.show(message: 'Erreur lors de l\'upload', type: ToastType.error);
         return;
       }
 
@@ -188,7 +189,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> with TickerProviderSt
         'created_at': DateTime.now().toIso8601String(),
       });
 
-      _showSnackBar('✅ Piste sauvegardée !');
+      ToastService.instance.show(message: '✅ Piste sauvegardée !', type: ToastType.success);
       await _loadMyTracks();
 
       setState(() {
@@ -197,7 +198,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> with TickerProviderSt
       });
     } catch (e) {
       debugPrint('❌ Error saving recording: $e');
-      _showSnackBar('Erreur lors de la sauvegarde');
+      ToastService.instance.show(message: 'Erreur lors de la sauvegarde', type: ToastType.error);
     }
   }
 
@@ -240,7 +241,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> with TickerProviderSt
       });
     } catch (e) {
       debugPrint('❌ Error playing track: $e');
-      _showSnackBar('Erreur lors de la lecture');
+      ToastService.instance.show(message: 'Erreur lors de la lecture', type: ToastType.error);
     }
   }
 
@@ -256,10 +257,10 @@ class _MusicStudioPageState extends State<MusicStudioPage> with TickerProviderSt
           .eq('id', track['id']);
 
       setState(() => _myTracks.removeAt(index));
-      _showSnackBar('Piste supprimée');
+      ToastService.instance.show(message: 'Piste supprimée', type: ToastType.success);
     } catch (e) {
       debugPrint('❌ Error deleting track: $e');
-      _showSnackBar('Erreur lors de la suppression');
+      ToastService.instance.show(message: 'Erreur lors de la suppression', type: ToastType.error);
     }
   }
 
@@ -269,15 +270,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> with TickerProviderSt
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppTheme.primaryViolet,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {

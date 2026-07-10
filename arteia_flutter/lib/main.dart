@@ -23,6 +23,7 @@ import 'pages/notifications_page_enhanced.dart';
 import 'pages/auth_page.dart';
 import 'pages/chat_page.dart';
 import 'services/word_predictor_service.dart';
+import 'services/toast_service.dart';
 import 'pages/favorites_page.dart';
 import 'pages/artwork_upload_page.dart';
 import 'pages/music_upload_page.dart';
@@ -31,6 +32,8 @@ import 'pages/comics_upload_page.dart';
 import 'pages/quests_page.dart';
 import 'widgets/page_transition.dart';
 import 'widgets/arteia_logo.dart';
+
+final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -67,6 +70,8 @@ Future<void> main() async {
     debugPrint('⚠️ RiveNative init failed: $e');
   }
 
+  ToastService.instance.init(scaffoldMessengerKey: _scaffoldMessengerKey);
+
   // Initialize word predictor
   if (!kIsWeb) {
     try {
@@ -94,6 +99,7 @@ class ArteiaApp extends StatelessWidget {
     final themeService = ThemeService();
     return MaterialApp(
       title: 'Artéïa',
+      scaffoldMessengerKey: _scaffoldMessengerKey,
       debugShowCheckedModeBanner: false,
       theme: themeService.theme,
       darkTheme: AppTheme.arteiaDarkTheme,

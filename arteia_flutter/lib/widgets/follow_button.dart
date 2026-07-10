@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/follow_service.dart';
 import '../services/supabase_service.dart';
 import '../services/quests_service.dart';
+import '../services/toast_service.dart';
 import '../theme/app_theme.dart';
 
 class FollowButton extends StatefulWidget {
@@ -45,18 +46,12 @@ class _FollowButtonState extends State<FollowButton> {
   Future<void> _toggleFollow() async {
     final user = _supabase.currentUser;
     if (user == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Connectez-vous pour suivre')),
-        );
-      }
+      ToastService.instance.show(message: 'Connectez-vous pour suivre', type: ToastType.warning);
       return;
     }
 
     if (user.id == widget.userId) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vous ne pouvez pas vous suivre vous-même')),
-      );
+      ToastService.instance.show(message: 'Vous ne pouvez pas vous suivre vous-même', type: ToastType.warning);
       return;
     }
 
@@ -71,17 +66,14 @@ class _FollowButtonState extends State<FollowButton> {
         });
         widget.onChanged?.call();
         
-        // Update quest progress
         if (_isFollowing) {
           _questsService.updateQuestProgress(QuestType.follow, 1);
         }
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_isFollowing ? 'Abonné avec succès!' : 'Désabonné'),
-            backgroundColor: _isFollowing ? Colors.green : Colors.grey,
-            duration: const Duration(seconds: 1),
-          ),
+        ToastService.instance.show(
+          message: _isFollowing ? 'Abonné avec succès!' : 'Désabonné',
+          type: ToastType.success,
+          duration: const Duration(seconds: 1),
         );
       } else {
         if (mounted) setState(() => _isLoading = false);
@@ -89,9 +81,7 @@ class _FollowButtonState extends State<FollowButton> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
-        );
+        ToastService.instance.show(message: 'Erreur: $e', type: ToastType.error);
       }
     }
   }
