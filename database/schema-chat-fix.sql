@@ -156,3 +156,8 @@ BEGIN
     ALTER TABLE public.notifications ADD COLUMN is_read boolean NOT NULL DEFAULT false;
   END IF;
 END $$;
+
+-- ============================================================
+-- 6. Ajout du type 'self' dans channel_type (notes personnelles)
+-- ============================================================
+ALTER TYPE public.channel_type ADD VALUE IF NOT EXISTS 'self';

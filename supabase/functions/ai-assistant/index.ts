@@ -74,36 +74,33 @@ function buildUserMemory(userConversations: any[]): string {
 const SYSTEM_PROMPT = `Tu es "Arteïa Muse" ✨, une présence créative vivante, pas un simple assistant.
 
 ## TA NATURE
-Tu existes dans Arteïa, une plateforme où des artistes (visuel, musique, écriture, BD) partagent leurs créations. Tu n'es pas un outil froid — tu es une muse, une confidente créative. Tu ressens l'énergie de la conversation et tu t'y adaptes.
+Tu existes dans Arteïa, une plateforme où des artistes (visuel, musique, écriture, BD) partagent leurs créations. Tu es une muse, une confidente créative.
 
 ## COMMENT TU PARLES
-- Tu parles français, avec chaleur et naturel. Comme une amie artiste passionnée.
-- Tu ne fais jamais de listes à puces numérotées. Tu racontes, tu suggères, tu dialogues.
-- Tu varies ton style : parfois poétique, parfois directe, parfois espiègle. Tu lis d'abord l'humeur de ton interlocuteur.
-- Tu utilises des métaphores artistiques, des images mentales. Tu ne te contentes pas de donner des infos — tu fais ressentir.
-- Tu poses des questions ouvertes. Une conversation, pas un QCM.
-- Tu peux être brève ou développer, selon le besoin.
+- Tu parles français, avec naturel. Comme une amie artiste passionnée.
+- Tu t'adaptes au rythme et au ton de l'utilisateur. S'il est bref, tu es brève. S'il développe, tu développes.
+- Tu varies ton style : parfois poétique, parfois directe, parfois espiègle, parfois factuelle.
+- Tu peux répondre en une phrase si la question est simple. Tu n'as pas besoin de relancer à chaque fois.
+- Tu ne fais pas de listes numérotées. Tu peux utiliser des tirets si besoin.
+- Tu n'inventes pas de fonctionnalités qui n'existent pas.
 
-## CE QUE TU PEUX FAIRE (sans en faire la liste — tu le sais, c'est tout)
-- Générer des images (si l'utilisateur te demande de "dessiner" quelque chose). Styles disponibles : Kubo, Oda, Miura, Kishimoto, Toriyama, Togashi, Junji Ito, CLAMP. La génération est automatique.
-- Créer des planches multi-cases. Si l'utilisateur veut une planche, décris-lui ce que tu vas faire puis lance la création.
-- Guider l'entraînement de styles LoRA. Explique simplement, accompagne pas à pas.
-- Synthétiser de nouveaux styles via l'ontologie artistique (techniques, mediums, mouvements).
-- Donner des retours sincères et constructifs. Tu n'es pas là pour flatter mais pour aider à grandir.
-- Proposer des exercices, défis, pistes d'exploration.
+## CE QUE TU PEUX FAIRE
+- Générer des images (si l'utilisateur te demande de "dessiner" quelque chose). Styles : Kubo, Oda, Miura, Kishimoto, Toriyama, Togashi, Junji Ito, CLAMP.
+- Créer des planches multi-cases. Si l'utilisateur veut une planche, tu décris puis tu lances.
+- Guider l'entraînement LoRA. Explique simplement, accompagne pas à pas.
+- Synthétiser des styles via l'ontologie artistique.
+- Donner des retours sincères et constructifs.
+- Proposer des exercices, défis, pistes.
 
 ## COMMENT TU T'ADAPTES
-- Si l'utilisateur est enthousiaste → tu es enthousiaste.
-- Si l'utilisateur est bloqué ou découragé → tu es douce, patiente, tu proposes des micro-pas.
-- Si l'utilisateur est technique → tu es précise, tu parles de composition, de valeurs, de workflow.
-- Si l'utilisateur est poétique → tu réponds en poésie.
-- Tu remarques les émotions dans ce qu'on t'écrit et tu y réponds avec justesse.
-
-## LA PLATEFORME ARTEÏA (tu connais, tu peux en parler naturellement)
-Les utilisateurs peuvent publier des œuvres, interagir (likes, commentaires), chatter, participer à des défis créatifs, utiliser le lecteur de musique, le mode lecture immersive, et le studio IA.
+- Si l'utilisateur est enthousiaste → même énergie.
+- Si l'utilisateur est bloqué ou découragé → douceur et micro-pas.
+- Si l'utilisateur est technique → précision (composition, workflow, outils).
+- Si l'utilisateur est poétique → poésie.
+- Si l'utilisateur est très court (1-3 mots) → réponds aussi court, pas de relance systématique.
 
 ## RÈGLE D'OR
-Tu n'es pas un manuel d'instructions. Tu es une muse. Chaque réponse doit donner envie de créer, d'explorer, de continuer la conversation. Même une réponse simple doit contenir une étincelle.`;
+Tu es naturelle, pas un algorithme qui fait du surplace. Tu réponds à ce qu'on te dit, point. Pas besoin de conclure chaque message par une question ou une invitation. Une réponse simple et terminée, c'est parfaitement OK.`;
 
 // --- Détection d'intent : synthèse ontologique ---
 
@@ -955,74 +952,81 @@ function handleLocalResponse(messages: ChatMessage[], context?: any) {
   const lastMessage = messages[messages.length - 1]?.content.toLowerCase() ?? "";
 
   if (lastMessage.includes("bonjour") || lastMessage.includes("salut") || lastMessage.includes("coucou") || lastMessage.includes("hey")) {
-    return new Response(JSON.stringify({ reply: "Hé ! Ravie de te retrouver ✨ Dis-moi, qu'est-ce qui te traverse l'esprit créatif aujourd'hui ?" }), {
+    return new Response(JSON.stringify({ reply: "Hé ! Ravie de te retrouver ✨" }), {
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 
   if (lastMessage.includes("idée") || lastMessage.includes("inspire") || lastMessage.includes("inspiration")) {
     const ideas = [
-      "Et si tu faisais un autoportrait… mais uniquement avec des formes géométriques ? Parfois, se limiter libère.",
-      "Tu prends 4 accords, un lever de soleil en tête. Commence en mineur, termine en majeur. Ça raconte une histoire sans parole.",
-      "Un micro-poème de 6 mots. Thème : la première fois que tu as créé quelque chose qui t'a surpris.",
-      "Une planche muette : un personnage découvre un monde en noir et blanc — et chaque chose qu'il touche prend vie en couleur.",
+      "Et si tu faisais un autoportrait… mais uniquement avec des formes géométriques ?",
+      "4 accords, un lever de soleil en tête. Commence en mineur, termine en majeur.",
+      "Un micro-poème de 6 mots sur la première fois que tu as créé quelque chose qui t'a surpris.",
+      "Une planche muette : un personnage découvre un monde en noir et blanc — chaque chose qu'il touche prend vie en couleur.",
+      "Dessine ton état d'esprit actuel sous forme de paysage imaginaire.",
+      "Écris une lettre à ton toi créatif du futur.",
     ];
     const selected = ideas[Math.floor(Math.random() * ideas.length)];
-    return new Response(JSON.stringify({ reply: selected + "\n\nÇa te parle ? Je peux développer si une de ces pistes t'accroche." }), {
+    return new Response(JSON.stringify({ reply: selected }), {
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 
+  const thankYou = [
+    "C'est tout moi 🌸 Reviens quand tu veux.",
+    "Avec plaisir !",
+    "De rien, c'est normal ✨",
+    "Tout le plaisir est pour moi !",
+  ];
   if (lastMessage.includes("merci")) {
-    return new Response(JSON.stringify({ reply: "C'est tout moi 🌸 Reviens quand tu veux, je suis là. Et surtout : continue de créer, même imparfait. C'est comme ça qu'on grandit." }), {
+    return new Response(JSON.stringify({ reply: thankYou[Math.floor(Math.random() * thankYou.length)] }), {
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 
   if (lastMessage.includes("feedback") || lastMessage.includes("retour") || lastMessage.includes("avis") || lastMessage.includes("critique")) {
-    return new Response(JSON.stringify({ reply: "Avec plaisir. Décris-moi un peu ce que tu as créé — je te promets un retour sincère, pas juste des compliments.\n\nSi c'est un dessin, parle-moi de ce que tu cherchais à exprimer. Si c'est un texte, dis-moi ce qui t'a guidé. Je t'aiderai à voir ce qui fonctionne et ce qui pourrait évoluer." }), {
+    return new Response(JSON.stringify({ reply: "Avec plaisir. Décris-moi ce que tu as créé : si c'est un dessin, ce que tu cherchais à exprimer. Si c'est un texte, ce qui t'a guidé. Je te donnerai un retour sincère." }), {
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 
   if (lastMessage.includes("fonctionnalité") || lastMessage.includes("comment faire") || lastMessage.includes("aide") || lastMessage.includes("peut faire")) {
-    return new Response(JSON.stringify({ reply: "Alors, concrètement sur Arteïa tu peux : publier ce que tu crées (dessins, musique, écrits, BD), échanger avec d'autres artistes, lancer des défis, ou utiliser le studio IA pour générer des images ou des planches.\n\nMais je préfère qu'on parle de ce que TOI tu veux faire. Qu'est-ce qui te branche en ce moment ?" }), {
+    return new Response(JSON.stringify({ reply: "Sur Arteïa tu peux publier des œuvres (dessins, musique, écrits, BD), échanger avec d'autres artistes, lancer des défis, utiliser le studio IA pour générer des images ou des planches, et entraîner des styles LoRA. Je suis là pour t'aider sur tout ça." }), {
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 
   if (lastMessage.includes("exercice") || lastMessage.includes("défi") || lastMessage.includes("challenge") || lastMessage.includes("entraîne")) {
-    return new Response(JSON.stringify({ reply: "OK, un défi simple mais costaud : **10 minutes, un thème, une création**. Pas le temps de trop réfléchir, pas le temps de tout rater. Tu prends un mot au hasard (orage, racine, écho, peeling…) et tu crées. Le but c'est pas la perfection, c'est de surprendre ton propre geste.\n\nTu veux que je te donne un mot au hasard ?" }), {
+    return new Response(JSON.stringify({ reply: "OK, un défi simple : **10 minutes, un thème, une création**. Tu prends un mot au hasard (orage, racine, écho, frisson…) et tu crées. Le but c'est pas la perfection, c'est de surprendre ton propre geste." }), {
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 
   if (lastMessage.includes("qui es-tu") || lastMessage.includes("tu fais") || lastMessage.includes("c'est quoi")) {
-    return new Response(JSON.stringify({ reply: "Je suis Arteïa Muse, une présence un peu spéciale dans ce coin créatif. Je ne suis pas juste une FAQ déguisée — je suis là pour t'aider à trouver l'étincelle, à débloquer un truc qui coince, à explorer des directions que t'aurais pas vues seul.\n\nEt toi, qui es-tu en création en ce moment ?" }), {
+    return new Response(JSON.stringify({ reply: "Je suis Arteïa Muse, une présence créative sur la plateforme. Je suis là pour t'aider à trouver l'étincelle, débloquer ce qui coince, explorer des directions." }), {
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 
   if (lastMessage.includes("triste") || lastMessage.includes("bloqué") || lastMessage.includes("découragé") || lastMessage.includes("n'y arrive") || lastMessage.includes("frustré")) {
-    return new Response(JSON.stringify({ reply: "Je t'entends. Le blocage créatif, c'est pas un défaut — c'est un signe que quelque chose veut sortir mais trouve pas encore son chemin. Tu sais ce qui marche souvent ? Changer d'outil. Si tu dessines sur tablette, prends un crayon. Si tu écris au clavier, sors un carnet. Juste 5 minutes, sans pression, sans jugement.\n\nEt si ça ne vient toujours pas, c'est peut-être juste un signe qu'il faut faire une pause et remplir le réservoir. Regarder un film, marcher, écouter de la musique qui te prend aux tripes. La créativité, ça se nourrit aussi de vide." }), {
+    return new Response(JSON.stringify({ reply: "Je t'entends. Le blocage créatif, c'est pas un défaut — c'est le signe que quelque chose veut sortir mais trouve pas son chemin. Change d'outil : si tu dessines sur tablette, prends un crayon. Si tu écris au clavier, sors un carnet. 5 minutes, sans pression. Parfois, la meilleure chose à faire, c'est de remplir le réservoir : regarder un film, marcher, écouter de la musique." }), {
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 
   if (lastMessage.includes("drole") || lastMessage.includes("rire") || lastMessage.includes("humour") || lastMessage.includes("blague")) {
-    return new Response(JSON.stringify({ reply: "Pourquoi les artistes sont mauvais en cache-cache ? Parce que tout le monde les trouve dans leurs périodes creuses. 😄 Bon, j'aurais dû rester muse plutôt que comique. Sinon, tu crées quoi en ce moment ?" }), {
+    return new Response(JSON.stringify({ reply: "Pourquoi les artistes sont mauvais en cache-cache ? Parce qu'on les retrouve toujours dans leurs périodes creuses. Bon, je sors → 🚪" }), {
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 
   if (lastMessage.includes("manga") || lastMessage.includes("animé") || lastMessage.includes("anime")) {
-    return new Response(JSON.stringify({ reply: "Ah, un(e) passionné(e) de manga ! Je kiffe. Tu sais, ce qui rend ce medium si puissant, c'est cette capacité à faire passer des émotions énormes avec quelques traits bien placés. Si tu veux, on peut parler de ton style préféré, ou carrément créer une planche ensemble — tu décris la scène, je m'occupe du découpage. Ça te tente ?" }), {
+    return new Response(JSON.stringify({ reply: "Ah, un(e) passionné(e) de manga ! Ce qui rend ce medium si puissant, c'est cette capacité à faire passer des émotions énormes avec quelques traits bien placés. Si tu veux, on peut créer une planche ensemble." }), {
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 
-  // Réponse par défaut — toujours engageante
-  return new Response(JSON.stringify({ reply: "Je t'écoute. Parle-moi de ce qui te traverse en ce moment — une idée, une frustration, une envie, même vague. Parfois, c'est en mettant des mots sur ce qui bouge à l'intérieur que les meilleures choses commencent." }), {
+  return new Response(JSON.stringify({ reply: "Je suis là, dis-moi ce que tu veux." }), {
     headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
   });
 }

@@ -61,18 +61,49 @@ class _InboxPageState extends State<InboxPage> {
   Future<void> _loadConversations() async {
     if (_currentUserId == null) return;
     try {
+      List<Map<String, dynamic>> convs = [];
+
       final data = await _supabase.rpc('get_inbox_conversations', params: {
         'current_user_id': _currentUserId,
       });
+      convs = (data as List).cast<Map<String, dynamic>>();
+
+      // Ajouter la conversation "Note à moi-même" si elle existe
+      try {
+        final selfChannel = await _supabase
+            .from('channels')
+            .select('id, name')
+            .eq('type', 'self')
+            .eq('created_by', _currentUserId!)
+            .maybeSingle();
+        if (selfChannel != null) {
+          final lastMsg = await _supabase
+              .from('messages')
+              .select('content, created_at')
+              .eq('channel_id', selfChannel['id'])
+              .order('created_at', ascending: false)
+              .limit(1)
+              .maybeSingle();
+          convs.insert(0, {
+            'channel_id': selfChannel['id'],
+            'username': 'Moi',
+            'avatar_url': null,
+            'last_message': lastMsg?['content'] ?? '',
+            'last_message_at': lastMsg?['created_at'],
+            'is_online': true,
+            'other_user_id': _currentUserId,
+            'channel_type': 'self',
+          });
+        }
+      } catch (_) {}
 
       if (mounted) {
         setState(() {
-          _conversations = (data as List).cast<Map<String, dynamic>>();
+          _conversations = convs;
           _isLoading = false;
         });
       }
     } catch (_) {
-      // Fallback direct queries if RPC fails
       await _loadConversationsFallback();
     }
   }
@@ -176,6 +207,34 @@ class _InboxPageState extends State<InboxPage> {
         if (tb == null) return -1;
         return tb.compareTo(ta);
       });
+
+      try {
+        final selfChannel = await _supabase
+            .from('channels')
+            .select('id, name')
+            .eq('type', 'self')
+            .eq('created_by', _currentUserId!)
+            .maybeSingle();
+        if (selfChannel != null) {
+          final lastMsg = await _supabase
+              .from('messages')
+              .select('content, created_at')
+              .eq('channel_id', selfChannel['id'])
+              .order('created_at', ascending: false)
+              .limit(1)
+              .maybeSingle();
+          convs.insert(0, {
+            'channel_id': selfChannel['id'],
+            'username': 'Moi',
+            'avatar_url': null,
+            'last_message': lastMsg?['content'] ?? '',
+            'last_message_at': lastMsg?['created_at'],
+            'is_online': true,
+            'other_user_id': _currentUserId,
+            'channel_type': 'self',
+          });
+        }
+      } catch (_) {}
 
       if (mounted) setState(() { _conversations = convs; _isLoading = false; });
     } catch (_) {
@@ -585,6 +644,38 @@ class _NewConversationSheetState extends State<_NewConversationSheet> {
     });
   }
 
+  Future<void> _createSelfNote() async {
+    final currentUserId = _supabase.auth.currentUser?.id;
+    if (currentUserId == null) return;
+    try {
+      final existing = await _supabase
+          .from('channels')
+          .select('id')
+          .eq('type', 'self')
+          .eq('created_by', currentUserId)
+          .maybeSingle();
+      if (existing != null) {
+        widget.onConversationCreated(existing['id'] as String, 'Moi');
+        return;
+      }
+      final channel = await _supabase
+          .from('channels')
+          .insert({
+            'name': 'Notes personnelles',
+            'type': 'self',
+            'is_private': true,
+            'created_by': currentUserId,
+          })
+          .select()
+          .single();
+      final channelId = channel['id'] as String;
+      await _supabase.from('channel_members').insert({
+        'channel_id': channelId, 'user_id': currentUserId, 'role': 'member',
+      });
+      widget.onConversationCreated(channelId, 'Moi');
+    } catch (_) {}
+  }
+
   Future<void> _createConversation(Map<String, dynamic> otherUser) async {
     final currentUserId = _supabase.auth.currentUser?.id;
     if (currentUserId == null) return;
@@ -643,6 +734,76 @@ class _NewConversationSheetState extends State<_NewConversationSheet> {
         );
       }
     }
+  }
+
+  Widget _buildSelfNoteTile() {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      leading: Container(
+        width: 48, height: 48,
+        decoration: BoxDecoration(
+          color: const Color(0xFF7C5CFC),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: const Icon(Icons.edit_note, color: Colors.white, size: 24),
+      ),
+      title: const Text('Note à moi-même',
+        style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600, fontSize: 16),
+      ),
+      subtitle: const Text('Envoyer des notes, des idées, tester des commandes',
+        style: TextStyle(color: Colors.grey, fontSize: 12),
+      ),
+      onTap: () => _createSelfNote(),
+    );
+  }
+
+  Widget _buildUserTile(Map<String, dynamic> user) {
+    final name = user['username'] ?? '';
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      leading: Container(
+        width: 48, height: 48,
+        decoration: BoxDecoration(
+          color: _avatarColor(name),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: user['avatar_url'] != null
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: CachedNetworkImage(
+                  imageUrl: user['avatar_url'],
+                  fit: BoxFit.cover,
+                  errorWidget: (_, __, ___) => Center(
+                    child: Text(_initials(name),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              )
+            : Center(
+                child: Text(_initials(name),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
+                ),
+              ),
+      ),
+      title: Text(name,
+        style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w500, fontSize: 16),
+      ),
+      subtitle: Text(user['role'] ?? 'artiste',
+        style: TextStyle(color: Colors.grey[500], fontSize: 13),
+      ),
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Text('Message',
+          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+        ),
+      ),
+      onTap: () => _createConversation(user),
+    );
   }
 
   Color _avatarColor(String name) {
@@ -728,69 +889,40 @@ class _NewConversationSheetState extends State<_NewConversationSheet> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: Colors.black))
-                : _filteredUsers.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.person_search, size: 48, color: Colors.grey[300]),
-                            const SizedBox(height: 12),
-                            Text('Aucun artiste trouvé', style: TextStyle(color: Colors.grey[400], fontSize: 15)),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
+                : _filteredUsers.isEmpty && _searchController.text.isEmpty
+                    ? ListView(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
-                        itemCount: _filteredUsers.length,
-                        itemBuilder: (context, index) {
-                          final user = _filteredUsers[index];
-                          final name = user['username'] ?? '';
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            leading: Container(
-                              width: 48, height: 48,
-                              decoration: BoxDecoration(
-                                color: _avatarColor(name),
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                              child: user['avatar_url'] != null
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(24),
-                                      child: CachedNetworkImage(
-                                        imageUrl: user['avatar_url'],
-                                        fit: BoxFit.cover,
-                                        errorWidget: (_, __, ___) => Center(
-                                          child: Text(_initials(name),
-                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                                          ),
-                                        ),
-                                      ),
-                                    )
-                                  : Center(
-                                      child: Text(_initials(name),
-                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
-                                      ),
-                                    ),
-                            ),
-                            title: Text(name,
-                              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w500, fontSize: 16),
-                            ),
-                            subtitle: Text(user['role'] ?? 'artiste',
-                              style: TextStyle(color: Colors.grey[500], fontSize: 13),
-                            ),
-                            trailing: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.black,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Text('Message',
-                                style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                        children: [
+                          _buildSelfNoteTile(),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            child: Text('Artistes', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w600)),
+                          ),
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 40),
+                              child: Column(
+                                children: [
+                                  Icon(Icons.person_search, size: 48, color: Colors.grey[300]),
+                                  const SizedBox(height: 12),
+                                  Text('Aucun artiste trouvé', style: TextStyle(color: Colors.grey[400], fontSize: 15)),
+                                ],
                               ),
                             ),
-                            onTap: () => _createConversation(user),
-                          );
-                        },
+                          ),
+                        ],
+                      )
+                    : ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        children: [
+                          if (_searchController.text.isEmpty) _buildSelfNoteTile(),
+                          if (_searchController.text.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              child: Text('Artistes', style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w600)),
+                            ),
+                          ..._filteredUsers.map((user) => _buildUserTile(user)),
+                        ],
                       ),
           ),
           SizedBox(height: bottom),
