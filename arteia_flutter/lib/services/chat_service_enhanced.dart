@@ -24,12 +24,14 @@ class ChatServiceEnhanced {
   }) async {
     try {
       final expiresAt = DateTime.now().add(duration);
+      final userId = _client.auth.currentUser?.id;
       
       await _client.from('messages').insert({
         'channel_id': channelId,
-        'sender_id': _client.auth.currentUser?.id,
+        'user_id': userId,
+        'user_name': _client.auth.currentUser?.email?.split('@').first ?? 'Anonyme',
         'content': content,
-        'message_type': 'text',
+        'is_voice': false,
         'is_ephemeral': true,
         'expires_at': expiresAt.toIso8601String(),
       });
@@ -39,11 +41,11 @@ class ChatServiceEnhanced {
     }
   }
 
-  // Envoyer un message (pour compatibilité)
+  // Envoyer un message (texte ou vocal)
   Future<void> sendMessage(String channelId, {
     required String content,
-    String? audioUrl,
-    int? audioDuration,
+    String? voiceUrl,
+    int? voiceDuration,
     bool isEphemeral = false,
     Duration? ephemeralDuration,
   }) async {
@@ -51,14 +53,16 @@ class ChatServiceEnhanced {
       final expiresAt = isEphemeral && ephemeralDuration != null 
           ? DateTime.now().add(ephemeralDuration) 
           : null;
+      final userId = _client.auth.currentUser?.id;
       
       await _client.from('messages').insert({
         'channel_id': channelId,
-        'sender_id': _client.auth.currentUser?.id,
+        'user_id': userId,
+        'user_name': _client.auth.currentUser?.email?.split('@').first ?? 'Anonyme',
         'content': content,
-        'message_type': audioUrl != null ? 'audio' : 'text',
-        'audio_url': audioUrl,
-        'audio_duration': audioDuration,
+        'is_voice': voiceUrl != null,
+        'voice_url': voiceUrl,
+        'voice_duration': voiceDuration ?? 0,
         'is_ephemeral': isEphemeral,
         'expires_at': expiresAt?.toIso8601String(),
       });

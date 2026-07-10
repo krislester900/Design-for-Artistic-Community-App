@@ -14,6 +14,8 @@ import { getStaticPagePath, type StaticPageId } from "../lib/page-links";
 import ProfilePage from "./ProfilePage";
 import { ProfileBird } from "./ProfileBird";
 import { MusicPage } from "./MusicPage";
+import { OntologyPage } from "./OntologyPage";
+import { InboxPage } from "./InboxPage";
 
 interface MultiPageAppProps {
   page: StaticPageId;
@@ -188,6 +190,14 @@ export default function MultiPageApp({ page }: MultiPageAppProps) {
 
     if (page === "music") {
       return <MusicPage />;
+    }
+
+    if (page === "ontology") {
+      return <OntologyPage />;
+    }
+
+    if (page === "inbox") {
+      return <InboxPage />;
     }
 
     if (categorySlug) {

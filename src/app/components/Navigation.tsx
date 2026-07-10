@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Database, Menu, Palette, User, X } from "lucide-react";
+import { Database, Inbox, Menu, Palette, User, Workflow, X } from "lucide-react";
 import {
   type CategorySlug,
   type SectionId,
@@ -66,10 +66,13 @@ export function Navigation({ selectedCategory, onNavigate }: NavigationProps) {
 
           <div className="flex items-center gap-3">
             <Link
-              to="/login"
-              className="hidden rounded-xl border border-border bg-card/60 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-foreground transition-colors hover:border-primary hover:text-primary md:block"
+              to="/inbox"
+              className="hidden rounded-xl border border-border bg-card/60 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-foreground transition-colors hover:border-blue-500 hover:text-blue-500 md:block"
             >
-              Connexion
+              <span className="inline-flex items-center gap-2">
+                <Inbox className="h-4 w-4" />
+                Messages
+              </span>
             </Link>
             <Link
               to="/database"
@@ -78,6 +81,15 @@ export function Navigation({ selectedCategory, onNavigate }: NavigationProps) {
               <span className="inline-flex items-center gap-2">
                 <Database className="h-4 w-4" />
                 Base
+              </span>
+            </Link>
+            <Link
+              to="/ontology"
+              className="hidden rounded-xl border border-border bg-card/60 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-foreground transition-colors hover:border-violet-500 hover:text-violet-500 md:block"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Workflow className="h-4 w-4" />
+                Ontologie
               </span>
             </Link>
             <Link

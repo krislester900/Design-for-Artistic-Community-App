@@ -32,6 +32,8 @@ export function AppRouter() {
         <Route path="/film" element={<RouteWrapper><MultiPageApp page="film" /></RouteWrapper>} />
         <Route path="/literature" element={<RouteWrapper><MultiPageApp page="literature" /></RouteWrapper>} />
         <Route path="/animation" element={<RouteWrapper><MultiPageApp page="animation" /></RouteWrapper>} />
+        <Route path="/ontology" element={<RouteWrapper><MultiPageApp page="ontology" /></RouteWrapper>} />
+        <Route path="/inbox" element={<RouteWrapper><MultiPageApp page="inbox" /></RouteWrapper>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </HashRouter>

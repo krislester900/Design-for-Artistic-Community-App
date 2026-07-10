@@ -13,7 +13,9 @@ type StaticPageId =
   | "login"
   | "signup"
   | "profile"
-  | "admin";
+  | "admin"
+  | "ontology"
+  | "inbox";
 
 const staticPagePaths: Record<StaticPageId, string> = {
   home: "/",
@@ -29,6 +31,8 @@ const staticPagePaths: Record<StaticPageId, string> = {
   signup: "/inscription.html",
   profile: "/profil.html",
   admin: "/admin.html",
+  ontology: "/#/ontology",
+  inbox: "/#/inbox",
 };
 
 export function getCategoryPagePath(category: Exclude<CategorySlug, "all">) {

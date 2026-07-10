@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:timeago/timeago.dart' as timeago;
 import 'utils/app_constants.dart';
 import 'services/supabase_service.dart';
 import 'services/theme_service.dart';
@@ -20,6 +21,7 @@ import 'pages/universe_page.dart';
 import 'pages/notifications_page_enhanced.dart';
 import 'pages/auth_page.dart';
 import 'pages/chat_page.dart';
+import 'services/word_predictor_service.dart';
 import 'pages/favorites_page.dart';
 import 'pages/artwork_upload_page.dart';
 import 'pages/music_upload_page.dart';
@@ -57,6 +59,16 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('⚠️ Supabase initialization failed (app will work offline): $e');
   }
+
+  // Initialize word predictor
+  if (!kIsWeb) {
+    try {
+      await WordPredictorService().init();
+    } catch (_) {}
+  }
+
+  // French locale for timeago
+  timeago.setLocaleMessages('fr', timeago.FrMessages());
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,

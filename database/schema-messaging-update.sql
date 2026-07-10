@@ -42,7 +42,7 @@ create trigger cleanup_ephemeral_trigger
 -- 6. RLS policies pour la suppression
 drop policy if exists "Users delete own messages" on public.messages;
 create policy "Users delete own messages" on public.messages
-  for delete to authenticated using (auth.uid() = sender_id);
+  for delete to authenticated using (auth.uid() = user_id);
 
 -- 7. Vue pour les messages non supprimés
 create or replace view public.active_messages as

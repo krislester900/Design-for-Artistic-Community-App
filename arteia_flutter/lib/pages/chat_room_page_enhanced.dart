@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import '../services/chat_service_enhanced.dart';
 import '../services/voice_recorder_service.dart';
 import '../services/supabase_service.dart';
+import '../services/word_predictor_service.dart';
 import '../widgets/ephemeral_message_widget.dart';
+import '../widgets/thought_bubble_audio.dart';
+import '../widgets/suggestion_overlay.dart';
 
 class ChatRoomPageEnhanced extends StatefulWidget {
   final String channelId;
@@ -23,10 +26,13 @@ class ChatRoomPageEnhanced extends StatefulWidget {
 class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
   final ChatServiceEnhanced _chatService = ChatServiceEnhanced();
   final VoiceRecorderService _voiceRecorder = VoiceRecorderService();
+  final WordPredictorService _predictor = WordPredictorService();
   final SupabaseService _supabase = SupabaseService();
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
   List<Map<String, dynamic>> _messages = [];
   bool _isLoading = true;
+  bool _showSuggestions = false;
 
   // Options pour message éphémère
   bool _isEphemeralMode = false;
@@ -43,6 +49,9 @@ class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
     super.initState();
     _loadMessages();
     _checkMicPermission();
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus) setState(() => _showSuggestions = false);
+    });
   }
 
   Future<void> _checkMicPermission() async {
@@ -68,7 +77,11 @@ class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
   }
 
   Future<void> _sendMessage() async {
-    if (_controller.text.isEmpty) return;
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+
+    _predictor.learn(text);
+    setState(() => _showSuggestions = false);
 
     try {
       if (_isEphemeralMode) {
@@ -211,18 +224,18 @@ class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
       final audioFileName = 'voice_messages/${DateTime.now().millisecondsSinceEpoch}.m4a';
       
       await _supabase.client.storage
-          .from('posts')
+          .from('voice-messages')
           .upload(audioFileName, audioFile);
 
       final audioUrl = _supabase.client.storage
-          .from('posts')
+          .from('voice-messages')
           .getPublicUrl(audioFileName);
 
       await _chatService.sendMessage(
         widget.channelId,
         content: '🎤 Message vocal',
-        audioUrl: audioUrl,
-        audioDuration: _voiceRecordingDuration.inSeconds,
+        voiceUrl: audioUrl,
+        voiceDuration: _voiceRecordingDuration.inSeconds,
         isEphemeral: _isEphemeralMode,
         ephemeralDuration: _isEphemeralMode ? _ephemeralDuration : null,
       );
@@ -247,6 +260,7 @@ class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
   void dispose() {
     _controller.dispose();
     _voiceRecorder.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -290,6 +304,11 @@ class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
                   ),
                 ],
               ),
+            ),
+          if (_showSuggestions)
+            SuggestionOverlay(
+              controller: _controller,
+              onSelect: () => _controller.clearComposing(),
             ),
           Expanded(
             child: _isLoading
@@ -364,15 +383,17 @@ class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
                         color: Colors.grey[100],
                         borderRadius: BorderRadius.circular(24),
                       ),
-                      child: TextField(
-                        controller: _controller,
-                        style: const TextStyle(color: Colors.black),
-                        decoration: InputDecoration(
-                          hintText: _isEphemeralMode ? 'Message éphémère...' : 'Écrire un message...',
-                          hintStyle: const TextStyle(color: Color(0xFF999999)),
-                          border: InputBorder.none,
+                        child: TextField(
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          style: const TextStyle(color: Colors.black),
+                          decoration: InputDecoration(
+                            hintText: _isEphemeralMode ? 'Message éphémère...' : 'Écrire un message...',
+                            hintStyle: const TextStyle(color: Color(0xFF999999)),
+                            border: InputBorder.none,
+                          ),
+                          onChanged: (_) => setState(() => _showSuggestions = true),
                         ),
-                      ),
                     ),
                   ),
                   IconButton(
@@ -413,64 +434,78 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final content = Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  message['profiles']?['username'] ?? 'Anonyme',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
-                ),
-              ),
-              if (isEphemeral)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+    final isVoice = message['is_voice'] == true;
+    final voiceUrl = message['voice_url'] as String?;
+    final voiceDuration = message['voice_duration'] as int?;
+    final authorName = message['profiles']?['username'] ?? message['user_name'] ?? 'Anonyme';
+
+    final Widget body;
+    if (isVoice && voiceUrl != null) {
+      body = ThoughtBubbleAudioPlayer(
+        audioUrl: voiceUrl,
+        authorName: authorName,
+        duration: Duration(seconds: voiceDuration ?? 0),
+      );
+    } else {
+      body = Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    authorName,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
                   ),
-                  child: const Text(
-                    'Éphémère',
-                    style: TextStyle(fontSize: 10, color: Colors.red, fontWeight: FontWeight.bold),
-                  ),
                 ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            message['content'] ?? '',
-            style: const TextStyle(fontSize: 14, color: Colors.black),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _formatTime(message['created_at']),
-                style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
-                onPressed: onDelete,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+                if (isEphemeral)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Éphémère',
+                      style: TextStyle(fontSize: 10, color: Colors.red, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              message['content'] ?? '',
+              style: const TextStyle(fontSize: 14, color: Colors.black),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _formatTime(message['created_at']),
+                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                  onPressed: onDelete,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
 
     if (isEphemeral && message['expires_at'] != null) {
       final expiresAt = DateTime.parse(message['expires_at']);
@@ -485,11 +520,11 @@ class _MessageBubble extends StatelessWidget {
         onExpired: () {
           // Le message sera supprimé automatiquement par la vue active_messages
         },
-        child: content,
+        child: body,
       );
     }
 
-    return content;
+    return body;
   }
 
   String _formatTime(String? timestamp) {

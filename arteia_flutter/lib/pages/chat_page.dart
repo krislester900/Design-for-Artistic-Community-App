@@ -1,6 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
+import '../services/voice_recorder_service.dart';
+import '../services/word_predictor_service.dart';
+import '../widgets/thought_bubble_audio.dart';
+import '../widgets/suggestion_overlay.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -12,20 +17,30 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final VoiceRecorderService _voiceRecorder = VoiceRecorderService();
+  final WordPredictorService _predictor = WordPredictorService();
+  final SupabaseClient _supabase = Supabase.instance.client;
+  final FocusNode _focusNode = FocusNode();
+
   List<Map<String, dynamic>> _messages = [];
   bool _isRecording = false;
   bool _isLoading = true;
+  bool _showSuggestions = false;
   String? _currentUserId;
   String? _currentUserName;
-  Timer? _recordingTimer;
-  int _recordingDuration = 0;
-  final SupabaseClient _supabase = Supabase.instance.client;
+  String? _defaultChannelId;
+  String? _voiceRecordingPath;
+  int _voiceRecordSeconds = 0;
+  Timer? _voiceTimer;
 
   @override
   void initState() {
     super.initState();
     _initUser();
     _setupRealtimeSubscription();
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus) setState(() => _showSuggestions = false);
+    });
   }
 
   Future<void> _initUser() async {
@@ -36,7 +51,21 @@ class _ChatPageState extends State<ChatPage> {
         _currentUserName = user.email?.split('@').first ?? 'Utilisateur';
       });
     }
+    await _loadDefaultChannel();
     await _loadMessages();
+  }
+
+  Future<void> _loadDefaultChannel() async {
+    try {
+      final channels = await _supabase
+          .from('channels')
+          .select('id')
+          .eq('type', 'general')
+          .limit(1);
+      if (channels.isNotEmpty) {
+        _defaultChannelId = channels[0]['id']?.toString();
+      }
+    } catch (_) {}
   }
 
   void _setupRealtimeSubscription() {
@@ -57,6 +86,8 @@ class _ChatPageState extends State<ChatPage> {
                   'time': _formatTime(newMsg['created_at']?.toString() ?? ''),
                   'isMe': newMsg['user_id'] == _currentUserId,
                   'isVoice': newMsg['is_voice'] ?? false,
+                  'voiceUrl': newMsg['voice_url'],
+                  'voiceDuration': newMsg['voice_duration'] ?? 0,
                 });
               });
               _scrollToBottom();
@@ -84,6 +115,8 @@ class _ChatPageState extends State<ChatPage> {
               'time': _formatTime(msg['created_at']?.toString() ?? ''),
               'isMe': msg['user_id'] == _currentUserId,
               'isVoice': msg['is_voice'] ?? false,
+              'voiceUrl': msg['voice_url'],
+              'voiceDuration': msg['voice_duration'] ?? 0,
             };
           }).toList();
           _isLoading = false;
@@ -91,7 +124,6 @@ class _ChatPageState extends State<ChatPage> {
         _scrollToBottom();
       }
     } catch (e) {
-      // Fallback si Supabase n'est pas disponible
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -102,8 +134,12 @@ class _ChatPageState extends State<ChatPage> {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
+    _predictor.learn(text);
+    setState(() => _showSuggestions = false);
+
     try {
       await _supabase.from('messages').insert({
+        'channel_id': _defaultChannelId,
         'user_id': _currentUserId ?? 'anonymous',
         'user_name': _currentUserName ?? 'Utilisateur',
         'content': text,
@@ -112,7 +148,6 @@ class _ChatPageState extends State<ChatPage> {
       });
       _messageController.clear();
     } catch (e) {
-      // Fallback local si Supabase n'est pas disponible
       if (mounted) {
         setState(() {
           _messages.add({
@@ -131,49 +166,90 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _startRecording() {
-    setState(() {
-      _isRecording = true;
-      _recordingDuration = 0;
-    });
-
-    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _voiceRecorder.startRecording().then((path) {
+      if (path != null && mounted) {
+        setState(() {
+          _isRecording = true;
+          _voiceRecordingPath = path;
+          _voiceRecordSeconds = 0;
+        });
+        _voiceTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+          if (mounted) {
+            setState(() => _voiceRecordSeconds++);
+            if (_voiceRecordSeconds >= 60) {
+              _stopRecording();
+            }
+          }
+        });
+      }
+    }).catchError((e) {
       if (mounted) {
-        setState(() => _recordingDuration++);
-        if (_recordingDuration >= 15) {
-          _stopRecording();
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur micro: $e'), backgroundColor: Colors.red),
+        );
       }
     });
   }
 
-  void _stopRecording() {
-    _recordingTimer?.cancel();
+  Future<void> _stopRecording() async {
+    _voiceTimer?.cancel();
+    final path = await _voiceRecorder.stopRecording();
+    if (path != null) {
+      _voiceRecordingPath = path;
+      await _uploadAndSendVoice();
+    }
     if (mounted) {
       setState(() {
         _isRecording = false;
+        _voiceRecordSeconds = 0;
+      });
+    }
+  }
+
+  Future<void> _uploadAndSendVoice() async {
+    if (_voiceRecordingPath == null || _defaultChannelId == null) return;
+
+    try {
+      final audioFile = File(_voiceRecordingPath!);
+      final audioFileName = 'voice_messages/${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+      await _supabase.storage
+          .from('voice-messages')
+          .upload(audioFileName, audioFile);
+
+      final voiceUrl = _supabase.storage
+          .from('voice-messages')
+          .getPublicUrl(audioFileName);
+
+      await _supabase.from('messages').insert({
+        'channel_id': _defaultChannelId,
+        'user_id': _currentUserId ?? 'anonymous',
+        'user_name': _currentUserName ?? 'Utilisateur',
+        'content': '🎤 Message vocal',
+        'is_voice': true,
+        'voice_url': voiceUrl,
+        'voice_duration': _voiceRecordSeconds,
+        'created_at': DateTime.now().toIso8601String(),
       });
 
-      // Ajouter le message vocal
-      setState(() {
-        _messages.add({
-          'id': DateTime.now().toString(),
-          'user': _currentUserName ?? 'Moi',
-          'text': '🎤 Message vocal (${_recordingDuration}s)',
-          'time': DateTime.now().toString().substring(11, 16),
-          'isMe': true,
-          'isVoice': true,
-          'duration': _recordingDuration,
+      _voiceRecorder.deleteRecording();
+      _voiceRecordingPath = null;
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _messages.add({
+            'id': DateTime.now().toString(),
+            'user': _currentUserName ?? 'Moi',
+            'text': '🎤 Message vocal (${_voiceRecordSeconds}s)',
+            'time': DateTime.now().toString().substring(11, 16),
+            'isMe': true,
+            'isVoice': true,
+            'voiceUrl': null,
+            'voiceDuration': _voiceRecordSeconds,
+          });
         });
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Message vocal envoyé'),
-          backgroundColor: Colors.black,
-          duration: Duration(seconds: 1),
-        ),
-      );
-      _scrollToBottom();
+        _scrollToBottom();
+      }
     }
   }
 
@@ -202,7 +278,8 @@ class _ChatPageState extends State<ChatPage> {
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
-    _recordingTimer?.cancel();
+    _voiceTimer?.cancel();
+    _voiceRecorder.dispose();
     super.dispose();
   }
 
@@ -232,6 +309,12 @@ class _ChatPageState extends State<ChatPage> {
           ? const Center(child: CircularProgressIndicator(color: Colors.black))
           : Column(
               children: [
+                _showSuggestions
+                    ? SuggestionOverlay(
+                        controller: _messageController,
+                        onSelect: () => _messageController.clearComposing(),
+                      )
+                    : const SizedBox.shrink(),
                 Expanded(
                   child: _messages.isEmpty
                       ? Center(
@@ -271,7 +354,6 @@ class _ChatPageState extends State<ChatPage> {
       ),
       child: Row(
         children: [
-          // Bouton micro
           GestureDetector(
             onLongPress: _isRecording ? null : _startRecording,
             onLongPressUp: _isRecording ? _stopRecording : null,
@@ -289,7 +371,6 @@ class _ChatPageState extends State<ChatPage> {
             ),
           ),
           const SizedBox(width: 12),
-          // Champ de texte
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -297,34 +378,35 @@ class _ChatPageState extends State<ChatPage> {
                 color: Colors.grey[100],
                 borderRadius: BorderRadius.circular(24),
               ),
-              child: _isRecording
-                  ? Row(
-                      children: [
-                        const Icon(Icons.fiber_manual_record, color: Colors.red, size: 12),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Enregistrement ${_recordingDuration}s',
-                          style: const TextStyle(color: Colors.red, fontSize: 14),
-                        ),
-                        const Spacer(),
-                        Icon(Icons.graphic_eq, color: Colors.red, size: 20),
-                      ],
-                    )
-                  : TextField(
-                      controller: _messageController,
-                      style: const TextStyle(color: Colors.black, fontSize: 15),
-                      decoration: const InputDecoration(
-                        hintText: 'Écrire un message...',
-                        hintStyle: TextStyle(color: Color(0xFF999999), fontSize: 15),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 10),
-                      ),
-                      onSubmitted: (_) => _sendMessage(),
-                    ),
+                      child: _isRecording
+                          ? Row(
+                              children: [
+                                const Icon(Icons.fiber_manual_record, color: Colors.red, size: 12),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Enregistrement ${_voiceRecordSeconds}s',
+                                  style: const TextStyle(color: Colors.red, fontSize: 14),
+                                ),
+                                const Spacer(),
+                                Icon(Icons.graphic_eq, color: Colors.red, size: 20),
+                              ],
+                            )
+                          : TextField(
+                              controller: _messageController,
+                              focusNode: _focusNode,
+                              style: const TextStyle(color: Colors.black, fontSize: 15),
+                              decoration: const InputDecoration(
+                                hintText: 'Écrire un message...',
+                                hintStyle: TextStyle(color: Color(0xFF999999), fontSize: 15),
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.symmetric(vertical: 10),
+                              ),
+                              onChanged: (_) => setState(() => _showSuggestions = true),
+                              onSubmitted: (_) => _sendMessage(),
+                            ),
             ),
           ),
           const SizedBox(width: 12),
-          // Bouton envoyer
           GestureDetector(
             onTap: _isRecording ? null : _sendMessage,
             child: Container(
@@ -351,6 +433,8 @@ class _MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isMe = message['isMe'] == true;
     final isVoice = message['isVoice'] == true;
+    final voiceUrl = message['voiceUrl'] as String?;
+    final voiceDuration = message['voiceDuration'] as int? ?? 0;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -365,18 +449,28 @@ class _MessageBubble extends StatelessWidget {
                 style: const TextStyle(fontSize: 12, color: Color(0xFF999999), fontWeight: FontWeight.w500),
               ),
             ),
-          Container(
-            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-            padding: EdgeInsets.all(isVoice ? 10 : 14),
-            decoration: BoxDecoration(
-              color: isMe ? Colors.black : Colors.grey[100],
-              borderRadius: BorderRadius.circular(20).copyWith(
-                bottomRight: isMe ? const Radius.circular(4) : null,
-                bottomLeft: !isMe ? const Radius.circular(4) : null,
+          if (isVoice && voiceUrl != null)
+            SizedBox(
+              width: MediaQuery.of(context).size.width * 0.75,
+              child: ThoughtBubbleAudioPlayer(
+                audioUrl: voiceUrl,
+                authorName: message['user'] ?? 'Anonyme',
+                duration: Duration(seconds: voiceDuration),
               ),
+            )
+          else
+            Container(
+              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+              padding: EdgeInsets.all(isVoice ? 10 : 14),
+              decoration: BoxDecoration(
+                color: isMe ? Colors.black : Colors.grey[100],
+                borderRadius: BorderRadius.circular(20).copyWith(
+                  bottomRight: isMe ? const Radius.circular(4) : null,
+                  bottomLeft: !isMe ? const Radius.circular(4) : null,
+                ),
+              ),
+              child: isVoice ? _buildVoiceBubble() : _buildTextBubble(),
             ),
-            child: isVoice ? _buildVoiceBubble() : _buildTextBubble(),
-          ),
           Padding(
             padding: const EdgeInsets.only(top: 4, left: 4, right: 4),
             child: Text(
@@ -401,7 +495,7 @@ class _MessageBubble extends StatelessWidget {
   }
 
   Widget _buildVoiceBubble() {
-    final duration = message['duration'] ?? 3;
+    final duration = message['voiceDuration'] ?? message['duration'] ?? 3;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

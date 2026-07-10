@@ -3,7 +3,7 @@
  */
 import { useState } from "react";
 import { 
-  X, Home, Compass, Search, MessageCircle, User, Bell, Settings, 
+  X, Home, Compass, Search, MessageCircle, Inbox, User, Bell, Settings, 
   Heart, Bookmark, Star, TrendingUp, Music4, Palette, BookOpen, 
   Film, Pen, Clapperboard, Shield, HelpCircle, Globe, Moon, Sun,
   ChevronRight, LogOut, Camera, Edit3, Share2, Plus, Eye, Users,
@@ -28,6 +28,7 @@ interface MenuItem {
 
 const MENU_ITEMS: MenuItem[] = [
   { icon: Home, label: "Accueil", color: "text-primary" },
+  { icon: Inbox, label: "Messages", color: "text-blue-400" },
   { icon: Compass, label: "Explorer", color: "text-cyan-400" },
   { icon: Search, label: "Rechercher", color: "text-green-400" },
   { icon: MessageCircle, label: "Communauté", color: "text-violet-400", badge: 3 },

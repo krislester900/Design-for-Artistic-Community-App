@@ -152,7 +152,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - name: Appliquer les 23 schémas (ordre chronologique)
+      - name: Appliquer les schémas (ordre chronologique)
         run: |
           echo "::group::📜 Exécution des schémas SQL"
           SCHEMAS=(
@@ -184,7 +184,11 @@ jobs:
             "database/migration-planche-panels-metadata.sql"
             "database/migration-phase4-postprocessing.sql"
             "database/schema-knowledge-contrib.sql"
-            "database/schema-monitoring-logs.sql"
+            "database/schema-monitoring-logs.sql",
+            "database/schema-voice-messages.sql",
+            "database/schema-inbox-rpc.sql",
+            "database/schema-inbox-unified.sql",
+            "database/schema-chat-fix.sql"
           )
           TOTAL=${#SCHEMAS[@]}
           OK=0
@@ -236,7 +240,7 @@ jobs:
         with:
           version: latest
 
-      - name: Déployer les 7 Edge Functions
+      - name: Déployer les Edge Functions
         run: |
           echo "::group::⚡ Déploiement Edge Functions"
           FUNCTIONS=(
@@ -325,11 +329,11 @@ jobs:
             ### ✅ Tests & Validation
             - Tests Flutter (73+ unitaires)
             - Analyse statique Dart
-            - 24 migrations SQL appliquées
+            - 25+ migrations SQL appliquées
             
             ### 🚀 Déploiement
             - 🌐 Flutter Web (Vercel)
-            - ⚡ 8 Edge Functions Supabase
+            - ⚡ 9+ Edge Functions Supabase
             - 📱 APK Android (build automatique)
             
             ### 🤖 IA & Entraînement
