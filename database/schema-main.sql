@@ -1,15 +1,17 @@
 -- ============================================================
 -- ARTÉÏA — Script adapté au schéma existant
 -- La table categories utilise "title" et non "name"
+-- 
+-- ⚠️ EXÉCUTION EN DEUX TEMPS ⚠️
+-- ÉTAPE 1 : Exécutez d'abord la section 0 (ALTER TYPE) seule
+-- ÉTAPE 2 : Puis exécutez le reste du fichier (sections 1-9)
 -- ============================================================
 
 create extension if not exists "uuid-ossp";
 
 -- ============================================================
--- 0. AJOUT DES VALEURS MANQUANTES À L'ENUM category_slug
+-- ÉTAPE 1 - À EXÉCUTER SEULE D'ABORD
 -- ============================================================
--- L'enum original dans schema.sql a : music, visual-art, manga, film, literature, animation
--- On ajoute les nouvelles catégories nécessaires
 do $$ begin
   if not exists (select 1 from pg_enum where enumlabel = 'illustration' and enumtypid = 'public.category_slug'::regtype) then
     alter type public.category_slug add value 'illustration';
@@ -24,6 +26,10 @@ do $$ begin
     alter type public.category_slug add value '3d';
   end if;
 end $$;
+
+-- ⛔ STOP : Exécutez d'abord uniquement ce bloc ci-dessus,
+--    puis exécutez le reste du fichier (sections 1-9 ci-dessous)
+-- ============================================================
 
 -- ============================================================
 -- 1. PROFILS
@@ -92,9 +98,9 @@ create trigger on_auth_user_created
 
 
 -- ============================================================
--- 2. CATÉGORIES — Utilise le vrai schéma (title, pas name)
+-- 2. CATÉGORIES
 -- ============================================================
--- On insère uniquement avec les colonnes qui existent réellement
+-- Insertion safe : les valeurs d'enum ont été ajoutées à l'étape 1
 insert into public.categories (title, slug, color, sort_order) values
   ('Illustration',  'illustration', '#7C5CFC', 1),
   ('Musique',       'music',        '#14B8A6', 2),
