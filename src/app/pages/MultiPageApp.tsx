@@ -16,18 +16,20 @@ import { ProfileBird } from "./ProfileBird";
 import { MusicPage } from "./MusicPage";
 import { OntologyPage } from "./OntologyPage";
 import { InboxPage } from "./InboxPage";
+import GamesHubPage from "./GamesHubPage";
 
 interface MultiPageAppProps {
   page: StaticPageId;
 }
 
-const categoryPageById: Partial<Record<StaticPageId, Exclude<CategorySlug, "all">>> = {
+  const categoryPageById: Partial<Record<StaticPageId, Exclude<CategorySlug, "all">>> = {
   music: "music",
   "visual-art": "visual-art",
   manga: "manga",
   film: "film",
   literature: "literature",
   animation: "animation",
+  games: "games",
 };
 
 export default function MultiPageApp({ page }: MultiPageAppProps) {
@@ -177,6 +179,10 @@ export default function MultiPageApp({ page }: MultiPageAppProps) {
           </p>
         </div>
       );
+    }
+
+    if (page === "games") {
+      return <GamesHubPage />;
     }
 
     if (page === "community") {

@@ -5,7 +5,8 @@ export type CategorySlug =
   | "manga"
   | "film"
   | "literature"
-  | "animation";
+  | "animation"
+  | "games";
 
 export type SectionId =
   | "hero"
@@ -103,6 +104,7 @@ export const categoryLabels: Record<CategorySlug, string> = {
   film: "Films indépendants",
   literature: "Littérature",
   animation: "Animation",
+  games: "Jeux",
 };
 
 export const navigationItems: Array<{

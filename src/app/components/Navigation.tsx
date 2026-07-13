@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Database, Inbox, Menu, Palette, User, Workflow, X } from "lucide-react";
+import { Database, Gamepad2, Inbox, Menu, Palette, User, Workflow, X } from "lucide-react";
 import {
   type CategorySlug,
   type SectionId,
   categoryLabels,
   navigationItems,
 } from "../data/community";
-import { openStaticPage } from "../lib/page-links";
+import { openStaticPage, getStaticPagePath } from "../lib/page-links";
 
 interface NavigationProps {
   selectedCategory: CategorySlug;
@@ -62,6 +62,24 @@ export function Navigation({ selectedCategory, onNavigate }: NavigationProps) {
                 </button>
               )
             ))}
+            <Link
+              to="/database"
+              className="hidden rounded-xl border border-border bg-card/60 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-foreground transition-colors hover:border-accent hover:text-accent md:block"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Database className="h-4 w-4" />
+                Base de données
+              </span>
+            </Link>
+            <Link
+              to={getStaticPagePath("games")}
+              className="hidden rounded-xl border border-border bg-card/60 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-foreground transition-colors hover:border-primary hover:text-primary md:block"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Gamepad2 className="h-4 w-4" />
+                Jeux
+              </span>
+            </Link>
           </div>
 
           <div className="flex items-center gap-3">
