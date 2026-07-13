@@ -40,3 +40,5 @@ arteia_flutter/ios/.symlinks/
 /ios/App/build/
 
 .aider*
+public/games/
+*.env.local
