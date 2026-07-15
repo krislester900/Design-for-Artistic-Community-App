@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const TARGET_PER_STYLE = 500;
+const CONCURRENT_BOARDS = 5;
 const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY") ?? "";
 
 serve(async (req) => {
@@ -14,8 +15,9 @@ serve(async (req) => {
   try {
     const auth = req.headers.get("authorization")?.replace("Bearer ", "");
     const cronHeader = req.headers.get("x-cron-secret") ?? "";
-    const cronSecret = Deno.env.get("CRON_SECRET");
-    if (cronSecret && auth !== cronSecret && cronHeader !== cronSecret) {
+    const cronSecret = Deno.env.get("CRON_SECRET") ?? "";
+    // Fail-closed : si CRON_SECRET n'est pas configuré OU si le secret ne correspond pas, on refuse.
+    if (!cronSecret || (auth !== cronSecret && cronHeader !== cronSecret)) {
       return new Response(JSON.stringify({ error: "Non autorisé" }), { status: 403, headers: { "Content-Type": "application/json" } });
     }
 
@@ -34,188 +36,129 @@ serve(async (req) => {
       });
     }
 
-    const results: string[] = [];
     const stylesToTrain = new Set<string>();
+    const allResults: string[] = [];
 
-    for (const board of boards) {
+    const processBoard = async (board: any): Promise<string> => {
+      const username = board.username;
+      const boardName = board.board_name;
+      const styleSlug = board.style_slug;
+      const styleId = board.style_id;
+      const styleName = board.ai_manga_styles?.name ?? styleSlug;
+      const currentTotal = board.total_collected ?? 0;
+      const styleMeta = board.ai_manga_styles ?? {};
+      const needed = TARGET_PER_STYLE - currentTotal;
+
+      if (currentTotal >= TARGET_PER_STYLE) {
+        return `⏭️ ${username}/${boardName}: déjà ${currentTotal}/${TARGET_PER_STYLE} images`;
+      }
+
       try {
-        const username = board.username;
-        const boardName = board.board_name;
-        const styleSlug = board.style_slug;
-        const styleId = board.style_id;
-        const styleName = board.ai_manga_styles?.name ?? styleSlug;
-        const currentTotal = board.total_collected ?? 0;
-        const styleMeta = board.ai_manga_styles ?? {};
+        // Parallelise les 4 sources en même temps
+        const [rssUrls, pinterestUrls, bingUrls, googleUrls] = await Promise.all([
+          fetchRss(username, boardName).catch(() => [] as string[]),
+          fetchPinterestHtml(username, boardName).catch(() => [] as string[]),
+          fetchBingImages(styleName).catch(() => [] as string[]),
+          fetchGoogleImages(styleName, username).catch(() => [] as string[]),
+        ]);
 
-        if (currentTotal >= TARGET_PER_STYLE) {
-          results.push(`⏭️ ${username}/${boardName}: déjà ${currentTotal}/${TARGET_PER_STYLE} images`);
-          continue;
-        }
+        let allNewUrls = [...rssUrls, ...pinterestUrls, ...bingUrls, ...googleUrls];
 
-        const allNewUrls: string[] = [];
-
-        // 1) RSS feed
-        try {
-          const rssUrl = `https://www.pinterest.com/${username}/${boardName}.rss`;
-          const rssResp = await fetch(rssUrl, {
-            headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
-          });
-          if (rssResp.ok) {
-            const rssXml = await rssResp.text();
-            const rssUrls = extractFromRss(rssXml);
-            for (const u of rssUrls) allNewUrls.push(u);
-          }
-        } catch { /* RSS fallback */ }
-
-        // 2) HTML scraping
-        if (allNewUrls.length < 100) {
-          for (let page = 0; page < 3; page++) {
-            const pageParam = page === 0 ? "" : `?page=${page + 1}`;
-            const boardUrl = `https://www.pinterest.com/${username}/${boardName}/${pageParam}`;
-            try {
-              const resp = await fetch(boardUrl, {
-                headers: {
-                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                  "Accept": "text/html,application/xhtml+xml",
-                  "Accept-Language": "en-US,en;q=0.9",
-                },
-              });
-              if (resp.ok) {
-                const html = await resp.text();
-                const urls = extractPinterestImages(html);
-                for (const u of urls) allNewUrls.push(u);
-                if (urls.length < 30) break;
-              }
-            } catch { break; }
-            await new Promise((r) => setTimeout(r, 1500));
-          }
-        }
-
-        // 3) Bing image search (reliable HTML scraping, no JS required)
-        if (allNewUrls.length < 50) {
-          try {
-            const searchQuery = encodeURIComponent(`${styleName} manga anime artwork art`);
-            const bingUrl = `https://www.bing.com/images/search?q=${searchQuery}&count=50`;
-            const bingResp = await fetch(bingUrl, {
-              headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Accept": "text/html,application/xhtml+xml",
-                "Accept-Language": "en-US,en;q=0.9",
-              },
-            });
-            if (bingResp.ok) {
-              const bingHtml = await bingResp.text();
-              const bingUrls = extractBingImages(bingHtml);
-              for (const u of bingUrls) allNewUrls.push(u);
-            }
-          } catch { /* Bing fallback */ }
-        }
-
-        // 4) Google Images (second fallback)
-        if (allNewUrls.length < 50) {
-          try {
-            const searchQuery = encodeURIComponent(`${styleName} manga ${username}`);
-            const gUrl = `https://www.google.com/search?tbm=isch&q=${searchQuery}&tbs=isz:l`;
-            const gResp = await fetch(gUrl, {
-              headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Accept": "text/html,application/xhtml+xml",
-                "Accept-Language": "en-US,en;q=0.9",
-              },
-            });
-            if (gResp.ok) {
-              const gHtml = await gResp.text();
-              const gUrls = extractGoogleImages(gHtml);
-              for (const u of gUrls) allNewUrls.push(u);
-            }
-          } catch { /* Google fallback */ }
-        }
-
-        // 5) Bootstrap via Replicate (generate reference images from style prompt)
-        // Only if we have a prompt template AND enough quota remaining
-        const needed = TARGET_PER_STYLE - currentTotal;
+        // Bootstrap Replicate si pas assez d'images
         if (allNewUrls.length < 50 && needed > 50 && REPLICATE_API_KEY && styleMeta.prompt_template) {
           try {
             const bootUrls = await generateBootstrapImages(supabase, styleId, styleSlug, styleMeta, needed);
-            for (const u of bootUrls) allNewUrls.push(u);
+            allNewUrls = allNewUrls.concat(bootUrls);
             if (bootUrls.length > 0) {
-              results.push(`🎨 Bootstrap Replicate: ${bootUrls.length} images générées pour "${styleName}"`);
+              allResults.push(`🎨 Bootstrap Replicate: ${bootUrls.length} images pour "${styleName}"`);
             }
           } catch (e) {
-            results.push(`⚠️ Bootstrap Replicate échoué pour ${styleName}: ${e instanceof Error ? e.message : String(e)}`);
+            allResults.push(`⚠️ Bootstrap Replicate échoué ${styleName}: ${e instanceof Error ? e.message : String(e)}`);
           }
         }
 
         const uniqueUrls = [...new Set(allNewUrls)];
         if (uniqueUrls.length === 0) {
-          results.push(`⚠️ ${username}/${boardName}: aucune image trouvée (RSS+HTML+Bing+Google+Bootstrap)`);
-          continue;
+          return `⚠️ ${username}/${boardName}: aucune image trouvée`;
         }
 
-        // Déduplication
+        // Déduplication batch
         const existingUrls = new Set<string>();
-        const chunkSize = 50;
-        for (let i = 0; i < uniqueUrls.length; i += chunkSize) {
-          const chunk = uniqueUrls.slice(i, i + chunkSize);
+        for (let i = 0; i < uniqueUrls.length; i += 50) {
+          const chunk = uniqueUrls.slice(i, i + 50);
           const { data: existing } = await supabase
             .from("ai_manga_references")
             .select("image_url")
             .in("image_url", chunk)
-            .limit(chunkSize);
+            .limit(50);
           if (existing) for (const row of existing) existingUrls.add(row.image_url);
         }
 
-        let newCount = 0;
-        for (const url of uniqueUrls) {
-          if (existingUrls.has(url)) continue;
-          if (currentTotal + newCount >= TARGET_PER_STYLE) break;
-          await supabase.from("ai_manga_references").insert({
+        const newUrls = uniqueUrls.filter(u => !existingUrls.has(u)).slice(0, needed);
+
+        if (newUrls.length === 0) {
+          return `⏭️ ${username}/${boardName}: 0 nouvelle (total: ${currentTotal}/${TARGET_PER_STYLE})`;
+        }
+
+        // Batch insert
+        const { error: insertErr } = await supabase.from("ai_manga_references").insert(
+          newUrls.map(url => ({
             style_id: styleId,
             image_url: url,
             source: url.includes("replicate") ? "generated" : "scrape",
             caption: "",
-          });
-          newCount++;
-        }
+          }))
+        );
 
-        const total = currentTotal + newCount;
-        await supabase.from("ai_pinterest_sources").update({
-          last_fetched_at: new Date().toISOString(),
-          total_collected: total,
-          last_error: null,
-        }).eq("id", board.id);
+        if (insertErr) return `❌ ${username}/${boardName}: échec insert - ${insertErr.message}`;
 
-        await supabase.from("ai_manga_styles").update({ reference_count: total }).eq("id", styleId);
-
-        results.push(`${newCount > 0 ? "✅" : "⏭️"} ${username}/${boardName}: ${newCount} nouvelles (total: ${total}/${TARGET_PER_STYLE})`);
+        const total = currentTotal + newUrls.length;
+        await Promise.all([
+          supabase.from("ai_pinterest_sources").update({
+            last_fetched_at: new Date().toISOString(),
+            total_collected: total,
+            last_error: null,
+          }).eq("id", board.id),
+          supabase.from("ai_manga_styles").update({ reference_count: total }).eq("id", styleId),
+        ]);
 
         if (total >= 200) stylesToTrain.add(styleSlug);
+
+        return `✅ ${username}/${boardName}: ${newUrls.length} nouvelles (total: ${total}/${TARGET_PER_STYLE})`;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        results.push(`❌ ${board.username}/${board.board_name}: ${msg}`);
         await supabase.from("ai_pinterest_sources").update({ last_error: msg }).eq("id", board.id);
+        return `❌ ${username}/${boardName}: ${msg}`;
       }
+    };
+
+    // Parallelise les boards avec contrôle de concurrence
+    for (let i = 0; i < boards.length; i += CONCURRENT_BOARDS) {
+      const batch = boards.slice(i, i + CONCURRENT_BOARDS);
+      const batchResults = await Promise.all(batch.map(processBoard));
+      allResults.push(...batchResults);
     }
 
-    for (const slug of stylesToTrain) {
+    // Auto-training pour les styles prêts
+    await Promise.all(Array.from(stylesToTrain).map(async (slug) => {
       try {
         await fetch(`${supabaseUrl}/functions/v1/manga-trainer`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${cronSecret}` },
           body: JSON.stringify({ action: "start_training", style_slug: slug }),
         });
-        results.push(`🚀 Entraînement auto déclenché pour ${slug}`);
+        allResults.push(`🚀 Entraînement auto déclenché pour ${slug}`);
       } catch {
-        results.push(`⚠️ Échec auto-training pour ${slug}`);
+        allResults.push(`⚠️ Échec auto-training pour ${slug}`);
       }
-    }
+    }));
 
-    const totalPins = results.reduce((sum, r) => {
+    const totalPins = allResults.reduce((sum, r) => {
       const m = r.match(/^✅.*?(\d+) nouvelles/);
       return sum + (m ? parseInt(m[1]) : 0);
     }, 0);
 
-    return new Response(JSON.stringify({ ok: true, results, pins_collected: totalPins, styles_ready: Array.from(stylesToTrain) }), {
+    return new Response(JSON.stringify({ ok: true, results: allResults, pins_collected: totalPins, styles_ready: Array.from(stylesToTrain) }), {
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   } catch (error) {
@@ -224,9 +167,35 @@ serve(async (req) => {
   }
 });
 
-// ---------- Extracteurs ----------
+// ---------- Fetch sources (tous parallélisés) ----------
 
-function extractPinterestImages(html: string): string[] {
+async function fetchRss(username: string, boardName: string): Promise<string[]> {
+  const rssUrl = `https://www.pinterest.com/${username}/${boardName}.rss`;
+  const resp = await fetch(rssUrl, {
+    headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+  });
+  if (!resp.ok) return [];
+  const xml = await resp.text();
+  const urls = new Set<string>();
+  const imgPattern = /<img[^>]+src="(https?:\/\/i\.pinimg\.com\/[^"]+\.(?:jpg|png|webp))"/g;
+  let m;
+  while ((m = imgPattern.exec(xml)) !== null) urls.add(m[1]);
+  if (urls.size > 0) return Array.from(urls);
+  const mediaPattern = /<media:content[^>]+url="(https?:\/\/[^"]+\.(?:jpg|png|webp))"/g;
+  while ((m = mediaPattern.exec(xml)) !== null) urls.add(m[1]);
+  return Array.from(urls);
+}
+
+async function fetchPinterestHtml(username: string, boardName: string): Promise<string[]> {
+  const resp = await fetch(`https://www.pinterest.com/${username}/${boardName}/`, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      "Accept": "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+  });
+  if (!resp.ok) return [];
+  const html = await resp.text();
   const urls = new Set<string>();
   const patterns = [
     /https:\/\/i\.pinimg\.com\/(?:originals|[0-9]+x)\/[a-zA-Z0-9]+\/[a-zA-Z0-9]+\/[a-zA-Z0-9]+\.(?:jpg|png|webp)/g,
@@ -237,16 +206,20 @@ function extractPinterestImages(html: string): string[] {
     let match;
     while ((match = pattern.exec(html)) !== null) {
       const u = match[1] ?? match[0];
-      const clean = u.replace(/\/[0-9]+x\//, "/originals/").replace(/\\u0026/g, "&");
-      urls.add(clean);
+      urls.add(u.replace(/\/[0-9]+x\//, "/originals/").replace(/\\u0026/g, "&"));
     }
   }
   return Array.from(urls);
 }
 
-function extractBingImages(html: string): string[] {
+async function fetchBingImages(styleName: string): Promise<string[]> {
+  const resp = await fetch(
+    `https://www.bing.com/images/search?q=${encodeURIComponent(`${styleName} manga anime artwork art`)}&count=50`,
+    { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept": "text/html" } },
+  );
+  if (!resp.ok) return [];
+  const html = await resp.text();
   const urls = new Set<string>();
-  // Bing embeds images in JSON-like src attributes and m attribute
   const patterns = [
     /"m":{"[^}]*"src":"(https?:\/\/[^"]+\.(?:jpg|png|webp))"/g,
     /<img[^>]+src="(https?:\/\/[^"]+\.(?:jpg|png|webp)[^"]*?)"/g,
@@ -257,20 +230,22 @@ function extractBingImages(html: string): string[] {
     let match;
     while ((match = pattern.exec(html)) !== null) {
       const u = match[1].replace(/\\\//g, "/").split("?")[0].split("&")[0];
-      if (u.startsWith("http") && !u.includes("bing.com") && !u.includes("th.bing.com")) {
-        urls.add(u);
-      }
+      if (u.startsWith("http") && !u.includes("bing.com") && !u.includes("th.bing.com")) urls.add(u);
     }
   }
-  // Also normalize Bing thumbnail URLs to full size
   const thumbPattern = /https?:\/\/th\.bing\.com\/th\/id\/([^"&\s]+)/g;
-  while ((match = thumbPattern.exec(html)) !== null) {
-    urls.add(`https://i.bing.com/th/id/${match[1]}`);
-  }
+  let tm;
+  while ((tm = thumbPattern.exec(html)) !== null) urls.add(`https://i.bing.com/th/id/${tm[1]}`);
   return Array.from(urls);
 }
 
-function extractGoogleImages(html: string): string[] {
+async function fetchGoogleImages(styleName: string, username: string): Promise<string[]> {
+  const resp = await fetch(
+    `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(`${styleName} manga ${username}`)}&tbs=isz:l`,
+    { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept": "text/html" } },
+  );
+  if (!resp.ok) return [];
+  const html = await resp.text();
   const urls = new Set<string>();
   const patterns = [
     /"(https?:\/\/[^"]+\.(?:jpg|png|webp)[^"]*)"/g,
@@ -281,29 +256,8 @@ function extractGoogleImages(html: string): string[] {
     let match;
     while ((match = pattern.exec(html)) !== null) {
       const u = match[1].replace(/\\u003d/g, "=").replace(/\\u0026/g, "&").split("?")[0].split("&")[0];
-      if (u.startsWith("http") && !u.includes("google") && !u.includes("gstatic.com")) {
-        urls.add(u);
-      }
+      if (u.startsWith("http") && !u.includes("google") && !u.includes("gstatic.com")) urls.add(u);
     }
-  }
-  return Array.from(urls);
-}
-
-function extractFromRss(xml: string): string[] {
-  const urls = new Set<string>();
-  const imgPattern = /<img[^>]+src="(https?:\/\/i\.pinimg\.com\/[^"]+\.(?:jpg|png|webp))"/g;
-  let match;
-  while ((match = imgPattern.exec(xml)) !== null) urls.add(match[1]);
-  if (urls.size > 0) return Array.from(urls);
-  // Fallback: parse CDATA description
-  const mediaPattern = /<media:content[^>]+url="(https?:\/\/[^"]+\.(?:jpg|png|webp))"/g;
-  while ((match = mediaPattern.exec(xml)) !== null) urls.add(match[1]);
-  if (urls.size > 0) return Array.from(urls);
-  const descPattern = /<description>([^<]+)<\/description>/g;
-  while ((match = descPattern.exec(xml)) !== null) {
-    const desc = match[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
-    const imgMatch = desc.match(/https?:\/\/i\.pinimg\.com\/[^\s"']+\.(?:jpg|png|webp)/);
-    if (imgMatch) urls.add(imgMatch[0]);
   }
   return Array.from(urls);
 }
@@ -339,27 +293,23 @@ async function generateBootstrapImages(
   const generated: string[] = [];
   const batchSize = Math.min(4, Math.ceil(needed / 2));
 
-  for (const scene of scenes) {
-    if (generated.length >= needed) break;
-    const prompt = promptTemplate.replace(/\{scene\}/g, scene).replace(/\{characters\}/g, "1 young male character");
-    const seed = Math.floor(Math.random() * 1000000);
+  // Parallelise les scenes Replicate
+  const sceneResults = await Promise.allSettled(
+    scenes.slice(0, Math.ceil(needed / batchSize)).map(async (scene) => {
+      const prompt = promptTemplate.replace(/\{scene\}/g, scene).replace(/\{characters\}/g, "1 young male character");
+      const seed = Math.floor(Math.random() * 1000000);
 
-    try {
       const replicateRes = await fetch(
         `https://api.replicate.com/v1/models/${owner}/${model}/predictions`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${REPLICATE_API_KEY}`,
-          },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${REPLICATE_API_KEY}` },
           body: JSON.stringify({
             version,
             input: {
               prompt,
               negative_prompt: negPrompt || undefined,
-              width,
-              height,
+              width, height,
               num_inference_steps: steps,
               guidance_scale: guidance,
               num_outputs: batchSize,
@@ -369,20 +319,20 @@ async function generateBootstrapImages(
           }),
         },
       );
-
-      if (!replicateRes.ok) continue;
+      if (!replicateRes.ok) return [];
       const pred = await replicateRes.json();
       const output = await pollReplicate(pred.id);
       if (output && Array.isArray(output)) {
-        for (const url of output) {
-          if (typeof url === "string" && url.startsWith("http")) {
-            generated.push(url);
-          }
-        }
+        return output.filter((u): u is string => typeof u === "string" && u.startsWith("http"));
       }
-    } catch { continue; }
-    // Avoid rate limits
-    await new Promise((r) => setTimeout(r, 2000));
+      return [];
+    })
+  );
+
+  for (const result of sceneResults) {
+    if (result.status === "fulfilled" && result.value.length > 0) {
+      generated.push(...result.value);
+    }
   }
 
   // Upload generated images to Supabase storage for persistence

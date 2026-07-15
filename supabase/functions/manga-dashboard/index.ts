@@ -3,7 +3,21 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+// Échappe les valeurs provenant de la BDD avant injection dans le HTML (XSS stocké).
+function esc(value: unknown): string {
+  return String(value ?? "").replace(/[&<>"']/g, (c) => {
+    switch (c) {
+      case "&": return "&amp;";
+      case "<": return "&lt;";
+      case ">": return "&gt;";
+      case '"': return "&quot;";
+      default: return "&#39;";
+    }
+  });
+}
 
 const CSS = `
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -21,6 +35,15 @@ h2 { color:#f0f6fc; margin:1.5rem 0 0.75rem; border-bottom:1px solid #30363d; pa
 .badge-error { background:#4a1b1b; color:#d14646; }
 pre { background:#0d1117; padding:0.75rem; border-radius:4px; overflow-x:auto; font-size:0.85rem; }
 `;
+
+Deno.serve(async (req) => {
+  const auth = req.headers.get("authorization")?.replace("Bearer ", "");
+  const cronHeader = req.headers.get("x-cron-secret") ?? "";
+  if (!CRON_SECRET || (auth !== CRON_SECRET && cronHeader !== CRON_SECRET)) {
+    return new Response("Non autorisé", { status: 403 });
+  }
+  return serveDashboard();
+});
 
 async function serveDashboard(): Promise<Response> {
   const [styleRes, plancheRes, refRes] = await Promise.all([
@@ -49,7 +72,7 @@ async function serveDashboard(): Promise<Response> {
 <title>Dashboard Manga Pipeline</title><style>${CSS}</style></head>
 <body>
 <h1>Dashboard Manga Pipeline</h1>
-<p style="color:#8b949e">Dernière mise-à-jour: ${new Date().toISOString()}</p>
+<p style="color:#8b949e">Dernière mise-à-jour: ${esc(new Date().toISOString())}</p>
 
 <div class="grid">
   <div class="card">
@@ -65,7 +88,7 @@ async function serveDashboard(): Promise<Response> {
     <h2>Derniers Logs</h2>
     ${logs.slice(0, 8).map((l: any) => `
       <div class="stat">
-        <span class="stat-label"><span class="badge badge-${l.level === "error" ? "error" : l.level === "warn" ? "warn" : "ok"}">${l.level}</span> ${l.function_name || l.source}</span>
+        <span class="stat-label"><span class="badge badge-${l.level === "error" ? "error" : l.level === "warn" ? "warn" : "ok"}">${esc(l.level)}</span> ${esc(l.function_name || l.source)}</span>
         <span class="stat-value" style="font-size:0.8rem">${new Date(l.created_at).toLocaleTimeString()}</span>
       </div>
     `).join("")}
@@ -76,12 +99,12 @@ async function serveDashboard(): Promise<Response> {
 <div class="grid">
   ${styles.map((s: any) => `
     <div class="card">
-      <div style="display:flex;justify-content:space-between"><strong>${s.slug}</strong>
-        <span class="badge ${s.status === "active" ? "badge-ok" : "badge-warn"}">${s.status}</span>
+      <div style="display:flex;justify-content:space-between"><strong>${esc(s.slug)}</strong>
+        <span class="badge ${s.status === "active" ? "badge-ok" : "badge-warn"}">${esc(s.status)}</span>
       </div>
-      <div class="stat"><span class="stat-label">Réfs</span><span class="stat-value">${s.reference_count ?? 0}</span></div>
-      <div class="stat"><span class="stat-label">Générations</span><span class="stat-value">${s.generation_count ?? 0}</span></div>
-      <div class="stat"><span class="stat-label">Training</span><span class="stat-value">${s.training_status ?? "idle"}</span></div>
+      <div class="stat"><span class="stat-label">Réfs</span><span class="stat-value">${esc(s.reference_count ?? 0)}</span></div>
+      <div class="stat"><span class="stat-label">Générations</span><span class="stat-value">${esc(s.generation_count ?? 0)}</span></div>
+      <div class="stat"><span class="stat-label">Training</span><span class="stat-value">${esc(s.training_status ?? "idle")}</span></div>
     </div>
   `).join("")}
 </div>
@@ -96,9 +119,9 @@ async function serveDashboard(): Promise<Response> {
   </tr>
   ${planches.map((p: any) => `
     <tr>
-      <td style="padding:0.5rem;border-bottom:1px solid #21262d;font-size:0.85rem">${p.id.slice(0,8)}</td>
-      <td style="padding:0.5rem;border-bottom:1px solid #21262d">${p.style_slug || "-"}</td>
-      <td style="padding:0.5rem;border-bottom:1px solid #21262d"><span class="badge ${p.status === "completed" ? "badge-ok" : p.status === "error" ? "badge-error" : "badge-warn"}">${p.status}</span></td>
+       <td style="padding:0.5rem;border-bottom:1px solid #21262d;font-size:0.85rem">${esc(p.id.slice(0,8))}</td>
+       <td style="padding:0.5rem;border-bottom:1px solid #21262d">${esc(p.style_slug || "-")}</td>
+       <td style="padding:0.5rem;border-bottom:1px solid #21262d"><span class="badge ${p.status === "completed" ? "badge-ok" : p.status === "error" ? "badge-error" : "badge-warn"}">${esc(p.status)}</span></td>
       <td style="padding:0.5rem;border-bottom:1px solid #21262d">${new Date(p.created_at).toLocaleString()}</td>
     </tr>
   `).join("")}
@@ -106,13 +129,12 @@ async function serveDashboard(): Promise<Response> {
 
 <h2>Logs Récents</h2>
 <div class="card">
-  <pre>${JSON.stringify(logs.slice(0, 20), null, 2)}</pre>
+  <pre>${esc(JSON.stringify(logs.slice(0, 20), null, 2))}</pre>
 </div>
-</body></html>`;
+  </body></html>`;
 
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" },
   });
 }
 
-Deno.serve((req) => serveDashboard());

@@ -4,6 +4,25 @@ import JSZip from "npm:jszip@3.10.1";
 
 const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY") ?? "";
 const REPLICATE_BASE = "https://api.replicate.com/v1";
+// Compte Replicate propriétaire de la destination du LoRA (configurable, pas hardcodé).
+const REPLICATE_DEST_OWNER = Deno.env.get("REPLICATE_DEST_OWNER") ?? "krislester900";
+
+// Bloque les URLs pointant vers des hôtes internes / métadonnées (mitigation SSRF).
+function isSafeHttpUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    const host = u.hostname.toLowerCase();
+    if (host === "localhost" || host.endsWith(".localhost") || host === "0.0.0.0") return false;
+    if (host === "[::1]" || host === "::1") return false;
+    if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return false;
+    if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return false;
+    if (/^169\.254\./.test(host)) return false; // inclut 169.254.169.254 (metadata cloud)
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -85,19 +104,26 @@ serve(async (req) => {
     }
 
     if (action === "add_reference") {
-      if (!image_url) {
-        return new Response(JSON.stringify({ error: "image_url requis" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      if (!image_url || !isSafeHttpUrl(image_url)) {
+        return new Response(JSON.stringify({ error: "image_url invalide" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+      if (!isAdmin && style.user_id && style.user_id !== userId) {
+        return new Response(JSON.stringify({ error: "Style non autorisé" }), { status: 403, headers: { "Content-Type": "application/json" } });
       }
       await supabase.from("ai_manga_references").insert({
         user_id: userId, style_id: style.id, image_url, source: "upload",
       });
-      const { count } = await supabase.from("ai_manga_references").select("*", { count: "exact", head: true }).eq("style_id", style.id);
-      const isReady = count != null && (count >= 50 || (style.generation_count ?? 0) >= 100);
+      const { data: newCount } = await supabase.rpc("increment_style_counter", {
+        p_style_id: style.id,
+        p_field: "reference_count",
+        p_delta: 1,
+      });
+      const total = typeof newCount === "number" ? newCount : (style.reference_count ?? 0) + 1;
+      const isReady = total >= 50 || (style.generation_count ?? 0) >= 100;
       await supabase.from("ai_manga_styles").update({
-        reference_count: count ?? 0,
         training_status: isReady ? "ready" : "collecting",
       }).eq("id", style.id);
-      return new Response(JSON.stringify({ ok: true, reference_count: count, ready: isReady }), {
+      return new Response(JSON.stringify({ ok: true, reference_count: total, ready: isReady }), {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
       });
     }
@@ -136,27 +162,40 @@ serve(async (req) => {
       try {
         const zip = new JSZip();
         const captionLines: string[] = [];
-        const images = refs.map((r, i) => ({ url: r.image_url, index: i }));
+        const images = refs
+          .filter((r: any) => isSafeHttpUrl(r.image_url))
+          .map((r: any, i: number) => ({ id: r.id, url: r.image_url, index: i }));
 
         const dlResults = await Promise.allSettled(
           images.map((img) =>
             fetch(img.url).then(async (r) => {
               if (!r.ok) throw new Error(`HTTP ${r.status}`);
               const buf = await r.arrayBuffer();
-              return { index: img.index, buffer: buf, ext: img.url.match(/\.(png|jpg|jpeg|webp)/i)?.[1] ?? "jpg" };
+              return { id: img.id, index: img.index, buffer: buf, ext: img.url.match(/\.(png|jpg|jpeg|webp)/i)?.[1] ?? "jpg" };
             })
           )
         );
 
         let addedCount = 0;
+        const trainedIds: number[] = [];
         for (const res of dlResults) {
           if (res.status === "fulfilled") {
-            const { index, buffer, ext } = res.value;
+            const { id: refId, index, buffer, ext } = res.value;
             const fname = `${String(index).padStart(3, "0")}.${ext}`;
             zip.file(fname, buffer);
             captionLines.push(`{"image": "${fname}", "caption": "masterpiece, best quality, ${style.slug} manga panel art style by ${style.mangaka}, manga panel, monochrome, lineart, screentone"}`);
+            trainedIds.push(refId);
             addedCount++;
           }
+        }
+
+        // Marquer les images téléchargées
+        if (trainedIds.length > 0) {
+          await supabase.from("ai_manga_references").update({
+            used_in_training: true,
+            trained_at: new Date().toISOString(),
+            downloaded: true,
+          }).in("id", trainedIds);
         }
 
         if (addedCount < 5) {
@@ -176,19 +215,20 @@ serve(async (req) => {
 
         await supabase.from("ai_training_jobs").update({ status: "training" }).eq("id", job.id);
 
-        const replicateRes = await fetch(`${REPLICATE_BASE}/models/stability-ai/sdxl/trainings`, {
+        const SDXL_VERSION = "7762fd07cf82c948538e41f63f77d685e02b063e37e496e96eefd46c929f9bdc";
+        const replicateRes = await fetch(`${REPLICATE_BASE}/models/stability-ai/sdxl/versions/${SDXL_VERSION}/trainings`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${REPLICATE_API_KEY}` },
           body: JSON.stringify({
-            destination: `arteia/sdxl-manga-${style.slug}`,
+            destination: `${REPLICATE_DEST_OWNER}/sdxl-manga-${style.slug}`,
             input: {
-              instance_prompt: instancePrompt,
-              class_prompt: "manga artwork, anime comic art, japanese illustration style, monochrome, lineart",
-              train_data: publicUrl,
-              max_train_steps: 5000,
-              learning_rate: 5e-5,
-              resolution: 1024,
-              lora_rank: 64,
+              input_images: publicUrl,
+              token_string: "MANGA_STYLE",
+              caption_prefix: `masterpiece, best quality, MANGA_STYLE manga art style, manga panel, monochrome, lineart, screentone, `,
+              max_train_steps: 2000,
+              unet_learning_rate: 1e-4,
+              resolution: 768,
+              lora_rank: 32,
             },
           }),
         });
@@ -228,6 +268,9 @@ serve(async (req) => {
       if (!image_urls || !Array.isArray(image_urls) || image_urls.length === 0) {
         return new Response(JSON.stringify({ error: "image_urls[] requis" }), { status: 400, headers: { "Content-Type": "application/json" } });
       }
+      if (!image_urls.every((u) => typeof u === "string" && isSafeHttpUrl(u))) {
+        return new Response(JSON.stringify({ error: "URL invalide (hôte non autorisé)" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
 
       // Count existing refs for this style
       const { count: existingCount } = await supabase
@@ -250,7 +293,7 @@ serve(async (req) => {
         const chunk = toInsert.slice(i, i + 50);
         const { data: existing } = await supabase
           .from("ai_manga_references")
-          .select("image_url")
+        .select("id, image_url")
           .in("image_url", chunk);
         if (existing) for (const row of existing) existingUrls.add(row.image_url);
       }
@@ -267,11 +310,19 @@ serve(async (req) => {
         added++;
       }
 
-      const newTotal = (existingCount ?? 0) + added;
-      const isReady = newTotal >= 50 || (style.generation_count ?? 0) >= 100;
+      const { data: newTotal } = await supabase.rpc("increment_style_counter", {
+        p_style_id: style.id,
+        p_field: "reference_count",
+        p_delta: added,
+      });
+      await supabase.rpc("increment_style_counter", {
+        p_style_id: style.id,
+        p_field: "generation_count",
+        p_delta: 1,
+      });
+      const total = typeof newTotal === "number" ? newTotal : (existingCount ?? 0) + added;
+      const isReady = total >= 50 || (style.generation_count ?? 0) >= 100;
       await supabase.from("ai_manga_styles").update({
-        reference_count: newTotal,
-        generation_count: (style.generation_count ?? 0) + 1,
         training_status: isReady ? "ready" : "collecting",
       }).eq("id", style.id);
 
@@ -293,7 +344,9 @@ serve(async (req) => {
         });
       }
 
-      const images = refs.map((r, i) => ({ url: r.image_url, index: i }));
+      const images = refs
+        .filter((r: any) => isSafeHttpUrl(r.image_url))
+        .map((r: any, i: number) => ({ url: r.image_url, index: i }));
       const dlResults = await Promise.allSettled(
         images.map((img) =>
           fetch(img.url).then(async (r) => {
@@ -338,10 +391,10 @@ serve(async (req) => {
                 await supabase.from("ai_manga_styles").update({
                   model_version: versionId,
                   training_status: "ready",
-                  lora_url: `replicate://arteia/sdxl-manga-${style.slug}`,
+                  lora_url: `replicate://${REPLICATE_DEST_OWNER}/sdxl-manga-${style.slug}`,
                 }).eq("id", style.id);
                 await supabase.from("ai_training_jobs").update({
-                  status: "completed", lora_url: `replicate://arteia/sdxl-manga-${style.slug}`,
+                  status: "completed", lora_url: `replicate://${REPLICATE_DEST_OWNER}/sdxl-manga-${style.slug}`,
                   completed_at: new Date().toISOString(), progress: 1.0,
                 }).eq("id", latestJob.id);
               }

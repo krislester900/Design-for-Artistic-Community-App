@@ -149,6 +149,22 @@ serve(async (req) => {
     const body: RequestBody = await req.json();
     const { messages, context, feedback } = body;
 
+    // Validation des entrées (robustesse / anti-abus / anti-plantage).
+    if (!Array.isArray(messages) || messages.length === 0 || messages.length > 50) {
+      return new Response(JSON.stringify({ error: "Messages invalides" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    for (const m of messages) {
+      if (!m || typeof m.content !== "string" || m.content.length > 8000) {
+        return new Response(JSON.stringify({ error: "Message trop long ou invalide" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // Action admin : export des données d'entraînement
     if (isAdmin && body.action === "export_training_data") {
       return handleExportTrainingData(supabase, body.format ?? "jsonl");

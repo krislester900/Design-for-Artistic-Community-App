@@ -11,6 +11,21 @@ serve(async (req) => {
     });
   }
 
+  // Auth requise pour GET (statut de prédiction) et POST (génération).
+  const authHeader = req.headers.get("Authorization")?.replace("Bearer ", "");
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: "Non authentifié" }), { status: 401, headers: { "Content-Type": "application/json" } });
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader);
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: "Utilisateur non trouvé" }), { status: 401, headers: { "Content-Type": "application/json" } });
+  }
+
   const url = new URL(req.url);
   const predictionId = url.searchParams.get("prediction_id");
 
@@ -23,20 +38,6 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization")?.replace("Bearer ", "");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Non authentifié" }), { status: 401, headers: { "Content-Type": "application/json" } });
-    }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Utilisateur non trouvé" }), { status: 401, headers: { "Content-Type": "application/json" } });
-    }
-
     const body = await req.json();
     const { prompt, style_slug, pose_image, seed } = body;
 
@@ -120,7 +121,7 @@ serve(async (req) => {
         metadata: { fullPrompt: finalPrompt, negativePrompt: negPrompt, model: `${style.model_owner}/${style.model_name}`, seed: seed ?? null },
       });
 
-      await supabase.from("ai_manga_styles").update({ generation_count: style.generation_count + 1 }).eq("id", style.id);
+      await supabase.rpc("increment_style_counter", { p_style_id: style.id, p_field: "generation_count", p_delta: 1 });
 
       return new Response(JSON.stringify({ status: "completed", image_url: imageUrl, prediction_id: predId, seed: seed ?? null }), {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
