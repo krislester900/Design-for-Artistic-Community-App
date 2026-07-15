@@ -658,7 +658,7 @@ async function handleCreate(req: Request): Promise<Response> {
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     log.error("Erreur handleCreate", { error: msg });
-    return new Response(JSON.stringify({ error: msg }), {
+    return new Response(JSON.stringify({ error: "Erreur interne" }), {
       status: 500,
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
@@ -707,7 +707,7 @@ async function handleGetStatus(plancheId: string): Promise<Response> {
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     log.error("Erreur handleGetStatus", { planche_id: plancheId, error: msg });
-    return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: "Erreur interne" }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 }
 

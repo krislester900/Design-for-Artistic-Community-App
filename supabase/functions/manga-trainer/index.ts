@@ -259,7 +259,8 @@ serve(async (req) => {
         const msg = err instanceof Error ? err.message : String(err);
         await supabase.from("ai_training_jobs").update({ status: "failed", error_message: msg }).eq("id", job.id);
         await supabase.from("ai_manga_styles").update({ training_status: "failed" }).eq("id", style.id);
-        return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { "Content-Type": "application/json" } });
+        console.error("manga-trainer start_training error:", msg);
+        return new Response(JSON.stringify({ error: "Erreur interne" }), { status: 500, headers: { "Content-Type": "application/json" } });
       }
     }
 
@@ -434,7 +435,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: "Action inconnue" }), { status: 400, headers: { "Content-Type": "application/json" } });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { "Content-Type": "application/json" } });
+    console.error("manga-trainer error:", msg);
+    return new Response(JSON.stringify({ error: "Erreur interne" }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });
 

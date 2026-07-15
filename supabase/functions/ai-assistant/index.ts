@@ -552,7 +552,8 @@ async function handleExportTrainingData(supabase: any, format: string) {
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    return new Response(JSON.stringify({ success: false, error: msg }), {
+    console.error("ai-assistant error:", msg);
+    return new Response(JSON.stringify({ success: false, error: "Erreur interne" }), {
       status: 500,
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });

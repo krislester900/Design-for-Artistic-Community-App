@@ -50,7 +50,8 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json" },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ rows: [], error: e instanceof Error ? e.message : String(e) }), {
+    console.error("neon-proxy error:", e);
+    return new Response(JSON.stringify({ rows: [], error: "Erreur interne du proxy" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
