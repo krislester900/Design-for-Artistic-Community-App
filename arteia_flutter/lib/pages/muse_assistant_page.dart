@@ -441,17 +441,17 @@ class _TopicCardStackState extends State<_TopicCardStack> with SingleTickerProvi
     if (!_isDragging) return;
     setState(() => _isDragging = false);
 
-    const threshold = 50.0;
-    const velocityThreshold = 0.5;
-
+    const swipeThreshold = 50.0;
     final swipe = _dragOffset * _velocity;
 
-    if (_dragOffset.abs() > threshold || _velocity.abs() > velocityThreshold || swipe.abs() > threshold) {
-      if (_dragOffset < 0 || _velocity < -velocityThreshold || swipe < -threshold) {
+    if (swipe < -swipeThreshold || swipe > swipeThreshold) {
+      if (_dragOffset < 0) {
+        // Swiped right to left -> show next item
         final newIndex = (_displayIndex + 1).clamp(0, widget.topics.length - 1);
         widget.onIndexChanged(newIndex);
         widget.onTap(widget.topics[newIndex]);
-      } else if (_dragOffset > 0 || _velocity > velocityThreshold || swipe > threshold) {
+      } else if (_dragOffset > 0) {
+        // Swiped left to right -> show previous item
         final newIndex = (_displayIndex - 1).clamp(0, widget.topics.length - 1);
         widget.onIndexChanged(newIndex);
         widget.onTap(widget.topics[newIndex]);
@@ -471,10 +471,10 @@ class _TopicCardStackState extends State<_TopicCardStack> with SingleTickerProvi
       (_displayIndex + 2) % widget.topics.length,
     ];
 
-    final scales = [0.8, 1.0, 0.9, 0.85];
-    final yOffsets = [12.0, 0.0, -12.0, 0.0];
-    final xOffsets = [62.0, 0.0, 32.0, 48.0];
-    final rotations = [7.0, 0.0, 2.0, 4.0];
+    final scales = [1.0, 0.9, 0.85, 0.8];
+    final yOffsets = [0.0, -12.0, 0.0, 12.0];
+    final xOffsets = [0.0, 32.0, 48.0, 62.0];
+    final rotations = [0.0, 2.0, 4.0, 7.0];
 
     return GestureDetector(
       onHorizontalDragStart: (d) => _handleDragStart(d.globalPosition),

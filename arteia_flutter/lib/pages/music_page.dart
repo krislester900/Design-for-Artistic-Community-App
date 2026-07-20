@@ -1,517 +1,520 @@
 import 'package:flutter/material.dart';
-import '../services/supabase_service.dart';
-import '../theme/app_theme.dart';
-import '../theme/category_themes.dart';
-import '../widgets/rive_loading.dart';
-import '../widgets/spotify_playlist.dart';
-import 'music_player_page.dart';
-import 'music_studio_page.dart';
-import 'search_page.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
-class MusicPage extends StatefulWidget {
-  const MusicPage({super.key});
+class Song {
+  final String id;
+  final String title;
+  final String artist;
+  final String albumCover;
+  final String youtubeId;
+  final String? albumName;
+  final int? year;
 
-  @override
-  State<MusicPage> createState() => _MusicPageState();
+  const Song({
+    required this.id,
+    required this.title,
+    required this.artist,
+    required this.albumCover,
+    required this.youtubeId,
+    this.albumName,
+    this.year,
+  });
 }
 
-class _MusicPageState extends State<MusicPage>
-    with SingleTickerProviderStateMixin {
-  final SupabaseService _supabase = SupabaseService();
-  final ScrollController _scrollController = ScrollController();
+const List<Song> _defaultSongs = [
+  Song(
+    id: 'song-0',
+    title: 'Generous',
+    artist: 'Doja Cat',
+    albumName: 'Planet Her',
+    year: 2021,
+    youtubeId: 'o2m8UHK_tUU',
+    albumCover: 'assets/images/covers/generous_doja_cat.jpg',
+  ),
+  Song(
+    id: 'song-1',
+    title: 'Midnight Dreams',
+    artist: 'Luna Nova',
+    albumName: 'Neon Dreams',
+    year: 2023,
+    youtubeId: 'dQw4w9WgXcQ',
+    albumCover: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop',
+  ),
+  Song(
+    id: 'song-2',
+    title: 'Neon Nights',
+    artist: 'DJ Prism',
+    albumName: 'Electric Soul',
+    year: 2022,
+    youtubeId: 'kJQP7kiw5Fk',
+    albumCover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&h=400&fit=crop',
+  ),
+  Song(
+    id: 'song-3',
+    title: 'Summer Vibes',
+    artist: 'Solaris',
+    albumName: 'Sunset Sessions',
+    year: 2023,
+    youtubeId: '3JZ_D3ELwOQ',
+    albumCover: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=400&fit=crop',
+  ),
+  Song(
+    id: 'song-4',
+    title: 'Digital Love',
+    artist: 'Neon Wave',
+    albumName: 'Cyber Pop',
+    year: 2022,
+    youtubeId: 'fJ9rUzIMcZQ',
+    albumCover: 'https://images.unsplash.com/photo-1526401294524-0d9ce2a661d6?w=400&h=400&fit=crop',
+  ),
+  Song(
+    id: 'song-5',
+    title: 'Purple Haze',
+    artist: 'Electric Sky',
+    albumName: 'Synthwave Dreams',
+    year: 2023,
+    youtubeId: 'hT_nvWreIhg',
+    albumCover: 'https://images.unsplash.com/photo-1511512578047-639691d6ac95?w=400&h=400&fit=crop',
+  ),
+];
 
-  late final TabController _tabController;
-  late CategoryTheme _theme;
+class VynoraMusicPage extends StatefulWidget {
+  const VynoraMusicPage({super.key});
 
-  List<Map<String, dynamic>> _songs = [];
-  List<Map<String, dynamic>> _trendTags = [];
-  bool _isLoading = true;
-  bool _showRiveSplash = true;
-  double _scrollOffset = 0;
+  @override
+  State<VynoraMusicPage> createState() => _VynoraMusicPageState();
+}
+
+class _VynoraMusicPageState extends State<VynoraMusicPage> {
+  int _currentIndex = 0;
+  bool _isPlaying = false;
+  late final YoutubePlayerController _audioPlayerController;
+  late final YoutubePlayerController _backgroundPlayerController;
+
+  static const Color _bgPrimary = Color(0xFF000000);
+  static const Color _bgSecondary = Color(0xFF111111);
+  static const Color _textPrimary = Color(0xFFFFFFFF);
+  static const Color _textSecondary = Color(0xFF9CA3AF);
+  static const Color _textTertiary = Color(0xFF6B7280);
+  static const Color _greenBattery = Color(0xFF4ADE80);
+  static const Color _whiteGlow = Color(0x30FFFFFF);
 
   @override
   void initState() {
     super.initState();
-    _theme = CategoryThemes.music;
-    _tabController = TabController(length: 5, vsync: this);
-    _scrollController.addListener(() {
-      setState(() => _scrollOffset = _scrollController.offset);
+    _initializePlayers();
+  }
+
+  void _initializePlayers() {
+    final initialSong = _songs[_currentIndex];
+    _audioPlayerController = YoutubePlayerController.fromVideoId(
+      videoId: initialSong.youtubeId,
+      autoPlay: false,
+      params: const YoutubePlayerParams(
+        showControls: false,
+        showFullscreenButton: false,
+      ),
+    );
+
+    _backgroundPlayerController = YoutubePlayerController.fromVideoId(
+      videoId: initialSong.youtubeId,
+      autoPlay: false,
+      params: const YoutubePlayerParams(
+        showControls: false,
+        showFullscreenButton: false,
+      ),
+    );
+
+    _audioPlayerController.listen((playerState) {
+      final isPlaying = playerState.toString() == 'YoutubePlayerState.playing';
+      setState(() => _isPlaying = isPlaying);
+      
+      // Sync background player with audio player
+      if (isPlaying) {
+        _backgroundPlayerController.playVideo();
+      } else {
+        _backgroundPlayerController.pauseVideo();
+      }
     });
-    _loadData();
-  }
 
-  Future<void> _loadData() async {
-    try {
-      final results = await Future.wait([
-        _supabase.getArtworks(categorySlug: 'music', limit: 24),
-        _supabase.getTrendTags(categorySlug: 'music'),
-      ]);
-
-      if (!mounted) return;
-      setState(() {
-        _songs = _normalizeSongs(results[0]);
-        _trendTags = results[1];
-        _isLoading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _songs = _fallbackSongs;
-        _trendTags = _fallbackGenres;
-        _isLoading = false;
-      });
-    }
-  }
-
-  List<Map<String, dynamic>> _normalizeSongs(List<Map<String, dynamic>> items) {
-    if (items.isEmpty) return _fallbackSongs;
-
-    return items.map((item) {
-      return {
-        'title': item['title'] ?? 'Sans titre',
-        'artist': item['artist_name'] ?? item['artist'] ?? 'Artiste Arteïa',
-        'medium': item['medium'] ?? 'Single',
-        'cover': item['image'] ?? '',
-        'duration': item['duration'] ?? '3:24',
-        'likes': item['likes'] ?? 0,
-      };
-    }).toList();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final headerOpacity = (_scrollOffset / 90).clamp(0.0, 1.0);
-
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D0C0C),
-      body: Stack(
-        children: [
-          AnimatedOpacity(
-            opacity: headerOpacity,
-            duration: const Duration(milliseconds: 120),
-            child: Container(
-              height: MediaQuery.of(context).padding.top + 58,
-              color: const Color(0xFF121212),
-            ),
-          ),
-          if (_showRiveSplash)
-            RiveLoading(
-              riveAsset: 'assets/animations/rock-girl.riv',
-              onComplete: () {
-                if (mounted) setState(() => _showRiveSplash = false);
-              },
-              durationInSeconds: 1.8,
-            ),
-          if (!_showRiveSplash)
-            _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: AppTheme.primaryViolet,
-                    ),
-                  )
-                : CustomScrollView(
-                    controller: _scrollController,
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: SizedBox(
-                          height: MediaQuery.of(context).padding.top + 16,
-                        ),
-                      ),
-                      SliverToBoxAdapter(child: _topBar(headerOpacity)),
-                      SliverToBoxAdapter(child: _featuredAlbum()),
-                      SliverToBoxAdapter(child: _tabs()),
-                      SliverToBoxAdapter(
-                        child: SizedBox(
-                          height: 264,
-                          child: TabBarView(
-                            controller: _tabController,
-                            children: [
-                              _horizontalSongs(_songs.take(8).toList()),
-                              _horizontalSongs(_songs.skip(4).take(8).toList()),
-                              _horizontalSongs(_songs.skip(8).take(8).toList()),
-                              _genrePanel(),
-                              const MusicStudioPage(),
-                            ],
-                          ),
-                        ),
-                      ),
-                      SliverToBoxAdapter(
-                        child: SpotifyPlaylist(
-                          songs: _songs,
-                          onSongTap: (index) => _openPlayer(_songs[index]),
-                        ),
-                      ),
-                      const SliverToBoxAdapter(child: SizedBox(height: 110)),
-                    ],
-                  ),
-        ],
-      ),
-    );
-  }
-
-  Widget _topBar(double headerOpacity) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 120),
-            style: TextStyle(
-              fontSize: headerOpacity > 0.5 ? 20 : 30,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-            ),
-            child: const Text('Musique'),
-          ),
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchPage())),
-                child: _roundIcon(Icons.search_rounded),
-              ),
-              const SizedBox(width: 12),
-              _roundIcon(Icons.history_rounded),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _featuredAlbum() {
-    final song = _songs.isNotEmpty ? _songs.first : _fallbackSongs.first;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
-      child: GestureDetector(
-        onTap: () => _openPlayer(song),
-        child: Container(
-          height: 172,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(30),
-            gradient: LinearGradient(
-              colors: [_theme.primaryColor, const Color(0xFF111111)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: _theme.primaryColor.withOpacity(0.35),
-                blurRadius: 24,
-                offset: const Offset(0, 14),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                right: -16,
-                top: -18,
-                child: Icon(
-                  Icons.graphic_eq_rounded,
-                  size: 150,
-                  color: Colors.white.withOpacity(0.08),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(22),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            'Nouveau son',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            song['title'] ?? 'Sans titre',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 25,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            song['artist'] ?? 'Artiste Arteïa',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      width: 58,
-                      height: 58,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF42C83C),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.play_arrow_rounded,
-                        color: Colors.black,
-                        size: 36,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _tabs() {
-    return TabBar(
-      controller: _tabController,
-      isScrollable: true,
-      labelColor: Colors.white,
-      unselectedLabelColor: Colors.grey[500],
-      indicatorColor: const Color(0xFF42C83C),
-      indicatorWeight: 3,
-      tabAlignment: TabAlignment.start,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      tabs: [
-        const Tab(text: 'Nouveautés'),
-        const Tab(text: 'Vidéos'),
-        const Tab(text: 'Artistes'),
-        const Tab(text: 'Genres'),
-        Tab(
-          text: 'Créer ma musique',
-          icon: const Icon(Icons.mic_rounded, size: 18),
-        ),
-      ],
-    );
-  }
-
-  Widget _horizontalSongs(List<Map<String, dynamic>> songs) {
-    final items = songs.isEmpty ? _songs.take(6).toList() : songs;
-
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 8),
-      scrollDirection: Axis.horizontal,
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(width: 16),
-      itemBuilder: (context, index) {
-        final song = items[index];
-        return GestureDetector(
-          onTap: () => _openPlayer(song),
-          child: SizedBox(
-            width: 148,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _coverTile(song, size: 148),
-                const SizedBox(height: 12),
-                Text(
-                  song['title'] ?? 'Sans titre',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  song['artist'] ?? 'Artiste',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _coverTile(Map<String, dynamic> song, {required double size}) {
-    final cover = (song['cover'] ?? '').toString();
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          colors: [_theme.primaryColor, _theme.secondaryColor],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (cover.isNotEmpty)
-            cover.startsWith('http')
-                ? Image.network(cover, fit: BoxFit.cover)
-                : Image.asset(cover, fit: BoxFit.cover),
-          if (cover.isEmpty)
-            Icon(
-              Icons.music_note_rounded,
-              color: Colors.white.withOpacity(0.9),
-              size: size * 0.38,
-            ),
-          Align(
-            alignment: Alignment.bottomRight,
-            child: Container(
-              width: 38,
-              height: 38,
-              margin: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: Color(0xFF42C83C),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.play_arrow_rounded,
-                color: Colors.black,
-                size: 26,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _genrePanel() {
-    final tags = _trendTags.isEmpty ? _fallbackGenres : _trendTags;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(18, 22, 18, 8),
-      child: Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        children: tags.map((tag) {
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-            decoration: BoxDecoration(
-              color: const Color(0xFF222222),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
-            ),
-            child: Text(
-              tag['tag'] ?? '',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _roundIcon(IconData icon) {
-    return Container(
-      width: 42,
-      height: 42,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        shape: BoxShape.circle,
-      ),
-      child: Icon(icon, color: Colors.white, size: 22),
-    );
-  }
-
-  void _openPlayer(Map<String, dynamic> song) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => MusicPlayerPage(song: song, theme: _theme),
-      ),
+    // Initialize background player to be ready
+    _backgroundPlayerController.loadVideoById(
+      videoId: initialSong.youtubeId,
+      startSeconds: 0,
     );
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
-    _scrollController.dispose();
+    _audioPlayerController.close();
+    _backgroundPlayerController.close();
     super.dispose();
   }
+
+  List<Song> get _songs => _defaultSongs;
+
+  Song get _currentSong => _songs[_currentIndex];
+
+  void _playVideo(String youtubeId) {
+    _audioPlayerController.loadVideoById(
+      videoId: youtubeId,
+      startSeconds: 0,
+    );
+    
+    _backgroundPlayerController.loadVideoById(
+      videoId: youtubeId,
+      startSeconds: 0,
+    );
+    
+    // Start playing the newly loaded video
+    _audioPlayerController.playVideo();
+    _backgroundPlayerController.playVideo();
+  }
+
+  void _selectSong(int index) {
+    if (index < 0 || index >= _songs.length) return;
+    
+    setState(() {
+      _currentIndex = index;
+      _isPlaying = true;
+    });
+    
+    _playVideo(_songs[index].youtubeId);
+  }
+
+  void _nextSong() {
+    if (_currentIndex < _songs.length - 1) {
+      _selectSong(_currentIndex + 1);
+    }
+  }
+
+  void _prevSong() {
+    if (_currentIndex > 0) {
+      _selectSong(_currentIndex - 1);
+    }
+  }
+
+  void _togglePlay() {
+    setState(() => _isPlaying = !_isPlaying);
+    
+    if (_isPlaying) {
+      _audioPlayerController.playVideo();
+      _backgroundPlayerController.playVideo();
+    } else {
+      _audioPlayerController.pauseVideo();
+      _backgroundPlayerController.pauseVideo();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _bgPrimary,
+      body: Stack(
+        children: [
+          // Background video for visualizer effect (behind everything)
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: true,
+              child: YoutubePlayer(
+                controller: _backgroundPlayerController,
+              ),
+            ),
+          ),
+          
+          // YouTube Player for the music (in background, hidden)
+          IgnorePointer(
+            ignoring: true,
+            child: YoutubePlayer(
+              controller: _audioPlayerController,
+            ),
+          ),
+
+          // Reflective floor
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: true,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [_bgSecondary, Colors.transparent],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Main content
+          SafeArea(
+            child: Column(
+              children: [
+                // iPod-style header
+                _buildHeader(),
+
+                // Album cover display (simplified version of CoverFlow)
+                Expanded(
+                  child: Center(
+                    child: _buildAlbumDisplay(),
+                  ),
+                ),
+
+                // Track info + Player
+                _buildPlayerSection(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: _bgPrimary.withOpacity(0.2),
+        border: Border(bottom: BorderSide(color: _textPrimary.withOpacity(0.08))),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: _textPrimary,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Text(
+            'iPod',
+            style: TextStyle(
+              color: _textSecondary,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 16,
+            height: 8,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(2),
+              border: Border.all(color: _textPrimary.withOpacity(0.4), width: 1),
+            ),
+            child: Row(
+              children: List.generate(4, (i) {
+                final level = i < 3;
+                return Expanded(
+                  child: Container(
+                    margin: EdgeInsets.only(
+                      left: i == 0 ? 1 : 0,
+                      right: i == 3 ? 1 : 0,
+                    ),
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: level ? _greenBattery : _textPrimary.withOpacity(0.2),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlbumDisplay() {
+    final song = _currentSong;
+    
+    return Container(
+      width: 200,
+      height: 200,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: _textPrimary.withOpacity(0.3),
+            blurRadius: 20,
+            spreadRadius: 2,
+          ),
+        ],
+        image: song.albumCover.startsWith('http')
+            ? DecorationImage(
+                image: NetworkImage(song.albumCover),
+                fit: BoxFit.cover,
+              )
+            : DecorationImage(
+                image: AssetImage(song.albumCover),
+                fit: BoxFit.cover,
+              ),
+      ),
+    );
+  }
+
+  Widget _buildPlayerSection() {
+    final song = _currentSong;
+    
+    return Container(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        bottom: MediaQuery.of(context).padding.bottom + 24,
+        top: 16,
+      ),
+      decoration: BoxDecoration(
+        color: _bgPrimary.withOpacity(0.85),
+        border: Border(top: BorderSide(color: _textPrimary.withOpacity(0.08))),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Track info
+          Text(
+            song.title,
+            style: const TextStyle(
+              color: _textPrimary,
+              fontSize: 22,
+              fontWeight: FontWeight.w400,
+              height: 1.2,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            song.artist,
+            style: TextStyle(
+              color: _textSecondary,
+              fontSize: 16,
+              fontWeight: FontWeight.w300,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          
+          // Controls
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Previous button
+              _controlButton(
+                icon: Icons.skip_previous_rounded,
+                iconSize: 28,
+                size: 56,
+                onTap: _prevSong,
+                label: 'Previous',
+              ),
+              const SizedBox(width: 32),
+              
+              // Play/Pause button
+              GestureDetector(
+                onTap: _togglePlay,
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: _textPrimary,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: _textPrimary.withOpacity(0.3),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    transitionBuilder: (Widget child, Animation<double> animation) {
+                      return ScaleTransition(scale: animation, child: child);
+                    },
+                    child: _isPlaying
+                        ? Icon(
+                            Icons.pause_rounded,
+                            color: _bgPrimary,
+                            size: 36,
+                            key: const ValueKey('pause'),
+                          )
+                        : Icon(
+                            Icons.play_arrow_rounded,
+                            color: _bgPrimary,
+                            size: 36,
+                            key: const ValueKey('play'),
+                          ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 32),
+              
+              // Next button
+              _controlButton(
+                icon: Icons.skip_next_rounded,
+                iconSize: 28,
+                size: 56,
+                onTap: _nextSong,
+                label: 'Next',
+              ),
+            ],
+          ),
+          
+          // Status text
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(
+              _isPlaying ? 'Now Playing' : 'Tap to play',
+              style: TextStyle(
+                color: _textSecondary,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _controlButton({
+    required IconData icon,
+    required double iconSize,
+    required double size,
+    required VoidCallback onTap,
+    required String label,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+children: [
+         GestureDetector(
+           onTap: onTap,
+           child: Container(
+             width: size,
+             height: size,
+             decoration: BoxDecoration(
+               color: _textPrimary.withOpacity(0.1),
+               shape: BoxShape.circle,
+               border: Border.all(
+                 color: _textPrimary.withOpacity(0.2),
+               ),
+             ),
+             child: Icon(
+               icon,
+               color: _textPrimary,
+               size: iconSize,
+             ),
+           ),
+         ),
+         const SizedBox(height: 4),
+         Text(
+           label,
+           style: TextStyle(
+             color: _textSecondary,
+             fontSize: 10,
+           ),
+         ),
+       ],
+    );
+  }
 }
-
-const List<Map<String, dynamic>> _fallbackSongs = [
-  {
-    'title': 'Nuit étoilée',
-    'artist': 'Luna',
-    'medium': 'Électro',
-    'cover': 'assets/images/album1.png',
-    'duration': '3:18',
-    'likes': 234,
-  },
-  {
-    'title': 'Urban Beat',
-    'artist': 'DJ Metro',
-    'medium': 'Hip-Hop',
-    'cover': 'assets/images/album2.png',
-    'duration': '2:56',
-    'likes': 198,
-  },
-  {
-    'title': 'Jazz Café',
-    'artist': 'Trio Blue',
-    'medium': 'Jazz',
-    'cover': '',
-    'duration': '4:02',
-    'likes': 176,
-  },
-  {
-    'title': 'Rock Anthem',
-    'artist': 'The Wild',
-    'medium': 'Rock',
-    'cover': '',
-    'duration': '3:44',
-    'likes': 221,
-  },
-  {
-    'title': 'Pop Dreams',
-    'artist': 'Star Light',
-    'medium': 'Pop',
-    'cover': '',
-    'duration': '3:31',
-    'likes': 145,
-  },
-  {
-    'title': 'Classical Mood',
-    'artist': 'Orchestra',
-    'medium': 'Classique',
-    'cover': '',
-    'duration': '5:10',
-    'likes': 98,
-  },
-];
-
-const List<Map<String, dynamic>> _fallbackGenres = [
-  {'tag': 'Électro'},
-  {'tag': 'Hip-Hop'},
-  {'tag': 'Jazz'},
-  {'tag': 'Rock'},
-  {'tag': 'Pop'},
-  {'tag': 'Classique'},
-  {'tag': 'R&B'},
-  {'tag': 'Reggae'},
-];
