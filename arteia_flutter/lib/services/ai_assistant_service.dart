@@ -26,12 +26,16 @@ class AiAssistantService {
 
   Future<void> _loadConfig() async {
     try {
+      await dotenv.load(fileName: "assets/.env");
       final env = dotenv.env;
       _groqApiKey = (env['GROQ_API_KEY'] ?? '').trim();
       _openRouterApiKey = (env['OPENROUTER_API_KEY'] ?? '').trim();
       final model = (env['OPENROUTER_MODEL'] ?? '').trim();
       if (model.isNotEmpty) _openRouterModel = model;
-    } catch (_) {}
+      debugPrint('[IA] Config loaded: groq=${_groqApiKey.isNotEmpty}, openrouter=${_openRouterApiKey.isNotEmpty}, model=$_openRouterModel');
+    } catch (e) {
+      debugPrint('[IA] Config load error: $e');
+    }
   }
 
   String _buildOpenRouterUrl() => 'https://openrouter.ai/api/v1/chat/completions';
@@ -148,6 +152,8 @@ class AiAssistantService {
     List<Map<String, String>>? history,
   }) async {
     if (message.trim().isEmpty) return '';
+
+    debugPrint('[IA] sendMessage: "$message" category=$contentType');
 
     String? userId;
     Map<String, String> prefs = {};
@@ -279,6 +285,7 @@ class AiAssistantService {
 
     // 7. Fallback final : réponse locale améliorée avec RAG
     final localResponse = _getLocalResponse(message, relevantKnowledge, personalizationContext);
+    debugPrint('[IA] Fallback local: $localResponse');
     await _saveConversation(message, localResponse, contentType);
     await _updateMemoryFromMessage(message, userId);
     return localResponse;
