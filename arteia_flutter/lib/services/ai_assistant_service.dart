@@ -13,7 +13,7 @@ class AiAssistantService {
   
   // Groq (100% gratuit, ultra rapide) - PRIORITAIRE
   // Clé API de Krislester (https://console.groq.com)
-  static const String _groqApiKey = ''; // Clé Krislester
+  String _groqApiKey = '';
   static const String _groqUrl = 'https://api.groq.com/openai/v1/chat/completions';
   
   // Hugging Face (100% gratuit, limité)
@@ -24,9 +24,10 @@ class AiAssistantService {
   String _openRouterApiKey = '';
   String _openRouterModel = 'meta-llama/llama-3.1-70b';
 
-  Future<void> _loadOpenRouterConfig() async {
+  Future<void> _loadConfig() async {
     try {
       final env = dotenv.env;
+      _groqApiKey = (env['GROQ_API_KEY'] ?? '').trim();
       _openRouterApiKey = (env['OPENROUTER_API_KEY'] ?? '').trim();
       final model = (env['OPENROUTER_MODEL'] ?? '').trim();
       if (model.isNotEmpty) _openRouterModel = model;
@@ -155,7 +156,7 @@ class AiAssistantService {
       // Supabase not initialized or unavailable; continue without personalization
     }
 
-    await _loadOpenRouterConfig();
+    await _loadConfig();
 
     final personalizationContext = _buildPersonalizationContext(prefs, relationshipMemory, habitsAnalysis);
 
