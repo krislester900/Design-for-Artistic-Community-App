@@ -1,48 +1,8 @@
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 
 import 'supabase_service.dart';
-import 'memory_service.dart';
-
-class SampleDeviceContacts {
-  static final List<Map<String, dynamic>> contacts = [
-    {
-      'id': '1',
-      'name': 'Marie Dubois',
-      'email': 'marie.dubois@email.com',
-      'phone': '+33612345678',
-      'avatar': 'https://example.com/avatars/marie.jpg',
-    },
-    {
-      'id': '2',
-      'name': 'Thomas Martin',
-      'email': 'thomas.martin@email.com',
-      'phone': '+33789012345',
-      'avatar': 'https://example.com/avatars/thomas.jpg',
-    },
-    {
-      'id': '3',
-      'name': 'Sophie Laurent',
-      'email': 'sophie.laurent@email.com',
-      'phone': '+33698765432',
-      'avatar': 'https://example.com/avatars/sophie.jpg',
-    },
-    {
-      'id': '4',
-      'name': 'Julien Petit',
-      'email': 'julien.petit@email.com',
-      'phone': '+33645678901',
-      'avatar': 'https://example.com/avatars/julien.jpg',
-    },
-    {
-      'id': '5',
-      'name': 'Amélie Chen',
-      'email': 'amelie.chen@email.com',
-      'phone': '+33623456789',
-      'avatar': 'https://example.com/avatars/amelie.jpg',
-    },
-  ];
-}
 
 class CountryCodeService {
   static final Map<String, String> countryCodes = {
@@ -140,13 +100,12 @@ class ContactMatch {
 
 class ChatService {
   final SupabaseService _supabase = SupabaseService();
-  final MemoryService _memoryService = MemoryService();
 
   Future<List<ContactMatch>> scanContactsAndFindAppUsers() async {
     try {
       final contacts = await _getDeviceContacts();
       final contactEmails = contacts.map((c) => c.email).where((e) => e.isNotEmpty).toList();
-      final contactPhones = contacts.map((c) => c.phone).where((p) => p != null && p!.isNotEmpty).toList();
+      final contactPhones = contacts.map((c) => c.phone).where((p) => p != null && p.isNotEmpty).toList();
       
       final appUsers = await _findAppUsersByContacts(contactEmails, contactPhones);
       return _createContactMatches(contacts, appUsers);
@@ -158,25 +117,39 @@ class ChatService {
   
   Future<List<Contact>> _getDeviceContacts() async {
     final contacts = <Contact>[];
-    
-    for (final contact in SampleDeviceContacts.contacts) {
-      final phone = contact['phone'] as String?;
+
+    if (kIsWeb) {
+      return contacts;
+    }
+
+    final status = await Permission.contacts.status;
+    if (status.isDenied) {
+      final result = await Permission.contacts.request();
+      if (!result.isGranted) {
+        return contacts;
+      }
+    }
+
+    final flutterContacts = await FlutterContacts.getContacts(withProperties: true);
+    for (final contact in flutterContacts) {
+      final phone = contact.phones.isNotEmpty ? contact.phones.first.number : null;
+      final email = contact.emails.isNotEmpty ? contact.emails.first.address : null;
       final normalizedPhone = phone != null ? CountryCodeService.normalizePhoneNumber(phone) : null;
       final countryCode = phone != null ? CountryCodeService.detectCountryCode(phone) : null;
-      
+
       contacts.add(Contact(
-        id: contact['id'],
-        name: contact['name'],
-        email: contact['email'] ?? '',
+        id: contact.hashCode.toString(),
+        name: contact.displayName,
+        email: email ?? '',
         phone: normalizedPhone,
-        avatarUrl: contact['avatar'],
+        avatarUrl: null,
         countryCode: countryCode,
       ));
     }
-    
+
     return contacts;
   }
-  
+
   Future<List<Map<String, dynamic>>> _findAppUsersByContacts(List<String> emails, List<String?> phones) async {
     if (emails.isEmpty && phones.isEmpty) return [];
     
@@ -185,18 +158,15 @@ class ChatService {
       
       if (emails.isNotEmpty && phoneList.isNotEmpty) {
         dynamic query = _supabase.client.from('profiles').select('id, email, display_name, avatar_url, bio, phone_number');
-        query = (query as dynamic).or('email.in.$emails,phone_number.in.$phoneList');
-        final response = await query;
+        final response = await query.or('email.in.$emails,phone_number.in.$phoneList');
         return List<Map<String, dynamic>>.from(response as List);
       } else if (emails.isNotEmpty) {
         dynamic query = _supabase.client.from('profiles').select('id, email, display_name, avatar_url, bio, phone_number');
-        query = (query as dynamic).in_('email', emails);
-        final response = await query;
+        final response = await query.in_('email', emails);
         return List<Map<String, dynamic>>.from(response as List);
       } else if (phoneList.isNotEmpty) {
         dynamic query = _supabase.client.from('profiles').select('id, email, display_name, avatar_url, bio, phone_number');
-        query = (query as dynamic).in_('phone_number', phoneList);
-        final response = await query;
+        final response = await query.in_('phone_number', phoneList);
         return List<Map<String, dynamic>>.from(response as List);
       }
       
@@ -217,19 +187,19 @@ class ChatService {
       Map<String, dynamic>? matchedUser;
       
       if (contact.email.isNotEmpty) {
-        matchedUser = appUsers.firstWhere(
-          (user) => user['email'] != null && 
+        final emailMatches = appUsers.where(
+          (user) => user['email'] != null &&
                       user['email'].toString().toLowerCase() == contact.email.toLowerCase(),
-          orElse: () => null as Map<String, dynamic>,
-        );
+        ).toList();
+        if (emailMatches.isNotEmpty) matchedUser = emailMatches.first;
       }
       
-      if (matchedUser == null && contact.phone != null && contact.phone!.isNotEmpty) {
-        matchedUser = appUsers.firstWhere(
-          (user) => user['phone_number'] != null && 
+      if (matchedUser == null && (contact.phone?.isNotEmpty ?? false)) {
+        final phoneMatches = appUsers.where(
+          (user) => user['phone_number'] != null &&
                       user['phone_number'].toString() == contact.phone,
-          orElse: () => null as Map<String, dynamic>,
-        );
+        ).toList();
+        if (phoneMatches.isNotEmpty) matchedUser = phoneMatches.first;
       }
       
       if (matchedUser != null) {
@@ -400,10 +370,11 @@ class ChatService {
 
   Future<Map<String, dynamic>?> _getExistingConversation(String userId, String contactId) async {
     try {
+      final channelId = _generateChannelId(userId, contactId);
       return await _supabase.client
           .from('chat_channels')
-          .select('id, name, last_message_at')
-          .or('and(user1_id.eq.$userId,user2_id.eq.$contactId),and(user1_id.eq.$contactId,user2_id.eq.$userId)')
+          .select('id, name')
+          .eq('id', channelId)
           .maybeSingle();
     } catch (e) {
       return null;
@@ -415,12 +386,13 @@ class ChatService {
       await _supabase.client.from('chat_channels').insert({
         'id': channelId,
         'name': name,
-        'user1_id': user1Id,
-        'user2_id': user2Id,
-        'last_message_at': DateTime.now().toIso8601String(),
-        'created_at': DateTime.now().toIso8601String(),
-        'is_group': false,
+        'type': 'dm',
+        'created_by': user1Id,
       });
+      await _supabase.client.from('chat_channel_members').insert([
+        {'channel_id': channelId, 'user_id': user1Id},
+        {'channel_id': channelId, 'user_id': user2Id},
+      ]);
     } catch (e) {
       debugPrint('Erreur création channel: $e');
     }
@@ -428,20 +400,13 @@ class ChatService {
 
   Future<void> _sendMessage(String channelId, String content, String senderId, String receiverId, String messageType) async {
     try {
-      final sender = await _supabase.getProfile(senderId);
-      
       await _supabase.client.from('chat_messages').insert({
         'channel_id': channelId,
-        'sender_id': senderId,
-        'receiver_id': receiverId,
+        'author_id': senderId,
         'content': content,
         'message_type': messageType,
-        'sender_name': sender?['display_name'] ?? 'Utilisateur',
-        'sender_avatar': sender?['avatar_url'],
-        'is_read': false,
-        'created_at': DateTime.now().toIso8601String(),
       });
-      
+
       await _updateChannelLastMessage(channelId);
     } catch (e) {
       debugPrint('Erreur envoi message: $e');

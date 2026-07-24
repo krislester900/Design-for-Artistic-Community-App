@@ -81,7 +81,7 @@ class AnalyticsService {
     await trackEvent(EVENT_POST_VIEW, {
       'post_id': postId,
       'post_type': postData['type'] ?? 'unknown',
-      'category': postData['categories']?['name'] ?? 'unknown',
+      'category': postData['categories']?['title'] ?? 'unknown',
     });
   }
 

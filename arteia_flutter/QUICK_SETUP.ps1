@@ -22,9 +22,9 @@ SUPABASE_URL=$supabaseUrl
 SUPABASE_ANON_KEY=$supabaseKey
 "@
 
-$envContent | Out-File -FilePath ".env" -Encoding UTF8
+$envContent | Out-File -FilePath "assets/.env" -Encoding UTF8
 
-Write-Host "✅ Fichier .env créé" -ForegroundColor Green
+Write-Host "✅ Fichier assets/.env créé" -ForegroundColor Green
 
 # Instructions pour appliquer le SQL
 Write-Host ""

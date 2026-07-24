@@ -174,14 +174,6 @@ class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
     }
   }
 
-  Future<void> _stopVoiceRecording() async {
-    final path = await _voiceRecorder.stopRecording();
-    if (path != null) {
-      _voiceRecordingPath = path;
-    }
-    setState(() => _isRecordingVoice = false);
-  }
-
   void _cancelVoiceRecording() {
     _voiceRecorder.deleteRecording();
     setState(() {

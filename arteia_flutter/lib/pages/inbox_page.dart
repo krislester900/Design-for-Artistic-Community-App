@@ -5,6 +5,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'dart:async';
 import '../services/voice_recorder_service.dart';
+import '../services/voice_cache_service.dart';
+import '../services/local_chat_repository.dart';
 import '../services/word_predictor_service.dart';
 import '../widgets/thought_bubble_audio.dart';
 import '../widgets/suggestion_overlay.dart';
@@ -22,27 +24,32 @@ class InboxPage extends StatefulWidget {
 
 class _InboxPageState extends State<InboxPage> {
   final SupabaseClient _supabase = Supabase.instance.client;
+  final LocalChatRepository _localRepo = LocalChatRepository();
   List<Map<String, dynamic>> _conversations = [];
+  List<Map<String, dynamic>> _filteredConversations = [];
   bool _isLoading = true;
   String? _currentUserId;
   RealtimeChannel? _realtimeSub;
   RealtimeChannel? _presenceSub;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _currentUserId = _supabase.auth.currentUser?.id;
+    _localRepo.init();
     _loadConversations();
     _setupRealtime();
+    _searchController.addListener(_filterConversations);
   }
 
   void _setupRealtime() {
     _realtimeSub = _supabase
-        .channel('public:messages')
+        .channel('public:chat_messages')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
-          table: 'messages',
+          table: 'chat_messages',
           callback: (_) => _loadConversations(),
         )
         .subscribe();
@@ -63,22 +70,23 @@ class _InboxPageState extends State<InboxPage> {
     try {
       List<Map<String, dynamic>> convs = [];
 
-      final data = await _supabase.rpc('get_inbox_conversations', params: {
+      final data = await _supabase.rpc('get_dm_conversations', params: {
         'current_user_id': _currentUserId,
       });
       convs = (data as List).cast<Map<String, dynamic>>();
 
       // Ajouter la conversation "Note à moi-même" si elle existe
+      Map<String, dynamic>? selfChannel;
       try {
-        final selfChannel = await _supabase
-            .from('channels')
+        selfChannel = await _supabase
+            .from('chat_channels')
             .select('id, name')
             .eq('type', 'self')
             .eq('created_by', _currentUserId!)
             .maybeSingle();
         if (selfChannel != null) {
           final lastMsg = await _supabase
-              .from('messages')
+              .from('chat_messages')
               .select('content, created_at')
               .eq('channel_id', selfChannel['id'])
               .order('created_at', ascending: false)
@@ -97,12 +105,34 @@ class _InboxPageState extends State<InboxPage> {
         }
       } catch (_) {}
 
+      if (selfChannel == null) {
+        try {
+          final created = await _supabase
+              .from('chat_channels')
+              .insert({
+                'name': 'Notes personnelles',
+                'type': 'self',
+                'is_private': true,
+                'created_by': _currentUserId,
+              })
+              .select('id')
+              .single();
+          await _supabase.from('chat_channel_members').insert({
+            'channel_id': created['id'],
+            'user_id': _currentUserId,
+            'role': 'member',
+          });
+        } catch (_) {}
+      }
+
       if (mounted) {
         setState(() {
           _conversations = convs;
+          _filteredConversations = convs;
           _isLoading = false;
         });
       }
+      _localRepo.saveMessages('__inbox__', convs);
     } catch (_) {
       await _loadConversationsFallback();
     }
@@ -111,31 +141,31 @@ class _InboxPageState extends State<InboxPage> {
   Future<void> _loadConversationsFallback() async {
     try {
       final channelIds = await _supabase
-          .from('channel_members')
+          .from('chat_channel_members')
           .select('channel_id')
           .eq('user_id', _currentUserId!);
 
       if (channelIds.isEmpty) {
-        if (mounted) setState(() { _isLoading = false; _conversations = []; });
+        if (mounted) setState(() { _isLoading = false; _conversations = []; _filteredConversations = []; });
         return;
       }
 
       final ids = (channelIds as List).map((e) => e['channel_id'] as String).toList();
       final channels = await _supabase
-          .from('channels')
+          .from('chat_channels')
           .select('id')
           .inFilter('id', ids)
           .eq('type', 'direct');
 
       if (channels.isEmpty) {
-        if (mounted) setState(() { _isLoading = false; _conversations = []; });
+        if (mounted) setState(() { _isLoading = false; _conversations = []; _filteredConversations = []; });
         return;
       }
 
       final chIds = (channels as List).map((e) => e['id'] as String).toList();
 
       final allMembers = await _supabase
-          .from('channel_members')
+          .from('chat_channel_members')
           .select('channel_id, user_id')
           .inFilter('channel_id', chIds);
 
@@ -159,7 +189,7 @@ class _InboxPageState extends State<InboxPage> {
       }
 
       final allMessages = await _supabase
-          .from('messages')
+          .from('chat_messages')
           .select('channel_id, content, created_at')
           .inFilter('channel_id', chIds)
           .order('created_at', ascending: false);
@@ -210,14 +240,14 @@ class _InboxPageState extends State<InboxPage> {
 
       try {
         final selfChannel = await _supabase
-            .from('channels')
+            .from('chat_channels')
             .select('id, name')
             .eq('type', 'self')
             .eq('created_by', _currentUserId!)
             .maybeSingle();
         if (selfChannel != null) {
           final lastMsg = await _supabase
-              .from('messages')
+              .from('chat_messages')
               .select('content, created_at')
               .eq('channel_id', selfChannel['id'])
               .order('created_at', ascending: false)
@@ -236,9 +266,72 @@ class _InboxPageState extends State<InboxPage> {
         }
       } catch (_) {}
 
-      if (mounted) setState(() { _conversations = convs; _isLoading = false; });
+      if (mounted) setState(() { _conversations = convs; _filteredConversations = convs; _isLoading = false; });
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _openSelfChat() async {
+    try {
+      final selfChannel = await _supabase
+          .from('chat_channels')
+          .select('id')
+          .eq('type', 'self')
+          .eq('created_by', _currentUserId!)
+          .maybeSingle();
+
+      if (selfChannel == null) {
+        final created = await _supabase
+            .from('chat_channels')
+            .insert({
+              'name': 'Notes personnelles',
+              'type': 'self',
+              'is_private': true,
+              'created_by': _currentUserId,
+            })
+            .select('id')
+            .single();
+        await _supabase.from('chat_channel_members').insert({
+          'channel_id': created['id'],
+          'user_id': _currentUserId,
+          'role': 'member',
+        });
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PrivateChatPage(
+                channelId: created['id'],
+                otherUserName: 'Moi',
+                otherUserId: _currentUserId,
+                isSelfChat: true,
+              ),
+            ),
+          ).then((_) => _loadConversations());
+        }
+        return;
+      }
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PrivateChatPage(
+              channelId: selfChannel['id'],
+              otherUserName: 'Moi',
+              otherUserId: _currentUserId,
+              isSelfChat: true,
+            ),
+          ),
+        ).then((_) => _loadConversations());
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -284,12 +377,13 @@ class _InboxPageState extends State<InboxPage> {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              _supabase.from('channel_members')
+              _supabase.from('chat_channel_members')
                   .delete()
                   .eq('channel_id', channelId)
                   .eq('user_id', _currentUserId!);
               setState(() {
                 _conversations.removeWhere((c) => c['channel_id'] == channelId);
+                _filteredConversations.removeWhere((c) => c['channel_id'] == channelId);
               });
             },
             child: const Text('Supprimer', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
@@ -299,8 +393,24 @@ class _InboxPageState extends State<InboxPage> {
     );
   }
 
+  void _filterConversations() {
+    final query = _searchController.text.toLowerCase().trim();
+    if (query.isEmpty) {
+      setState(() => _filteredConversations = List.from(_conversations));
+      return;
+    }
+    setState(() {
+      _filteredConversations = _conversations.where((conv) {
+        final name = (conv['username'] ?? '').toLowerCase();
+        final lastMsg = (conv['last_message'] ?? '').toLowerCase();
+        return name.contains(query) || lastMsg.contains(query);
+      }).toList();
+    });
+  }
+
   @override
   void dispose() {
+    _searchController.dispose();
     _realtimeSub?.unsubscribe();
     _presenceSub?.unsubscribe();
     super.dispose();
@@ -310,16 +420,6 @@ class _InboxPageState extends State<InboxPage> {
     final hash = name.hashCode;
     final hue = hash.abs() % 360;
     return HSLColor.fromAHSL(1.0, hue.toDouble(), 0.5, 0.7).toColor();
-  }
-
-  List<Color> _avatarGradient(String name) {
-    final hash = name.hashCode.abs();
-    final h1 = hash % 360;
-    final h2 = (hash * 7) % 360;
-    return [
-      HSLColor.fromAHSL(1.0, h1.toDouble(), 0.6, 0.65).toColor(),
-      HSLColor.fromAHSL(1.0, h2.toDouble(), 0.5, 0.55).toColor(),
-    ];
   }
 
   String _initials(String name) {
@@ -332,48 +432,102 @@ class _InboxPageState extends State<InboxPage> {
 
   @override
   Widget build(BuildContext context) {
+    final query = _searchController.text.trim();
+    final onlineConvos = _filteredConversations.where((c) => c['is_online'] == true).toList();
+    final recentConvos = _filteredConversations.where((c) => c['is_online'] != true).toList();
+
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text('Messages',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 22),
+          style: TextStyle(fontWeight: FontWeight.w800, color: Colors.black, fontSize: 22, letterSpacing: 0.3),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_square, color: Colors.black, size: 22),
-            onPressed: _startNewConversation,
-            tooltip: 'Nouvelle conversation',
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.edit_square, color: Colors.white, size: 20),
+              onPressed: _startNewConversation,
+              tooltip: 'Nouvelle conversation',
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.only(right: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.pink.shade400, Colors.purple.shade400],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.pink.withValues(alpha: 0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.note_alt_rounded, color: Colors.white, size: 20),
+              onPressed: _openSelfChat,
+              tooltip: 'Note à moi-même',
+            ),
           ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.black))
-          : _conversations.isEmpty
+          : _filteredConversations.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
-                        width: 88, height: 88,
+                        width: 96,
+                        height: 96,
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
-                            colors: [Colors.grey[200]!, Colors.grey[100]!],
-                            begin: Alignment.topLeft, end: Alignment.bottomRight,
+                            colors: [Colors.pink.shade100, Colors.purple.shade100],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                          borderRadius: BorderRadius.circular(44),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.pink.withValues(alpha: 0.25),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                         ),
-                        child: Icon(Icons.chat_bubble_outline, size: 36, color: Colors.grey[400]),
+                        child: Icon(Icons.chat_bubble_outline, size: 40, color: Colors.pink.shade400),
                       ),
-                      const SizedBox(height: 24),
-                      Text('Aucun message',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.grey[500]),
+                      const SizedBox(height: 28),
+                      Text(
+                        query.isEmpty ? 'Aucun message' : 'Aucun résultat',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black, letterSpacing: 0.3),
                       ),
-                      const SizedBox(height: 8),
-                      Text('Commencez une discussion\navec un artiste de la communauté',
+                      const SizedBox(height: 10),
+                      Text(
+                        query.isEmpty
+                            ? 'Commencez une discussion\navec un artiste de la communauté'
+                            : 'Essayez un autre terme de recherche',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 14, color: Colors.grey[400], height: 1.4),
+                        style: TextStyle(fontSize: 15, color: Colors.grey.shade500, height: 1.5, letterSpacing: 0.2),
                       ),
                     ],
                   ),
@@ -381,44 +535,500 @@ class _InboxPageState extends State<InboxPage> {
               : RefreshIndicator(
                   onRefresh: _loadConversations,
                   color: Colors.black,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    itemCount: _conversations.length,
-                    itemBuilder: (context, index) {
-                      final conv = _conversations[index];
-                      return _InboxTile(
-                        key: ValueKey(conv['channel_id']),
-                        avatarUrl: conv['avatar_url'],
-                        userName: conv['username'] ?? 'Utilisateur',
-                        lastMessage: conv['last_message'] ?? '',
-                        lastTime: conv['last_message_at'] != null
-                            ? DateTime.parse(conv['last_message_at'] as String)
-                            : null,
-                        isOnline: conv['is_online'] ?? false,
-                        initials: _initials(conv['username'] ?? '?'),
-                        avatarColor: _avatarColor(conv['username'] ?? ''),
-                        avatarGradient: _avatarGradient(conv['username'] ?? ''),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            PageRouteBuilder(
-                              pageBuilder: (_, __, ___) => PrivateChatPage(
-                                channelId: conv['channel_id'],
-                                otherUserName: conv['username'] ?? 'Utilisateur',
-                                otherUserId: conv['other_user_id'],
-                                otherAvatarUrl: conv['avatar_url'],
-                              ),
-                              transitionsBuilder: (_, a, __, child) =>
-                                  FadeTransition(opacity: a, child: child),
-                              transitionDuration: const Duration(milliseconds: 200),
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5F5F5),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: TextField(
+                            controller: _searchController,
+                            style: const TextStyle(color: Colors.black, fontSize: 15),
+                            decoration: InputDecoration(
+                              hintText: 'Rechercher une conversation...',
+                              hintStyle: TextStyle(color: Colors.grey[400], fontSize: 15),
+                              prefixIcon: Icon(Icons.search, color: Colors.grey[400], size: 20),
+                              suffixIcon: query.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.close, size: 18, color: Colors.grey),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        _filterConversations();
+                                      },
+                                    )
+                                  : null,
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(vertical: 12),
                             ),
-                          ).then((_) => _loadConversations());
-                        },
-                        onDelete: () => _deleteConversation(conv['channel_id']),
-                      );
-                    },
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          itemCount: _buildSectionCount(onlineConvos, recentConvos),
+                          itemBuilder: (context, index) {
+                            return _buildSectionItem(context, index, onlineConvos, recentConvos);
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+    );
+  }
+
+  int _buildSectionCount(List online, List recent) {
+    int count = 0;
+    if (online.isNotEmpty) count++;
+    if (recent.isNotEmpty) count++;
+    count += online.length + recent.length;
+    return count;
+  }
+
+  Widget _buildSectionItem(BuildContext context, int index, List online, List recent) {
+    int currentIndex = 0;
+
+    if (online.isNotEmpty) {
+      if (index == currentIndex) {
+        return _SectionHeader(title: 'En ligne (${online.length})');
+      }
+      currentIndex++;
+      if (index < currentIndex + online.length) {
+        final conv = online[index - currentIndex];
+        return _buildConversationTile(context, conv);
+      }
+      currentIndex += online.length;
+    }
+
+    if (recent.isNotEmpty) {
+      if (index == currentIndex) {
+        return _SectionHeader(title: 'Récentes (${recent.length})');
+      }
+      currentIndex++;
+      final recentIndex = index - currentIndex;
+      if (recentIndex < recent.length) {
+        final conv = recent[recentIndex];
+        return _buildConversationTile(context, conv);
+      }
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  Widget _SectionHeader({required String title}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Text(
+        title,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.grey, letterSpacing: 0.5),
+      ),
+    );
+  }
+
+  Widget _buildConversationTile(BuildContext context, Map<String, dynamic> conv) {
+    return _InboxTile(
+      key: ValueKey(conv['channel_id']),
+      avatarUrl: conv['avatar_url'],
+      userName: conv['username'] ?? 'Utilisateur',
+      lastMessage: conv['last_message'] ?? '',
+      lastTime: conv['last_message_at'] != null
+          ? DateTime.parse(conv['last_message_at'] as String)
+          : null,
+      isOnline: conv['is_online'] ?? false,
+      initials: _initials(conv['username'] ?? '?'),
+      avatarColor: _avatarColor(conv['username'] ?? ''),
+      onTap: () {
+        Navigator.push(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) => PrivateChatPage(
+              channelId: conv['channel_id'],
+              otherUserName: conv['username'] ?? 'Utilisateur',
+              otherUserId: conv['other_user_id'],
+              otherAvatarUrl: conv['avatar_url'],
+            ),
+            transitionsBuilder: (_, a, __, child) =>
+                FadeTransition(opacity: a, child: child),
+            transitionDuration: const Duration(milliseconds: 200),
+          ),
+        ).then((_) => _loadConversations());
+      },
+      onDelete: () => _deleteConversation(conv['channel_id']),
+      onSettings: () => _openConversationSettings(context, conv),
+    );
+  }
+
+  Future<void> _openConversationSettings(BuildContext context, Map<String, dynamic> conv) async {
+    final channelId = conv['channel_id'] as String;
+    final settings = await _localRepo.getConversationSettings(channelId) ?? {};
+    final muted = settings['muted'] as bool? ?? false;
+    final pinned = settings['pinned'] as bool? ?? false;
+    final wallpaperType = settings['wallpaperType'] as String? ?? 'solid';
+    final wallpaperColor = settings['wallpaperColor'] as String? ?? '#FF000000';
+    final fontFamily = settings['fontFamily'] as String? ?? 'Default';
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        conv['username'] ?? 'Conversation',
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 18),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close, size: 18, color: Colors.black),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _SettingsRow(
+                  icon: Icons.pin_rounded,
+                  title: 'Épingler',
+                  value: pinned,
+                  onChanged: (val) async {
+                    await _localRepo.saveConversationSettings(channelId, {
+                      'muted': muted,
+                      'pinned': val,
+                      'wallpaperType': wallpaperType,
+                      'wallpaperColor': wallpaperColor,
+                      'fontFamily': fontFamily,
+                    });
+                    setModalState(() {});
+                  },
+                ),
+                _SettingsRow(
+                  icon: Icons.notifications_off_rounded,
+                  title: 'Muette',
+                  value: muted,
+                  onChanged: (val) async {
+                    await _localRepo.saveConversationSettings(channelId, {
+                      'muted': val,
+                      'pinned': pinned,
+                      'wallpaperType': wallpaperType,
+                      'wallpaperColor': wallpaperColor,
+                      'fontFamily': fontFamily,
+                    });
+                    setModalState(() {});
+                  },
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.wallpaper_rounded, size: 22, color: Colors.black87),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text('Fond d\'écran', style: TextStyle(fontSize: 16, color: Colors.black)),
+                      ),
+                      _WallpaperPicker(
+                        currentType: wallpaperType,
+                        currentColor: wallpaperColor,
+                        onChanged: (type, color) async {
+                          await _localRepo.saveConversationSettings(channelId, {
+                            'muted': muted,
+                            'pinned': pinned,
+                            'wallpaperType': type,
+                            'wallpaperColor': color,
+                            'fontFamily': fontFamily,
+                          });
+                          setModalState(() {});
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.text_fields_rounded, size: 22, color: Colors.black87),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text('Police', style: TextStyle(fontSize: 16, color: Colors.black)),
+                      ),
+                      _FontPicker(
+                        currentFont: fontFamily,
+                        onChanged: (font) async {
+                          await _localRepo.saveConversationSettings(channelId, {
+                            'muted': muted,
+                            'pinned': pinned,
+                            'wallpaperType': wallpaperType,
+                            'wallpaperColor': wallpaperColor,
+                            'fontFamily': font,
+                          });
+                          setModalState(() {});
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () async {
+                        Navigator.pop(context);
+                        await _localRepo.deleteConversation(channelId);
+                        _deleteConversation(channelId);
+                      },
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF3B30).withValues(alpha: 0.1),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Supprimer la conversation', style: TextStyle(color: Color(0xFFFF3B30), fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SettingsRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _SettingsRow({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 22, color: Colors.grey[700]),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(title, style: const TextStyle(fontSize: 16, color: Colors.black)),
+          ),
+            Switch(
+              value: value,
+              onChanged: onChanged,
+              activeTrackColor: Colors.black,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WallpaperPicker extends StatelessWidget {
+  final String currentType;
+  final String currentColor;
+  final void Function(String, String) onChanged;
+
+  const _WallpaperPicker({
+    required this.currentType,
+    required this.currentColor,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        final type = await showDialog<String>(
+          context: context,
+          builder: (_) => SimpleDialog(
+            title: const Text('Fond d\'écran'),
+            children: [
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, 'solid'),
+                child: const Text('Couleur unie'),
+              ),
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, 'gradient'),
+                child: const Text('Dégradé'),
+              ),
+            ],
+          ),
+        ) ?? currentType;
+
+        if (type == 'gradient') {
+          onChanged(type, currentColor);
+          return;
+        }
+
+        final color = await showDialog<String>(
+          context: context,
+          builder: (_) => SimpleDialog(
+            title: const Text('Couleur'),
+            children: [
+              _ColorOption(color: '#FFF8E1', label: 'Crème', current: currentColor),
+              _ColorOption(color: '#E3F2FD', label: 'Bleu', current: currentColor),
+              _ColorOption(color: '#FCE4EC', label: 'Rose', current: currentColor),
+              _ColorOption(color: '#E8F5E9', label: 'Vert', current: currentColor),
+              _ColorOption(color: '#FF000000', label: 'Noir', current: currentColor),
+            ],
+          ),
+        ) ?? currentColor;
+
+        onChanged(type, color);
+      },
+      child: Container(
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(
+          color: _parseColor(currentColor),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+      ),
+    );
+  }
+
+  Color _parseColor(String hex) {
+    final buffer = StringBuffer();
+    if (hex.length == 6 || hex.length == 7) buffer.write('FF');
+    buffer.write(hex.replaceFirst('#', ''));
+    return Color(int.parse(buffer.toString(), radix: 16));
+  }
+}
+
+class _ColorOption extends StatelessWidget {
+  final String color;
+  final String label;
+  final String current;
+
+  const _ColorOption({required this.color, required this.label, required this.current});
+
+  @override
+  Widget build(BuildContext context) {
+    final isSelected = current.toUpperCase() == color.toUpperCase();
+    return SimpleDialogOption(
+      onPressed: () => Navigator.pop(context, color),
+      child: Row(
+        children: [
+          Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: _parseColor(color),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.grey.shade400),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(label, style: TextStyle(color: isSelected ? Colors.black : Colors.grey.shade700)),
+          if (isSelected) ...[
+            const Spacer(),
+            Icon(Icons.check, size: 18, color: Colors.black),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Color _parseColor(String hex) {
+    final buffer = StringBuffer();
+    if (hex.length == 6 || hex.length == 7) buffer.write('FF');
+    buffer.write(hex.replaceFirst('#', ''));
+    return Color(int.parse(buffer.toString(), radix: 16));
+  }
+}
+
+class _FontPicker extends StatefulWidget {
+  final String currentFont;
+  final ValueChanged<String> onChanged;
+
+  const _FontPicker({required this.currentFont, required this.onChanged});
+
+  @override
+  State<_FontPicker> createState() => _FontPickerState();
+}
+
+class _FontPickerState extends State<_FontPicker> {
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        final fonts = ['Default', 'Roboto', 'Open Sans', 'Montserrat', 'Poppins'];
+        final selected = await showDialog<String>(
+          context: context,
+          builder: (_) => SimpleDialog(
+            title: const Text('Police'),
+            children: fonts
+                .map(
+                  (font) => SimpleDialogOption(
+                    onPressed: () => Navigator.pop(context, font),
+                    child: Text(
+                      font,
+                      style: TextStyle(
+                        fontFamily: font == 'Default' ? null : font,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        );
+        if (selected != null && mounted) {
+          widget.onChanged(selected);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Text(
+          widget.currentFont,
+          style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
+        ),
+      ),
     );
   }
 }
@@ -435,9 +1045,9 @@ class _InboxTile extends StatelessWidget {
   final bool isOnline;
   final String initials;
   final Color avatarColor;
-  final List<Color> avatarGradient;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final VoidCallback onSettings;
 
   const _InboxTile({
     super.key,
@@ -448,15 +1058,14 @@ class _InboxTile extends StatelessWidget {
     required this.isOnline,
     required this.initials,
     required this.avatarColor,
-    required this.avatarGradient,
     required this.onTap,
     required this.onDelete,
+    required this.onSettings,
   });
 
   @override
   Widget build(BuildContext context) {
     final timeStr = lastTime != null ? timeago.format(lastTime!, locale: 'fr') : '';
-    final isUnread = false; // TODO: track via message_reads
 
     return Dismissible(
       key: Key('inbox_${userName}_$lastTime'),
@@ -532,8 +1141,23 @@ class _InboxTile extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 14),
-              // Content
+                  const SizedBox(width: 14),
+                  // Settings button
+                  GestureDetector(
+                    onTap: onSettings,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.settings_rounded, size: 18, color: Colors.grey[600]),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  // Content
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -542,15 +1166,15 @@ class _InboxTile extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(userName,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 16,
-                            fontWeight: isUnread ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight: FontWeight.w600,
                             color: Colors.black,
                           ),
                         ),
                         if (timeStr.isNotEmpty)
                           Text(timeStr,
-                            style: TextStyle(fontSize: 12, color: isUnread ? Colors.black : Colors.grey[400]),
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
                           ),
                       ],
                     ),
@@ -560,10 +1184,9 @@ class _InboxTile extends StatelessWidget {
                         Expanded(
                           child: Text(
                             lastMessage,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 14,
-                              color: isUnread ? Colors.black87 : Colors.grey[500],
-                              fontWeight: isUnread ? FontWeight.w500 : FontWeight.normal,
+                              color: Colors.grey,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -646,10 +1269,15 @@ class _NewConversationSheetState extends State<_NewConversationSheet> {
 
   Future<void> _createSelfNote() async {
     final currentUserId = _supabase.auth.currentUser?.id;
-    if (currentUserId == null) return;
+    if (currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connectez-vous d\'abord'), backgroundColor: Colors.red),
+      );
+      return;
+    }
     try {
       final existing = await _supabase
-          .from('channels')
+          .from('chat_channels')
           .select('id')
           .eq('type', 'self')
           .eq('created_by', currentUserId)
@@ -659,7 +1287,7 @@ class _NewConversationSheetState extends State<_NewConversationSheet> {
         return;
       }
       final channel = await _supabase
-          .from('channels')
+          .from('chat_channels')
           .insert({
             'name': 'Notes personnelles',
             'type': 'self',
@@ -669,11 +1297,17 @@ class _NewConversationSheetState extends State<_NewConversationSheet> {
           .select()
           .single();
       final channelId = channel['id'] as String;
-      await _supabase.from('channel_members').insert({
+      await _supabase.from('chat_channel_members').insert({
         'channel_id': channelId, 'user_id': currentUserId, 'role': 'member',
       });
       widget.onConversationCreated(channelId, 'Moi');
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _createConversation(Map<String, dynamic> otherUser) async {
@@ -682,12 +1316,12 @@ class _NewConversationSheetState extends State<_NewConversationSheet> {
 
     try {
       final myChannels = await _supabase
-          .from('channel_members')
+          .from('chat_channel_members')
           .select('channel_id')
           .eq('user_id', currentUserId);
 
       final theirChannels = await _supabase
-          .from('channel_members')
+          .from('chat_channel_members')
           .select('channel_id')
           .eq('user_id', otherUser['id']);
 
@@ -697,7 +1331,7 @@ class _NewConversationSheetState extends State<_NewConversationSheet> {
 
       if (common.isNotEmpty) {
         final ch = await _supabase
-            .from('channels')
+            .from('chat_channels')
             .select('id')
             .eq('id', common.first)
             .eq('type', 'direct')
@@ -709,7 +1343,7 @@ class _NewConversationSheetState extends State<_NewConversationSheet> {
       }
 
       final channel = await _supabase
-          .from('channels')
+          .from('chat_channels')
           .insert({
             'name': otherUser['username'] ?? 'Discussion',
             'type': 'direct',
@@ -721,7 +1355,7 @@ class _NewConversationSheetState extends State<_NewConversationSheet> {
 
       final channelId = channel['id'] as String;
 
-      await _supabase.from('channel_members').insert([
+      await _supabase.from('chat_channel_members').insert([
         {'channel_id': channelId, 'user_id': currentUserId, 'role': 'member'},
         {'channel_id': channelId, 'user_id': otherUser['id'], 'role': 'member'},
       ]);
@@ -941,6 +1575,7 @@ class PrivateChatPage extends StatefulWidget {
   final String otherUserName;
   final String? otherUserId;
   final String? otherAvatarUrl;
+  final bool isSelfChat;
 
   const PrivateChatPage({
     super.key,
@@ -948,6 +1583,7 @@ class PrivateChatPage extends StatefulWidget {
     required this.otherUserName,
     this.otherUserId,
     this.otherAvatarUrl,
+    this.isSelfChat = false,
   });
 
   @override
@@ -966,6 +1602,7 @@ class _PrivateChatPageState extends State<PrivateChatPage> {
   bool _isLoading = true;
   String? _currentUserId;
   String? _currentUserName;
+  final Map<String, String?> _cachedVoicePaths = {};
 
   bool _isRecording = false;
   String? _voiceRecordingPath;
@@ -993,18 +1630,18 @@ class _PrivateChatPageState extends State<PrivateChatPage> {
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
-          table: 'messages',
+          table: 'chat_messages',
           callback: (payload) {
             final msg = payload.newRecord;
             if (msg['channel_id'] == widget.channelId && mounted) {
               setState(() {
                 _messages.add({
                   'id': msg['id'].toString(),
-                  'sender': msg['user_name'] ?? 'Anonyme',
+                  'sender': msg['profiles']?['display_name'] ?? 'Anonyme',
                   'text': msg['content'] ?? '',
                   'time': _formatTime(msg['created_at']?.toString() ?? ''),
-                  'isMe': msg['user_id'] == _currentUserId,
-                  'isVoice': msg['is_voice'] ?? false,
+                  'isMe': msg['author_id'] == _currentUserId,
+                  'isVoice': msg['message_type'] == 'voice',
                   'voiceUrl': msg['voice_url'],
                   'voiceDuration': msg['voice_duration'] ?? 0,
                 });
@@ -1019,8 +1656,8 @@ class _PrivateChatPageState extends State<PrivateChatPage> {
   Future<void> _loadMessages() async {
     try {
       final response = await _supabase
-          .from('active_messages')
-          .select('*')
+          .from('chat_messages')
+          .select('*, profiles(display_name, avatar_url)')
           .eq('channel_id', widget.channelId)
           .order('created_at', ascending: true)
           .limit(100);
@@ -1028,13 +1665,14 @@ class _PrivateChatPageState extends State<PrivateChatPage> {
       if (mounted) {
         setState(() {
           _messages = (response as List).map((msg) {
+            final profile = msg['profiles'] as Map<String, dynamic>?;
             return {
               'id': msg['id'].toString(),
-              'sender': msg['user_name'] ?? 'Anonyme',
+              'sender': profile?['display_name'] ?? 'Anonyme',
               'text': msg['content'] ?? '',
               'time': _formatTime(msg['created_at']?.toString() ?? ''),
-              'isMe': msg['user_id'] == _currentUserId,
-              'isVoice': msg['is_voice'] ?? false,
+              'isMe': msg['author_id'] == _currentUserId,
+              'isVoice': msg['message_type'] == 'voice',
               'voiceUrl': msg['voice_url'],
               'voiceDuration': msg['voice_duration'] ?? 0,
             };
@@ -1043,9 +1681,31 @@ class _PrivateChatPageState extends State<PrivateChatPage> {
         });
         _scrollToBottom();
       }
+
+      _cacheVoiceMessages();
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _cacheVoiceMessages() async {
+    try {
+      final cache = VoiceCacheService();
+      await cache.init();
+      for (final msg in _messages) {
+        if (msg['isVoice'] == true) {
+          final voiceUrl = msg['voiceUrl'] as String?;
+          if (voiceUrl != null && voiceUrl.isNotEmpty) {
+            final cachedPath = await cache.cacheVoice(voiceUrl);
+            if (cachedPath != null) {
+              setState(() {
+                _cachedVoicePaths[voiceUrl] = cachedPath;
+              });
+            }
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   void _sendMessage() {
@@ -1056,12 +1716,11 @@ class _PrivateChatPageState extends State<PrivateChatPage> {
     setState(() => _showSuggestions = false);
 
     try {
-      _supabase.from('messages').insert({
+      _supabase.from('chat_messages').insert({
         'channel_id': widget.channelId,
-        'user_id': _currentUserId,
-        'user_name': _currentUserName,
+        'author_id': _currentUserId,
         'content': text,
-        'is_voice': false,
+        'message_type': 'text',
       });
     } catch (_) {}
 
@@ -1114,7 +1773,7 @@ class _PrivateChatPageState extends State<PrivateChatPage> {
           .from('voice-messages')
           .getPublicUrl(audioFileName);
 
-      await _supabase.from('messages').insert({
+      await _supabase.from('chat_messages').insert({
         'channel_id': widget.channelId,
         'user_id': _currentUserId,
         'user_name': _currentUserName,
@@ -1126,6 +1785,14 @@ class _PrivateChatPageState extends State<PrivateChatPage> {
 
       _voiceRecorder.deleteRecording();
       _voiceRecordingPath = null;
+
+      try {
+        final cache = VoiceCacheService();
+        final cachedPath = await cache.cacheVoice(voiceUrl);
+        if (cachedPath != null && mounted) {
+          setState(() => _cachedVoicePaths[voiceUrl] = cachedPath);
+        }
+      } catch (_) {}
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -1207,8 +1874,17 @@ class _PrivateChatPageState extends State<PrivateChatPage> {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(widget.otherUserName,
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.isSelfChat ? 'Note à moi-même' : widget.otherUserName,
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 16),
+                  ),
+                  if (widget.isSelfChat)
+                    Text('Espace personnel',
+                      style: TextStyle(fontSize: 11, color: Colors.pink.shade400, fontWeight: FontWeight.w500),
+                    ),
+                ],
               ),
             ),
           ],
@@ -1226,12 +1902,32 @@ class _PrivateChatPageState extends State<PrivateChatPage> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey[300]),
-                              const SizedBox(height: 12),
-                              Text('Aucun message', style: TextStyle(color: Colors.grey[400], fontSize: 16)),
+                              Container(
+                                width: 72,
+                                height: 72,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [Colors.pink.shade100, Colors.purple.shade100],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(widget.isSelfChat ? Icons.note_alt_rounded : Icons.chat_bubble_outline,
+                                  size: 32, color: widget.isSelfChat ? Colors.pink.shade400 : Colors.grey[400]),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                widget.isSelfChat ? 'Vos notes personnelles' : 'Aucun message',
+                                style: TextStyle(color: Colors.grey[600], fontSize: 16, fontWeight: FontWeight.w600),
+                              ),
                               const SizedBox(height: 4),
-                              Text('Envoyez un message à ${widget.otherUserName}',
-                                style: TextStyle(color: Colors.grey[300], fontSize: 14),
+                              Text(
+                                widget.isSelfChat
+                                    ? 'Notez vos idées, rappels et pensées'
+                                    : 'Envoyez un message à ${widget.otherUserName}',
+                                style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                                textAlign: TextAlign.center,
                               ),
                             ],
                           ),
@@ -1242,7 +1938,12 @@ class _PrivateChatPageState extends State<PrivateChatPage> {
                           itemCount: _messages.length,
                           itemBuilder: (context, index) {
                             final msg = _messages[index];
-                            return _PrivateMessageBubble(message: msg);
+                            return _PrivateMessageBubble(
+                              message: msg,
+                              cachedVoicePath: msg['voiceUrl'] != null
+                                  ? _cachedVoicePaths[msg['voiceUrl']]
+                                  : null,
+                            );
                           },
                         ),
             ),
@@ -1359,7 +2060,8 @@ class _PrivateChatPageState extends State<PrivateChatPage> {
 
 class _PrivateMessageBubble extends StatelessWidget {
   final Map<String, dynamic> message;
-  const _PrivateMessageBubble({required this.message});
+  final String? cachedVoicePath;
+  const _PrivateMessageBubble({required this.message, this.cachedVoicePath});
 
   @override
   Widget build(BuildContext context) {
@@ -1378,6 +2080,7 @@ class _PrivateMessageBubble extends StatelessWidget {
               width: MediaQuery.of(context).size.width * 0.7,
               child: ThoughtBubbleAudioPlayer(
                 audioUrl: voiceUrl,
+                cachedPath: cachedVoicePath,
                 authorName: message['sender'] ?? 'Anonyme',
                 duration: Duration(seconds: voiceDuration),
               ),

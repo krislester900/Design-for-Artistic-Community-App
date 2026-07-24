@@ -98,9 +98,9 @@ create trigger on_auth_user_created
 
 
 -- ============================================================
--- 2. CATÉGORIES
+-- 2. CATÉGORIES (Insertion commentée pour éviter l'erreur enum)
 -- ============================================================
--- Insertion safe : les valeurs d'enum ont été ajoutées à l'étape 1
+/*
 insert into public.categories (title, slug, color, sort_order) values
   ('Illustration',  'illustration', '#7C5CFC', 1),
   ('Musique',       'music',        '#14B8A6', 2),
@@ -109,6 +109,7 @@ insert into public.categories (title, slug, color, sort_order) values
   ('Photographie',  'photo',        '#60A5FA', 5),
   ('3D & Design',   '3d',           '#A78BFA', 6)
 on conflict (slug) do nothing;
+*/
 
 
 -- ============================================================

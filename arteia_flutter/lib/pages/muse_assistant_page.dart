@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 import '../services/ai_assistant_service.dart';
 
 class MuseTheme {
@@ -135,9 +132,9 @@ class _MuseAssistantPageState extends State<MuseAssistantPage> with SingleTicker
   final List<_ChatBubble> _messages = [];
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  int _currentTopicIndex = 0;
   bool _showTopics = true;
   bool _isLoading = false;
+  VoiceActivityState _voiceState = VoiceActivityState.idle;
   final AiAssistantService _assistant = AiAssistantService();
   String _selectedCategory = 'general';
 
@@ -148,6 +145,7 @@ class _MuseAssistantPageState extends State<MuseAssistantPage> with SingleTicker
     super.initState();
     _theme = MuseThemes.all[0];
     _themeIndex = 0;
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _addMessage(_welcomeMessage, isUser: false);
     });
@@ -165,6 +163,32 @@ class _MuseAssistantPageState extends State<MuseAssistantPage> with SingleTicker
       _themeIndex = (_themeIndex + 1) % MuseThemes.all.length;
       _theme = MuseThemes.all[_themeIndex];
     });
+  }
+
+  void _setVoiceState(VoiceActivityState state) {
+    if (_voiceState == state) return;
+    setState(() => _voiceState = state);
+  }
+
+  void _onVoiceTap() async {
+    if (_voiceState == VoiceActivityState.listening) {
+      _setVoiceState(VoiceActivityState.idle);
+      return;
+    }
+    if (_voiceState == VoiceActivityState.speaking) {
+      _setVoiceState(VoiceActivityState.idle);
+      return;
+    }
+    _setVoiceState(VoiceActivityState.listening);
+    await Future.delayed(const Duration(seconds: 3));
+    if (!mounted) return;
+    _setVoiceState(VoiceActivityState.processing);
+    await Future.delayed(const Duration(seconds: 1));
+    if (!mounted) return;
+    _setVoiceState(VoiceActivityState.speaking);
+    await Future.delayed(const Duration(seconds: 3));
+    if (!mounted) return;
+    _setVoiceState(VoiceActivityState.idle);
   }
 
   Future<void> _sendMessage() async {
@@ -257,12 +281,19 @@ class _MuseAssistantPageState extends State<MuseAssistantPage> with SingleTicker
                     ),
                   ),
                   const Spacer(),
+                  VoiceActivityIndicator(
+                    state: _voiceState,
+                    accent: _theme.accent,
+                    glow: _theme.glow,
+                    onTap: _onVoiceTap,
+                  ),
+                  const SizedBox(width: 12),
                   _ThemeSwordButton(onTap: _cycleTheme, theme: _theme),
                 ],
               ),
             ),
 
-            // Messages + Card Stack avec gradient radiant
+            // Messages avec gradient radiant
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -282,12 +313,10 @@ class _MuseAssistantPageState extends State<MuseAssistantPage> with SingleTicker
                     if (_showTopics) ...[
                       const SizedBox(height: 8),
                       SizedBox(
-                        height: 350,
+                        height: 320,
                         child: _TopicCardStack(
                           topics: MuseTopics.all,
-                          currentIndex: _currentTopicIndex,
-                          onIndexChanged: (i) => setState(() => _currentTopicIndex = i),
-                          onTap: _selectTopic,
+                          onTopicTap: (index) => _selectTopic(MuseTopics.all[index]),
                           theme: _theme,
                         ),
                       ),
@@ -375,271 +404,76 @@ class _MuseAssistantPageState extends State<MuseAssistantPage> with SingleTicker
   }
 }
 
-class _TopicCardStack extends StatefulWidget {
+class _TopicCardStack extends StatelessWidget {
   final List<MuseTopic> topics;
-  final int currentIndex;
-  final ValueChanged<int> onIndexChanged;
-  final ValueChanged<MuseTopic> onTap;
+  final ValueChanged<int> onTopicTap;
   final MuseTheme theme;
 
   const _TopicCardStack({
     required this.topics,
-    required this.currentIndex,
-    required this.onIndexChanged,
-    required this.onTap,
+    required this.onTopicTap,
     required this.theme,
   });
 
   @override
-  State<_TopicCardStack> createState() => _TopicCardStackState();
-}
-
-class _TopicCardStackState extends State<_TopicCardStack> with SingleTickerProviderStateMixin {
-  int _displayIndex = 0;
-  double _dragOffset = 0;
-  bool _isDragging = false;
-  double _velocity = 0;
-  DateTime _lastDragTime = DateTime.now();
-
-  @override
-  void initState() {
-    super.initState();
-    _displayIndex = widget.currentIndex;
-  }
-
-  @override
-  void didUpdateWidget(covariant _TopicCardStack oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.currentIndex != oldWidget.currentIndex) {
-      _displayIndex = widget.currentIndex;
-    }
-  }
-
-  void _handleDragStart(Offset globalPosition) {
-    setState(() {
-      _isDragging = true;
-      _dragOffset = 0;
-      _velocity = 0;
-    });
-    _lastDragTime = DateTime.now();
-  }
-
-  void _handleDragUpdate(DragUpdateDetails details) {
-    if (!_isDragging) return;
-    final now = DateTime.now();
-    final deltaTime = now.difference(_lastDragTime).inMilliseconds.toDouble();
-    _lastDragTime = now;
-
-    final newOffset = details.globalPosition.dx;
-    setState(() {
-      _dragOffset = newOffset;
-      _velocity = (newOffset - _dragOffset) / (deltaTime > 1 ? deltaTime : 1);
-    });
-  }
-
-  void _handleDragEnd(DragEndDetails details) {
-    if (!_isDragging) return;
-    setState(() => _isDragging = false);
-
-    const swipeThreshold = 50.0;
-    final swipe = _dragOffset * _velocity;
-
-    if (swipe < -swipeThreshold || swipe > swipeThreshold) {
-      if (_dragOffset < 0) {
-        // Swiped right to left -> show next item
-        final newIndex = (_displayIndex + 1).clamp(0, widget.topics.length - 1);
-        widget.onIndexChanged(newIndex);
-        widget.onTap(widget.topics[newIndex]);
-      } else if (_dragOffset > 0) {
-        // Swiped left to right -> show previous item
-        final newIndex = (_displayIndex - 1).clamp(0, widget.topics.length - 1);
-        widget.onIndexChanged(newIndex);
-        widget.onTap(widget.topics[newIndex]);
-      }
-    }
-
-    _dragOffset = 0;
-    _velocity = 0;
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final indices = [
-      (_displayIndex - 1 + widget.topics.length) % widget.topics.length,
-      _displayIndex,
-      (_displayIndex + 1) % widget.topics.length,
-      (_displayIndex + 2) % widget.topics.length,
-    ];
-
-    final scales = [1.0, 0.9, 0.85, 0.8];
-    final yOffsets = [0.0, -12.0, 0.0, 12.0];
-    final xOffsets = [0.0, 32.0, 48.0, 62.0];
-    final rotations = [0.0, 2.0, 4.0, 7.0];
-
-    return GestureDetector(
-      onHorizontalDragStart: (d) => _handleDragStart(d.globalPosition),
-      onHorizontalDragUpdate: (d) => _handleDragUpdate(d),
-      onHorizontalDragEnd: _handleDragEnd,
-      onTap: () => widget.onTap(widget.topics[_displayIndex]),
-      child: SizedBox(
-        height: 220,
-        child: Stack(
-          children: List.generate(4, (i) {
-            final topic = widget.topics[indices[i]];
-            return _AnimatedTopicCard(
-              topic: topic,
-              theme: widget.theme,
-              scale: scales[i],
-              yOffset: yOffsets[i],
-              xOffset: xOffsets[i],
-              rotation: rotations[i],
-              index: i,
-              isDragging: _isDragging,
-              dragOffset: _dragOffset,
-              onTap: () => widget.onTap(topic),
-            );
-          }),
-        ),
-      ),
-    );
-  }
-}
-
-class _AnimatedTopicCard extends StatelessWidget {
-  final MuseTopic topic;
-  final MuseTheme theme;
-  final double scale;
-  final double yOffset;
-  final double xOffset;
-  final double rotation;
-  final int index;
-  final bool isDragging;
-  final double dragOffset;
-  final VoidCallback onTap;
-
-  const _AnimatedTopicCard({
-    required this.topic,
-    required this.theme,
-    required this.scale,
-    required this.yOffset,
-    required this.xOffset,
-    required this.rotation,
-    required this.index,
-    required this.isDragging,
-    required this.dragOffset,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final opacity = scale == 1.0 ? 1.0 : 0.6;
-    
-    return Positioned(
-      left: xOffset + (isDragging ? dragOffset / 4 : 0),
-      top: yOffset,
-      child: AnimatedBuilder(
-        animation: Tween(begin: scale, end: scale).animate(
-          CurvedAnimation(parent: AlwaysStoppedAnimation(1.0), curve: Curves.easeOut),
-        ),
-        builder: (context, child) {
-          return Transform.translate(
-            offset: Offset(scale == 1.0 ? 0 : (xOffset > 0 ? xOffset - 30 : 0), 0),
-            child: Transform.scale(
-              scale: scale,
-              child: Opacity(
-                opacity: opacity,
-                child: GestureDetector(
-                  onTap: onTap,
-                  child: Container(
-                    width: 280,
-                    height: 220,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: theme.border.withOpacity(0.2)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: theme.glow,
-                          blurRadius: 24,
-                          spreadRadius: 4,
-                        ),
-                      ],
-                    ),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(28),
-                        color: theme.surface.withOpacity(0.95),
-                        border: Border.all(color: theme.border.withOpacity(0.25)),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                color: topic.color.withOpacity(0.1),
-                              ),
-                              child: Icon(topic.icon, color: topic.color, size: 24),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    topic.title,
-                                    style: TextStyle(
-                                      color: theme.text,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    topic.description,
-                                    style: TextStyle(
-                                      color: theme.muted,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: topic.color.withOpacity(0.3)),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  '${MuseTopics.all.indexOf(topic) + 1}/${MuseTopics.all.length}',
-                                  style: TextStyle(
-                                    color: theme.muted,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+    return ListView.builder(
+      scrollDirection: Axis.horizontal,
+      itemCount: topics.length,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemBuilder: (context, index) {
+        final topic = topics[index];
+        return GestureDetector(
+          onTap: () => onTopicTap(index),
+          child: Container(
+            width: 200,
+            margin: const EdgeInsets.only(right: 16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: theme.border.withOpacity(0.2)),
+              color: theme.surface.withOpacity(0.95),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.glow,
+                  blurRadius: 24,
+                  spreadRadius: 4,
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(topic.icon, color: topic.color, size: 32),
+                  const SizedBox(height: 12),
+                  Text(
+                    topic.title,
+                    style: TextStyle(
+                      color: theme.text,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ),
+                  const SizedBox(height: 4),
+                  Text(
+                    topic.description,
+                    style: TextStyle(
+                      color: theme.muted,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
               ),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }
+
 
 class _MessageBubble extends StatelessWidget {
   final _ChatBubble message;
@@ -768,7 +602,6 @@ class _ZeldaSwordPainter extends CustomPainter {
     final h = size.height;
     final w = size.width;
 
-    // Pixelated sword blade
     path.moveTo(w * 0.35, h * 0.15);
     path.lineTo(w * 0.65, h * 0.15);
     path.lineTo(w * 0.75, h * 0.35);
@@ -778,7 +611,6 @@ class _ZeldaSwordPainter extends CustomPainter {
     path.lineTo(w * 0.25, h * 0.35);
     path.close();
 
-    // Crossguard
     path.moveTo(w * 0.35, h * 0.35);
     path.lineTo(w * 0.65, h * 0.35);
     path.lineTo(w * 0.7, h * 0.3);
@@ -787,7 +619,6 @@ class _ZeldaSwordPainter extends CustomPainter {
     path.lineTo(w * 0.3, h * 0.3);
     path.close();
 
-    // Handle
     path.moveTo(w * 0.4, h * 0.65);
     path.lineTo(w * 0.6, h * 0.65);
     path.lineTo(w * 0.6, h * 0.85);
@@ -824,7 +655,6 @@ class _BottomBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Bouton dessiner
           _ActionButton(
             icon: Icons.brush_rounded,
             theme: theme,
@@ -832,7 +662,6 @@ class _BottomBar extends StatelessWidget {
             label: 'Dessiner',
           ),
           const SizedBox(width: 10),
-          // Bouton lotus
           _ActionButton(
             icon: Icons.local_florist_rounded,
             theme: theme,
@@ -840,7 +669,6 @@ class _BottomBar extends StatelessWidget {
             label: 'Lotus',
           ),
           const SizedBox(width: 10),
-          // Bouton ajouter
           _ActionButton(
             icon: Icons.add_rounded,
             theme: theme,
@@ -848,7 +676,6 @@ class _BottomBar extends StatelessWidget {
             label: 'Ajouter',
           ),
           const SizedBox(width: 12),
-          // Champ de texte
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -942,6 +769,210 @@ class _ActionButton extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+enum VoiceActivityState { idle, listening, processing, speaking }
+
+class VoiceActivityIndicator extends StatelessWidget {
+  final VoiceActivityState state;
+  final Color accent;
+  final Color glow;
+  final VoidCallback? onTap;
+
+  const VoiceActivityIndicator({
+    super.key,
+    required this.state,
+    required this.accent,
+    required this.glow,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: 64,
+        height: 64,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: state == VoiceActivityState.idle ? _surfaceColor() : accent,
+          boxShadow: [
+            if (state != VoiceActivityState.idle)
+              BoxShadow(
+                color: glow,
+                blurRadius: 24,
+                spreadRadius: 4,
+              ),
+          ],
+        ),
+        child: Center(
+          child: _buildContent(),
+        ),
+      ),
+    );
+  }
+
+  Color _surfaceColor() {
+    return Colors.grey.withValues(alpha: 0.08);
+  }
+
+  Widget _buildContent() {
+    switch (state) {
+      case VoiceActivityState.idle:
+        return Icon(Icons.mic_none_rounded, color: Colors.grey[400], size: 28);
+      case VoiceActivityState.listening:
+        return _WaveformAnimation(color: Colors.white);
+      case VoiceActivityState.processing:
+        return _PulsingDots(color: Colors.white);
+      case VoiceActivityState.speaking:
+        return _SpeakingRings(accent: accent);
+    }
+  }
+}
+
+class _WaveformAnimation extends StatefulWidget {
+  final Color color;
+  const _WaveformAnimation({required this.color});
+
+  @override
+  State<_WaveformAnimation> createState() => _WaveformAnimationState();
+}
+
+class _WaveformAnimationState extends State<_WaveformAnimation> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(3, (i) {
+            final start = i * 0.15;
+            final phase = ((_controller.value + start) % 1.0);
+            final scale = 1.0 + 0.8 * (phase < 0.5 ? phase * 2 : (1 - phase) * 2);
+            final height = 6 + 14 * (scale - 1.0);
+            return Container(
+              width: 3,
+              height: height,
+              margin: EdgeInsets.symmetric(horizontal: 2),
+              decoration: BoxDecoration(
+                color: widget.color,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+}
+
+class _PulsingDots extends StatelessWidget {
+  final Color color;
+  const _PulsingDots({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _Dot(color: color, delay: 0),
+        const SizedBox(width: 4),
+        _Dot(color: color, delay: 1),
+        const SizedBox(width: 4),
+        _Dot(color: color, delay: 2),
+      ],
+    );
+  }
+}
+
+class _Dot extends StatelessWidget {
+  final Color color;
+  final int delay;
+  const _Dot({required this.color, required this.delay});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.3, end: 1.0),
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeInOut,
+      builder: (context, value, child) {
+        return Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: value),
+            shape: BoxShape.circle,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SpeakingRings extends StatelessWidget {
+  final Color accent;
+  const _SpeakingRings({required this.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        _Ring(color: accent, delay: 0),
+        _Ring(color: accent, delay: 1),
+        _Ring(color: accent, delay: 2),
+        Icon(Icons.volume_up_rounded, color: Colors.white, size: 22),
+      ],
+    );
+  }
+}
+
+class _Ring extends StatelessWidget {
+  final Color color;
+  final int delay;
+  const _Ring({required this.color, required this.delay});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.5, end: 1.0),
+      duration: const Duration(milliseconds: 1400),
+      curve: Curves.easeOut,
+      builder: (context, value, child) {
+        final scale = 0.6 + 0.8 * value;
+        final alpha = 1.0 - value;
+        return Container(
+          width: 40 * scale,
+          height: 40 * scale,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: color.withValues(alpha: alpha * 0.6), width: 2),
+          ),
+        );
+      },
     );
   }
 }

@@ -19,10 +19,10 @@ export type SectionId =
 
 export interface Category {
   slug: Exclude<CategorySlug, "all">;
-  title: string;
+  name: string;
   shortLabel: string;
   description: string;
-  image: string;
+  icon: string;
   color: string;
   targetSectionId: Exclude<SectionId, "hero" | "categories" | "join">;
 }
@@ -153,60 +153,60 @@ export const footerSections: FooterSection[] = [
 export const categories: Category[] = [
   {
     slug: "music",
-    title: "Musique",
+    name: "Musique",
     shortLabel: "Musique",
     description: "Compositions, EP, bandes-son et performances live.",
-    image:
+    icon:
       "https://images.unsplash.com/photo-1541961017774-22349e4a1262?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMGFydCUyMHBhaW50aW5nJTIwdGV4dHVyZXN8ZW58MXx8fHwxNzgwOTk2MzExfDA&ixlib=rb-4.1.0&q=80&w=1080",
     color: "from-primary/20 to-primary/5",
     targetSectionId: "showcase",
   },
   {
     slug: "visual-art",
-    title: "Art Visuel",
+    name: "Art Visuel",
     shortLabel: "Art",
     description: "Illustration, peinture, photo et créations graphiques.",
-    image:
+    icon:
       "https://images.unsplash.com/photo-1618331833071-ce81bd50d300?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwyfHxhYnN0cmFjdCUyMGFydCUyMHBhaW50aW5nJTIwdGV4dHVyZXN8ZW58MXx8fHwxNzgwOTk2MzExfDA&ixlib=rb-4.1.0&q=80&w=1080",
     color: "from-secondary/20 to-secondary/5",
     targetSectionId: "showcase",
   },
   {
     slug: "manga",
-    title: "Manga & BD",
+    name: "Manga & BD",
     shortLabel: "Manga",
     description: "Planches, chapitres, concept art et univers narratifs.",
-    image:
+    icon:
       "https://images.unsplash.com/photo-1763732397864-5b860bb298b0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwyfHxtYW5nYSUyMGFydCUyMGphcGFuZXNlJTIwaW5rfGVufDF8fHx8MTc4MDk5NjMxMXww&ixlib=rb-4.1.0&q=80&w=1080",
     color: "from-accent/20 to-accent/5",
     targetSectionId: "artists",
   },
   {
     slug: "film",
-    title: "Films indépendants",
+    name: "Films indépendants",
     shortLabel: "Films",
     description: "Courts-métrages, teasers, scénarios et making-of.",
-    image:
+    icon:
       "https://images.unsplash.com/photo-1618331835717-801e976710b2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHw0fHxhYnN0cmFjdCUyMGFydCUyMHBhaW50aW5nJTIwdGV4dHVyZXN8ZW58MXx8fHwxNzgwOTk2MzExfDA&ixlib=rb-4.1.0&q=80&w=1080",
     color: "from-chart-4/20 to-chart-4/5",
     targetSectionId: "showcase",
   },
   {
     slug: "literature",
-    title: "Littérature",
+    name: "Littérature",
     shortLabel: "Littérature",
     description: "Poésie, nouvelles, manifestes et récits illustrés.",
-    image:
+    icon:
       "https://images.unsplash.com/photo-1533208087231-c3618eab623c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHw1fHxhYnN0cmFjdCUyMGFydCUyMHBhaW50aW5nJTIwdGV4dHVyZXN8ZW58MXx8fHwxNzgwOTk2MzExfDA&ixlib=rb-4.1.0&q=80&w=1080",
     color: "from-chart-5/20 to-chart-5/5",
     targetSectionId: "forum",
   },
   {
     slug: "animation",
-    title: "Animation",
+    name: "Animation",
     shortLabel: "Animation",
     description: "Motion design, animation 2D/3D et expérimentations visuelles.",
-    image:
+    icon:
       "https://images.unsplash.com/photo-1779864535439-292f58c6c6a4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHw1fHxzdHJlZXQlMjBhcnQlMjBncmFmZml0aSUyMHZpY3RvcmlhbiUyMGFyY2hpdGVjdHVyZXxlbnwxfHx8fDE3ODA5OTYzMTB8MA&ixlib=rb-4.1.0&q=80&w=1080",
     color: "from-primary/20 to-secondary/5",
     targetSectionId: "showcase",

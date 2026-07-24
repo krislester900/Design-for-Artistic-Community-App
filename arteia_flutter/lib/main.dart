@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:async';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:rive/rive.dart';
+import 'package:app_links/app_links.dart';
 import 'utils/app_constants.dart';
 import 'services/supabase_service.dart';
 import 'services/theme_service.dart';
 import 'services/app_state.dart';
+import 'services/local_chat_repository.dart';
+import 'services/web_asset_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/loading_screen.dart';
 import 'widgets/app_drawer.dart';
@@ -30,6 +34,7 @@ import 'pages/music_upload_page.dart';
 import 'pages/writing_page.dart';
 import 'pages/comics_upload_page.dart';
 import 'pages/quests_page.dart';
+import 'pages/games_hub_page.dart';
 import 'widgets/page_transition.dart';
 import 'widgets/arteia_logo.dart';
 
@@ -38,11 +43,13 @@ final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey = GlobalKey<Scaffo
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Load environment variables
-  try {
-    await dotenv.load(fileName: ".env");
-  } catch (e) {
-    debugPrint('⚠️ Error loading .env: $e');
+  // Load environment variables (mobile only; web uses defaults)
+  if (!kIsWeb) {
+    try {
+      await dotenv.load(fileName: "assets/.env");
+    } catch (e) {
+      debugPrint('⚠️ Error loading .env: $e');
+    }
   }
   
   // Initialize Hive for local cache (not supported on web)
@@ -53,6 +60,13 @@ Future<void> main() async {
     } catch (e) {
       debugPrint('Hive initialization skipped: $e');
     }
+  }
+
+  // Initialize local chat repository for offline support
+  if (!kIsWeb) {
+    try {
+      await LocalChatRepository().init();
+    } catch (_) {}
   }
   
   try {
@@ -81,6 +95,9 @@ Future<void> main() async {
 
   // French locale for timeago
   timeago.setLocaleMessages('fr', timeago.FrMessages());
+
+  // Serveur HTTP local pour les WebViews (contourne file:// sur Android)
+  await LocalWebServer.initialize();
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
@@ -120,14 +137,45 @@ class LoadingScreenWrapper extends StatefulWidget {
 
 class _LoadingScreenWrapperState extends State<LoadingScreenWrapper> {
   bool _isLoading = true;
+  bool _isAuthenticated = false;
+  AppLinks? _appLinks;
+  StreamSubscription<Uri>? _linkSubscription;
 
   @override
   void initState() {
     super.initState();
+    _initDeepLinks();
     _checkInitialization();
     _startRealtimeNotifications();
   }
-  
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initDeepLinks() async {
+    if (kIsWeb) return;
+    try {
+      _appLinks = AppLinks();
+      final initialUri = await _appLinks?.getInitialLink();
+      if (initialUri != null && mounted) {
+        _handleOAuthRedirect(initialUri);
+      }
+      _linkSubscription = _appLinks?.uriLinkStream.listen((Uri uri) {
+        if (mounted) _handleOAuthRedirect(uri);
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _handleOAuthRedirect(Uri uri) async {
+    final path = uri.toString();
+    if (path.contains('auth/v1/callback') || path.contains('io.supabase.flutter://')) {
+      debugPrint('OAuth callback reçu: $uri');
+    }
+  }
+
   void _startRealtimeNotifications() {
     try {
       final appState = AppState();
@@ -137,9 +185,13 @@ class _LoadingScreenWrapperState extends State<LoadingScreenWrapper> {
 
   Future<void> _checkInitialization() async {
     await Future.delayed(AppConstants.loadingScreenMinDuration);
-
     if (!mounted) return;
-    setState(() => _isLoading = false);
+    // Vérifie si l'utilisateur est déjà connecté
+    final user = Supabase.instance.client.auth.currentUser;
+    setState(() {
+      _isAuthenticated = user != null;
+      _isLoading = false;
+    });
   }
 
   @override
@@ -151,7 +203,19 @@ class _LoadingScreenWrapperState extends State<LoadingScreenWrapper> {
         },
       );
     }
-    return const MainScreen();
+    // StreamBuilder pour réagir aux changements d'auth en temps réel
+    return StreamBuilder<AuthState>(
+      stream: Supabase.instance.client.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        final session = snapshot.data?.session;
+        final isLoggedIn = session != null;
+        if (isLoggedIn || _isAuthenticated) {
+          return const MainScreen();
+        }
+        return const MainScreen(); // On laisse toujours accès à MainScreen
+        // L'AuthPage est accessible via le profil pour ne pas bloquer l'exploration
+      },
+    );
   }
 }
 
@@ -222,6 +286,13 @@ class MainScreenState extends State<MainScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const QuestsPage()),
+    );
+  }
+
+  void openGames() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const GamesHubPage()),
     );
   }
 
@@ -350,14 +421,21 @@ class MainScreenState extends State<MainScreen> {
                     const SizedBox(width: 10),
                     Text('Artéïa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyLarge?.color)),
                     const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.add_circle_outline, size: 20),
-                      onPressed: openUpload,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      tooltip: 'Publier une œuvre',
-                    ),
-                    const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline, size: 20),
+            onPressed: openUpload,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            tooltip: 'Publier une œuvre',
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.videogame_asset_outlined, size: 20),
+            onPressed: openGames,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            tooltip: 'Jeux',
+          ),
                     Text(
                       ['Accueil', 'Univers', 'Rechercher', 'Discussions', 'Profil'][_currentIndex],
                       style: TextStyle(

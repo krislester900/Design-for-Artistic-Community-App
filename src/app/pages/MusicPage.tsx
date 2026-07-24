@@ -17,6 +17,8 @@ import type { MusicTrack, MusicGenre } from "../data/music";
 import { MUSIC_GENRES } from "../data/music";
 import { getTrendingTracks, getMusicTracksByGenre } from "../services/music";
 import { AudioPlayer } from "../components/AudioPlayer";
+import { CoverFlow } from "../components/CoverFlow";
+import { itunesService } from "../services/itunes";
 
 type Props = {
   onNavigate?: (page: string) => void;
@@ -241,6 +243,22 @@ export function MusicPage({ onNavigate }: Props) {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="mb-10">
+            <div className="mb-2 flex items-center gap-2">
+              <Music className="h-4 w-4 text-violet-500" />
+              <h2 className="text-lg font-semibold text-foreground">Cover Flow</h2>
+            </div>
+            <CoverFlow
+              songs={featured.map((t) => ({ id: t.id, title: t.title, artist: t.artist, albumCover: t.coverUrl, youtubeId: "" }))}
+              selectedSong={currentTrack ? { id: currentTrack.id, title: currentTrack.title, artist: currentTrack.artist, albumCover: currentTrack.coverUrl, youtubeId: "" } : null}
+              onSongSelect={(song) => {
+                const found = featured.find((t) => t.id === song.id);
+                if (found) playTrack(found);
+              }}
+              getCover={(song) => song.albumCover || null}
+            />
           </div>
 
           <div className="mb-8">

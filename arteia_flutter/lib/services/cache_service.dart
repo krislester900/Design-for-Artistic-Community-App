@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'supabase_service.dart';
 
 /// Exceptions personnalisées pour le cache
 class CacheException implements Exception {
@@ -210,10 +213,11 @@ class CacheService {
 
   Future<bool> isOnline() async {
     try {
-      final result = await _box?.get('is_online');
-      return result ?? false;
-    } catch (e) {
-      debugPrint('⚠️ isOnline check failed: $e');
+      final result = await http.get(Uri.parse(SupabaseConfig.supabaseUrl)).timeout(const Duration(seconds: 3));
+      return result.statusCode >= 200 && result.statusCode < 400;
+    } on Exception catch (_) {
+      return false;
+    } catch (_) {
       return false;
     }
   }

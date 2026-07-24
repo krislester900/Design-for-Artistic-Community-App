@@ -34,11 +34,11 @@ class _ArtworkUploadPageState extends State<ArtworkUploadPage> {
   bool _isSubmitting = false;
 
   final List<Map<String, dynamic>> _categories = [
-    {'slug': 'musique', 'name': 'Musique', 'icon': '🎵'},
-    {'slug': 'art-visuel', 'name': 'Arts Visuels', 'icon': '🎨'},
-    {'slug': 'litterature', 'name': 'Littérature', 'icon': '✍️'},
+    {'slug': 'visual-art', 'name': 'Arts Visuels', 'icon': '🎨'},
+    {'slug': 'music', 'name': 'Musique', 'icon': '🎵'},
+    {'slug': 'literature', 'name': 'Littérature', 'icon': '✍️'},
     {'slug': 'manga', 'name': 'Manga', 'icon': '📚'},
-    {'slug': 'films', 'name': 'Films', 'icon': '🎬'},
+    {'slug': 'film', 'name': 'Films', 'icon': '🎬'},
     {'slug': 'animation', 'name': 'Animation', 'icon': '🎞️'},
   ];
 

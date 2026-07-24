@@ -7,7 +7,7 @@ class ChatServiceEnhanced {
   Future<void> deleteMessage(String messageId) async {
     try {
       await _client
-          .from('messages')
+          .from('chat_messages')
           .update({'deleted_at': DateTime.now().toIso8601String()})
           .eq('id', messageId);
     } catch (e) {
@@ -25,13 +25,12 @@ class ChatServiceEnhanced {
     try {
       final expiresAt = DateTime.now().add(duration);
       final userId = _client.auth.currentUser?.id;
-      
-      await _client.from('messages').insert({
+
+      await _client.from('chat_messages').insert({
         'channel_id': channelId,
-        'user_id': userId,
-        'user_name': _client.auth.currentUser?.email?.split('@').first ?? 'Anonyme',
+        'author_id': userId,
         'content': content,
-        'is_voice': false,
+        'message_type': 'text',
         'is_ephemeral': true,
         'expires_at': expiresAt.toIso8601String(),
       });
@@ -50,17 +49,16 @@ class ChatServiceEnhanced {
     Duration? ephemeralDuration,
   }) async {
     try {
-      final expiresAt = isEphemeral && ephemeralDuration != null 
-          ? DateTime.now().add(ephemeralDuration) 
+      final expiresAt = isEphemeral && ephemeralDuration != null
+          ? DateTime.now().add(ephemeralDuration)
           : null;
       final userId = _client.auth.currentUser?.id;
-      
-      await _client.from('messages').insert({
+
+      await _client.from('chat_messages').insert({
         'channel_id': channelId,
-        'user_id': userId,
-        'user_name': _client.auth.currentUser?.email?.split('@').first ?? 'Anonyme',
+        'author_id': userId,
         'content': content,
-        'is_voice': voiceUrl != null,
+        'message_type': voiceUrl != null ? 'voice' : 'text',
         'voice_url': voiceUrl,
         'voice_duration': voiceDuration ?? 0,
         'is_ephemeral': isEphemeral,
@@ -92,7 +90,7 @@ class ChatServiceEnhanced {
   Future<Duration?> getMessageExpiry(String messageId) async {
     try {
       final response = await _client
-          .from('messages')
+          .from('chat_messages')
           .select('is_ephemeral, expires_at')
           .eq('id', messageId)
           .single();

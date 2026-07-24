@@ -5,14 +5,15 @@ import '../pages/settings_page.dart';
 import '../pages/notifications_page_enhanced.dart';
 import '../pages/favorites_page.dart';
 import '../pages/quests_page.dart';
-import '../pages/music_page.dart';
 import '../pages/universe_page.dart';
 import '../pages/artwork_upload_page.dart';
 import '../pages/music_upload_page.dart';
 import '../pages/writing_page.dart';
 import '../pages/comics_upload_page.dart';
 import '../pages/auth_page.dart';
-import '../pages/ai_assistant_page.dart';
+import '../pages/muse_assistant_page.dart';
+import '../pages/vynora_music/vynora_music_page.dart';
+import '../pages/vynora_playlist_page.dart';
 
 import 'arteia_logo.dart';
 
@@ -92,7 +93,7 @@ class AppDrawer extends StatelessWidget {
         }),
         _drawerItem(Icons.auto_awesome, 'Arteïa Muse ✨', () {
           onClose();
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage()));
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const MuseAssistantPage()));
         }),
 
         const Divider(),
@@ -124,7 +125,11 @@ class AppDrawer extends StatelessWidget {
         const Divider(),
         _drawerItem(Icons.music_note, 'Musique', () {
           onClose();
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const MusicPage()));
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const VynoraMusicPage()));
+        }),
+        _drawerItem(Icons.playlist_play, 'Playlist', () {
+          onClose();
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const VynoraPlaylistPage()));
         }),
         _drawerItem(Icons.palette_outlined, 'Art Visuel', () {
           onClose();

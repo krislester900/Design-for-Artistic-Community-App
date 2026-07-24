@@ -11,14 +11,33 @@ class MangaGeneratorService {
   Future<List<Map<String, dynamic>>> getStyles() async {
     try {
       final response = await _supabase.client
-          .from('ai_manga_styles')
-          .select('id, name, slug, mangaka, description, style_tags, sample_image_url, generation_count, training_status, reference_count, lora_url')
-          .eq('is_active', true)
-          .order('generation_count', ascending: false);
+          .from('ai_training_stats')
+          .select('*')
+          .order('reference_count', ascending: false);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      return [];
+      try {
+        final response = await _supabase.client
+            .from('ai_manga_styles')
+            .select('id, name, slug, mangaka, description, style_tags, sample_image_url, generation_count, training_status, reference_count, lora_url')
+            .eq('is_active', true)
+            .order('generation_count', ascending: false);
+        return List<Map<String, dynamic>>.from(response);
+      } catch (_) {
+        return [];
+      }
     }
+  }
+
+  Future<Map<String, dynamic>?> getGlobalStats() async {
+    try {
+      final response = await _supabase.client
+          .from('ai_global_stats')
+          .select('*')
+          .limit(1);
+      if (response.isNotEmpty) return response[0] as Map<String, dynamic>;
+    } catch (_) {}
+    return null;
   }
 
   Future<List<Map<String, dynamic>>> getMyGenerations({int limit = 20}) async {
@@ -97,7 +116,7 @@ class MangaGeneratorService {
 
       final refs = await _supabase.client
           .from('ai_manga_references')
-          .select('id, image_url, created_at')
+          .select('id, image_url, used_in_training, downloaded, created_at')
           .eq('style_id', styleId)
           .order('created_at', ascending: false);
 

@@ -59,7 +59,7 @@ export async function getCommunityData(): Promise<{
       supabase
         .from("categories")
         .select(
-          "slug, title, short_label, description, image, color, target_section_id",
+          "slug, name, short_label, description, icon, color, target_section_id",
         )
         .order("sort_order", { ascending: true }),
       supabase
@@ -124,10 +124,10 @@ export async function getCommunityData(): Promise<{
           (categoriesResult.data ?? []).length > 0
             ? (categoriesResult.data ?? []).map((item) => ({
                 slug: item.slug,
-                title: item.title,
+                name: item.name,
                 shortLabel: item.short_label,
                 description: item.description,
-                image: item.image,
+                icon: item.icon,
                 color: item.color,
                 targetSectionId: item.target_section_id,
               }))

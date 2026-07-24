@@ -20,6 +20,7 @@ class _MangaTrainingPageState extends State<MangaTrainingPage> {
   Map<String, dynamic>? _selectedStyle;
   List<Map<String, dynamic>> _references = [];
   Map<String, dynamic>? _trainingJob;
+  Map<String, dynamic>? _globalStats;
   bool _isLoading = true;
   bool _isUploading = false;
   bool _isTraining = false;
@@ -32,8 +33,17 @@ class _MangaTrainingPageState extends State<MangaTrainingPage> {
 
   Future<void> _load() async {
     setState(() => _isLoading = true);
-    final styles = await _service.getStyles();
-    if (mounted) setState(() { _styles = styles; _isLoading = false; });
+    final results = await Future.wait([
+      _service.getStyles(),
+      _service.getGlobalStats(),
+    ]);
+    if (mounted) {
+      setState(() {
+        _styles = results[0] as List<Map<String, dynamic>>;
+        _globalStats = results[1] as Map<String, dynamic>?;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _selectStyle(Map<String, dynamic> style) async {
@@ -102,14 +112,144 @@ class _MangaTrainingPageState extends State<MangaTrainingPage> {
           ? const Center(child: CircularProgressIndicator())
           : Row(
               children: [
-                SizedBox(
-                  width: 220,
-                  child: _buildStyleList(theme),
-                ),
+                SizedBox(width: 220, child: _buildStyleList(theme)),
                 const VerticalDivider(width: 1),
-                Expanded(child: _selectedStyle != null ? _buildTrainingPanel(theme) : _buildEmptyState(theme)),
+                Expanded(
+                  child: _selectedStyle != null
+                      ? _buildTrainingPanel(theme)
+                      : _buildDashboard(theme),
+                ),
               ],
             ),
+    );
+  }
+
+  Widget _buildDashboard(ThemeData theme) {
+    final stats = _globalStats;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Pipeline Entraînement', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: theme.textTheme.bodyLarge?.color)),
+          const SizedBox(height: 8),
+          Text('Suivi des images collectées et entraînées', style: TextStyle(fontSize: 13, color: Colors.grey[500])),
+          const SizedBox(height: 24),
+
+          if (stats != null) ...[
+            _statCard('Images collectées', '${stats['total_images_collected'] ?? 0}', Icons.collections, Colors.blue, theme),
+            const SizedBox(height: 12),
+            _statCard('Images entraînées', '${stats['total_images_trained'] ?? 0}', Icons.model_training, Colors.green, theme),
+            const SizedBox(height: 12),
+            _statCard('Générations', '${stats['total_generations'] ?? 0}', Icons.auto_awesome, Colors.orange, theme),
+            const SizedBox(height: 12),
+            _statCard('Entraînements complétés', '${stats['total_trainings_completed'] ?? 0}', Icons.check_circle, Colors.purple, theme),
+          ],
+
+          const SizedBox(height: 24),
+          Text('Styles', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: theme.textTheme.bodyLarge?.color)),
+          const SizedBox(height: 12),
+
+          ..._styles.map((s) => _stylePipelineCard(s, theme)),
+        ],
+      ),
+    );
+  }
+
+  Widget _statCard(String label, String value, IconData icon, Color color, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+              const SizedBox(height: 4),
+              Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stylePipelineCard(Map<String, dynamic> style, ThemeData theme) {
+    final name = style['name'] as String? ?? '';
+    final scraped = style['scraped_count'] as int? ?? 0;
+    final trained = style['trained_count'] as int? ?? 0;
+    final total = style['total_refs'] as int? ?? 0;
+    final status = style['training_status'] as String? ?? 'untrained';
+    final downloaded = style['downloaded_count'] as int? ?? 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              const Spacer(),
+              _statusBadge(status, total),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Barre de progression collecte → entrainement
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: SizedBox(
+              height: 8,
+              child: Row(
+                children: [
+                  Flexible(
+                    flex: total,
+                    child: Container(color: Colors.blue.withOpacity(0.5)),
+                  ),
+                  if (total == 0) Expanded(child: Container(color: Colors.grey[800])),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              _dot(Colors.blue, 'Collecté: $total'),
+              const SizedBox(width: 12),
+              _dot(Colors.green, 'Entraîné: $trained'),
+              const SizedBox(width: 12),
+              _dot(Colors.orange, 'Téléchargé: $downloaded'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 10, color: Colors.grey[400])),
+      ],
     );
   }
 
@@ -168,6 +308,8 @@ class _MangaTrainingPageState extends State<MangaTrainingPage> {
     final style = _selectedStyle!;
     final status = style['training_status'] as String? ?? 'untrained';
     final hasLora = style['lora_url'] != null;
+    final trainedCount = style['trained_count'] as int? ?? 0;
+    final totalRefs = style['total_refs'] as int? ?? 0;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -178,7 +320,49 @@ class _MangaTrainingPageState extends State<MangaTrainingPage> {
           Text('par ${style['mangaka']}', style: TextStyle(fontSize: 14, color: Colors.grey[400])),
           const SizedBox(height: 8),
           Text(style['description'] as String? ?? '', style: TextStyle(fontSize: 13, color: Colors.grey[500])),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+
+          // Tracking card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Tracking', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: theme.textTheme.bodyLarge?.color)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _trackStat('Collectées', '$totalRefs', Colors.blue),
+                    _trackStat('Entraînées', '$trainedCount', Colors.green),
+                    _trackStat('Générées', '${style['generation_count'] ?? 0}', Colors.orange),
+                  ],
+                ),
+                if (totalRefs > 0) ...[
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: SizedBox(
+                      height: 6,
+                      child: LinearProgressIndicator(
+                        value: totalRefs > 0 ? trainedCount / totalRefs : 0,
+                        backgroundColor: Colors.grey[800],
+                        color: Colors.green,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text('${totalRefs > 0 ? (trainedCount * 100 / totalRefs).toInt() : 0}% utilisé en entraînement',
+                      style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
 
           if (hasLora)
             Container(
@@ -211,13 +395,27 @@ class _MangaTrainingPageState extends State<MangaTrainingPage> {
                     separatorBuilder: (_, __) => const SizedBox(width: 8),
                     itemBuilder: (context, index) {
                       final ref = _references[index];
-                      return ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          ref['image_url'] as String? ?? '',
-                          width: 100, fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(width: 100, color: Colors.grey[800]),
-                        ),
+                      final isTrained = ref['used_in_training'] == true;
+                      return Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              ref['image_url'] as String? ?? '',
+                              width: 100, height: 140, fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(width: 100, height: 140, color: Colors.grey[800]),
+                            ),
+                          ),
+                          if (isTrained)
+                            Positioned(
+                              top: 4, right: 4,
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                                child: const Icon(Icons.check, size: 12, color: Colors.white),
+                              ),
+                            ),
+                        ],
                       );
                     },
                   ),
@@ -258,10 +456,22 @@ class _MangaTrainingPageState extends State<MangaTrainingPage> {
     );
   }
 
+  Widget _trackStat(String label, String value, Color color) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color)),
+          Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+        ],
+      ),
+    );
+  }
+
   Widget _buildJobStatus(ThemeData theme) {
     final job = _trainingJob!;
     final jobStatus = job['status'] as String? ?? 'unknown';
     final progress = (job['progress'] as num?)?.toDouble() ?? 0;
+    final refCount = job['reference_count'] as int? ?? 0;
 
     return Container(
       width: double.infinity,
@@ -302,6 +512,10 @@ class _MangaTrainingPageState extends State<MangaTrainingPage> {
               }, style: const TextStyle(fontSize: 13)),
             ],
           ),
+          if (refCount > 0) ...[
+            const SizedBox(height: 8),
+            Text('$refCount images utilisées', style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+          ],
           if (jobStatus == 'training' || jobStatus == 'preparing') ...[
             const SizedBox(height: 12),
             LinearProgressIndicator(value: progress > 0 ? progress : null, backgroundColor: Colors.grey[800], color: const Color(0xFF7C5CFC)),
@@ -317,21 +531,6 @@ class _MangaTrainingPageState extends State<MangaTrainingPage> {
               padding: const EdgeInsets.only(top: 8),
               child: Text('Terminé le ${job['completed_at']}', style: TextStyle(fontSize: 11, color: Colors.grey[500])),
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(ThemeData theme) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.brush, size: 60, color: Colors.grey[600]),
-          const SizedBox(height: 16),
-          Text('Sélectionne un style à entraîner', style: TextStyle(fontSize: 16, color: Colors.grey[500])),
-          const SizedBox(height: 8),
-          Text('Ajoute des planches manga → entraîne le LoRA →\ngénère avec le trait réel du mangaka', style: TextStyle(fontSize: 12, color: Colors.grey[600]), textAlign: TextAlign.center),
         ],
       ),
     );

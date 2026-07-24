@@ -9,15 +9,31 @@ class AuthAdvancedService {
   factory AuthAdvancedService() => _instance;
   AuthAdvancedService._();
 
-  /// Connexion avec Google
   Future<Map<String, dynamic>> signInWithGoogle() async {
     try {
-      // Sur mobile, utiliser Google Sign-In natif
-      // Sur web, utiliser OAuth popup
       final response = await _client.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: kIsWeb ? null : 'arteia://login',
+        redirectTo: kIsWeb ? null : 'io.supabase.flutter://',
+        queryParams: {
+          'access_type': 'offline',
+          'prompt': 'consent',
+        },
       );
+      
+      if (response != null) {
+        final session = _client.auth.currentSession;
+        final user = _client.auth.currentUser;
+        if (user != null) {
+          await _client.from('profiles').upsert({
+            'id': user.id,
+            'email': user.email,
+            'display_name': user.userMetadata?['full_name'] ?? user.userMetadata?['name'] ?? user.email?.split('@').first ?? 'Créateur',
+            'avatar_url': user.userMetadata?['picture'],
+            'role': 'user',
+            'updated_at': DateTime.now().toIso8601String(),
+          }, onConflict: 'id');
+        }
+      }
       
       return {'success': true, 'url': response};
     } catch (e) {
@@ -25,12 +41,11 @@ class AuthAdvancedService {
     }
   }
 
-  /// Connexion avec Apple
   Future<Map<String, dynamic>> signInWithApple() async {
     try {
       final response = await _client.auth.signInWithOAuth(
         OAuthProvider.apple,
-        redirectTo: kIsWeb ? null : 'arteia://login',
+        redirectTo: kIsWeb ? null : 'io.supabase.flutter://',
       );
       
       return {'success': true, 'url': response};
@@ -39,12 +54,11 @@ class AuthAdvancedService {
     }
   }
 
-  /// Connexion avec Twitter/X
   Future<Map<String, dynamic>> signInWithTwitter() async {
     try {
       final response = await _client.auth.signInWithOAuth(
         OAuthProvider.twitter,
-        redirectTo: kIsWeb ? null : 'arteia://login',
+        redirectTo: kIsWeb ? null : 'io.supabase.flutter://',
       );
       
       return {'success': true, 'url': response};
@@ -53,12 +67,11 @@ class AuthAdvancedService {
     }
   }
 
-  /// Connexion avec GitHub
   Future<Map<String, dynamic>> signInWithGitHub() async {
     try {
       final response = await _client.auth.signInWithOAuth(
         OAuthProvider.github,
-        redirectTo: kIsWeb ? null : 'arteia://login',
+        redirectTo: kIsWeb ? null : 'io.supabase.flutter://',
       );
       
       return {'success': true, 'url': response};
@@ -67,12 +80,11 @@ class AuthAdvancedService {
     }
   }
 
-  /// Connexion avec Discord
   Future<Map<String, dynamic>> signInWithDiscord() async {
     try {
       final response = await _client.auth.signInWithOAuth(
         OAuthProvider.discord,
-        redirectTo: kIsWeb ? null : 'arteia://login',
+        redirectTo: kIsWeb ? null : 'io.supabase.flutter://',
       );
       
       return {'success': true, 'url': response};
@@ -81,12 +93,11 @@ class AuthAdvancedService {
     }
   }
 
-  /// Connexion avec Facebook
   Future<Map<String, dynamic>> signInWithFacebook() async {
     try {
       final response = await _client.auth.signInWithOAuth(
         OAuthProvider.facebook,
-        redirectTo: kIsWeb ? null : 'arteia://login',
+        redirectTo: kIsWeb ? null : 'io.supabase.flutter://',
       );
       
       return {'success': true, 'url': response};

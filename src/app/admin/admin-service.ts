@@ -84,10 +84,10 @@ export async function syncDefaultCategories() {
   const client = ensureSupabase();
   const payload = categories.map((category, index) => ({
     slug: category.slug,
-    title: category.title,
+    name: category.name,
     short_label: category.shortLabel,
     description: category.description,
-    image: category.image,
+    icon: category.icon,
     color: category.color,
     target_section_id: category.targetSectionId,
     sort_order: index + 1,

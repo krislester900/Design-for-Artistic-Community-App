@@ -13,7 +13,7 @@ class VoteService {
     try {
       final response = await _client
           .from('competitions')
-          .select('*, category:categories!category_id(name, icon)')
+          .select('*, category:categories!category_id(title, icon)')
           .eq('status', 'active')
           .order('end_date', ascending: true)
           .limit(10);
@@ -30,7 +30,7 @@ class VoteService {
     try {
       final response = await _client
           .from('competitions')
-          .select('*, category:categories!category_id(name, icon)')
+          .select('*, category:categories!category_id(title, icon)')
           .eq('status', 'upcoming')
           .order('start_date', ascending: true)
           .limit(10);
@@ -47,7 +47,7 @@ class VoteService {
     try {
       final response = await _client
           .from('competitions')
-          .select('*, category:categories!category_id(name, icon), winner:posts!winner_id(title)')
+          .select('*, category:categories!category_id(title, icon), winner:posts!winner_id(title)')
           .eq('status', 'closed')
           .order('end_date', ascending: false)
           .limit(10);
@@ -64,7 +64,7 @@ class VoteService {
     try {
       final response = await _client
           .from('competitions')
-          .select('*, category:categories!category_id(name, icon, color), prizes:competition_prizes(*)')
+          .select('*, category:categories!category_id(title, icon, color), prizes:competition_prizes(*)')
           .eq('id', competitionId)
           .maybeSingle();
 

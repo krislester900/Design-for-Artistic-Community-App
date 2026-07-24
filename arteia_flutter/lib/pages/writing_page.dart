@@ -25,7 +25,7 @@ class _WritingPageState extends State<WritingPage> {
   bool _isSubmitting = false;
 
   final List<Map<String, dynamic>> _categories = [
-    {'slug': 'litterature', 'name': 'Littérature', 'icon': '✍️'},
+    {'slug': 'literature', 'name': 'Littérature', 'icon': '✍️'},
     {'slug': 'manga', 'name': 'Manga / BD', 'icon': '📚'},
     {'slug': 'poesie', 'name': 'Poésie', 'icon': '📜'},
     {'slug': 'nouvelle', 'name': 'Nouvelle', 'icon': '📖'},

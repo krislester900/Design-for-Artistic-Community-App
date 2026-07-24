@@ -32,11 +32,8 @@ export default defineConfig({
   },
 
   build: {
-    // Enable source maps for production debugging
     sourcemap: false,
-    // Minify aggressively
     minify: 'terser',
-    // Split chunks for better caching
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
@@ -68,15 +65,12 @@ export default defineConfig({
         },
       },
     },
-    // CSS code splitting
     cssCodeSplit: true,
-    // Optimize for mobile
     target: 'es2020',
   },
 
   assetsInclude: ['**/*.svg', '**/*.csv'],
 
-  // Development server for mobile testing
   server: {
     host: true,
     port: 5173,

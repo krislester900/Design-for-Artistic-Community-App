@@ -3,8 +3,11 @@ import { lazy, Suspense } from "react";
 import App from "./App";
 import { ArtLoadingScreen } from "./components/ArtLoadingScreen";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { VynoraPage } from "./pages/VynoraPage";
+import { MuseCarouselPage } from "./pages/MuseCarouselPage";
 
 const MultiPageApp = lazy(() => import("./pages/MultiPageApp"));
+const MuseAssistantPage = lazy(() => import("./pages/MuseAssistantPage"));
 
 function RouteWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -34,6 +37,9 @@ export function AppRouter() {
         <Route path="/animation" element={<RouteWrapper><MultiPageApp page="animation" /></RouteWrapper>} />
         <Route path="/ontology" element={<RouteWrapper><MultiPageApp page="ontology" /></RouteWrapper>} />
         <Route path="/inbox" element={<RouteWrapper><MultiPageApp page="inbox" /></RouteWrapper>} />
+        <Route path="/muse" element={<RouteWrapper><MuseAssistantPage /></RouteWrapper>} />
+        <Route path="/music-vynora" element={<RouteWrapper><VynoraPage /></RouteWrapper>} />
+        <Route path="/muse-carousel" element={<RouteWrapper><MuseCarouselPage /></RouteWrapper>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </HashRouter>

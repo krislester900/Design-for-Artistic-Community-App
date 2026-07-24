@@ -34,12 +34,22 @@ class _MusicPlayerWidgetState extends State<MusicPlayerWidget> {
     _setupPlayer();
   }
 
+  @override
+  void didUpdateWidget(MusicPlayerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.audioUrl != widget.audioUrl) {
+      _setupPlayer();
+    }
+  }
+
   Future<void> _setupPlayer() async {
     try {
-      // TODO: Remplacer par l'URL réelle du fichier audio
-      // await _audioPlayer.setUrl(widget.audioUrl);
+      setState(() => _isLoading = true);
       
-      // Simulation pour le moment
+      if (widget.audioUrl.isNotEmpty) {
+        await _audioPlayer.setUrl(widget.audioUrl);
+      }
+      
       setState(() => _isLoading = false);
       
       _audioPlayer.durationStream.listen((duration) {
@@ -47,34 +57,25 @@ class _MusicPlayerWidgetState extends State<MusicPlayerWidget> {
           setState(() => _duration = duration ?? Duration.zero);
         }
       });
-      
+
       _audioPlayer.positionStream.listen((position) {
         if (mounted) {
           setState(() => _position = position);
         }
       });
-      
+
       _audioPlayer.playerStateStream.listen((state) {
         if (mounted) {
-          setState(() => _isPlaying = state.playing);
+          setState(() {
+            _isPlaying = state.playing;
+          _isLoading = state.processingState == ProcessingState.loading;
+          });
         }
       });
     } catch (e) {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _togglePlay() async {
-    try {
-      if (_isPlaying) {
-        await _audioPlayer.pause();
-      } else {
-        // TODO: await _audioPlayer.play();
-        setState(() => _isPlaying = true);
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
-    } catch (e) {
-      // Fallback: simulation
-      setState(() => _isPlaying = !_isPlaying);
     }
   }
 
@@ -84,227 +85,136 @@ class _MusicPlayerWidgetState extends State<MusicPlayerWidget> {
     super.dispose();
   }
 
+  Future<void> _playPause() async {
+    if (_isPlaying) {
+      await _audioPlayer.pause();
+    } else {
+      await _audioPlayer.play();
+    }
+  }
+
   String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.cardDark,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
-              // Cover art
+              // Cover image
               Container(
-                width: 56,
-                height: 56,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: AppTheme.primaryViolet.withOpacity(0.2),
-                ),
-                child: widget.coverUrl != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.network(
-                          widget.coverUrl!,
+                  borderRadius: BorderRadius.circular(8),
+                  image: widget.coverUrl != null
+                      ? DecorationImage(
+                          image: NetworkImage(widget.coverUrl!),
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => const Icon(
-                            Icons.music_note,
-                            color: AppTheme.primaryViolet,
-                            size: 28,
-                          ),
-                        ),
-                      )
-                    : const Icon(
-                        Icons.music_note,
-                        color: AppTheme.primaryViolet,
-                        size: 28,
-                      ),
+                        )
+                      : null,
+                  color: theme.primaryColor.withOpacity(0.2),
+                ),
+                child: widget.coverUrl == null
+                    ? Icon(Icons.music_note, color: theme.primaryColor)
+                    : null,
               ),
               const SizedBox(width: 12),
-              // Info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       widget.title,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: theme.textTheme.bodyLarge?.color,
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (widget.artist != null)
+                    if (widget.artist != null) ...[
+                      const SizedBox(height: 2),
                       Text(
                         widget.artist!,
                         style: TextStyle(
-                          color: Colors.grey[400],
+                          color: theme.textTheme.bodySmall?.color,
                           fontSize: 12,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                    ],
                   ],
                 ),
               ),
-              // Play button
-              GestureDetector(
-                onTap: _togglePlay,
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryViolet,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    _isPlaying ? Icons.pause : Icons.play_arrow,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
+              // Play/Pause button
+              IconButton(
+                icon: _isLoading
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: theme.primaryColor,
+                        ),
+                      )
+                    : Icon(
+                        _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                        color: theme.primaryColor,
+                        size: 32,
+                      ),
+                onPressed: _isLoading ? null : _playPause,
               ),
             ],
           ),
-          const SizedBox(height: 8),
           // Progress bar
-          Row(
-            children: [
-              Text(
-                _formatDuration(_position),
-                style: TextStyle(color: Colors.grey[400], fontSize: 10),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: SliderTheme(
-                  data: SliderThemeData(
-                    trackHeight: 2,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                    activeTrackColor: AppTheme.primaryViolet,
-                    inactiveTrackColor: Colors.grey[700],
-                    thumbColor: AppTheme.primaryViolet,
-                  ),
-                  child: Slider(
-                    value: _duration.inMilliseconds > 0
-                        ? _position.inMilliseconds / _duration.inMilliseconds
-                        : 0.0,
-                    onChanged: (value) {
-                      final position = Duration(
-                        milliseconds: (value * _duration.inMilliseconds).round(),
-                      );
-                      _audioPlayer.seek(position);
-                    },
-                  ),
-                ),
-              ),
-              Text(
-                _formatDuration(_duration),
-                style: TextStyle(color: Colors.grey[400], fontSize: 10),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class MiniMusicPlayer extends StatelessWidget {
-  final String title;
-  final String? artist;
-  final VoidCallback onTap;
-
-  const MiniMusicPlayer({
-    super.key,
-    required this.title,
-    this.artist,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppTheme.cardDark,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey.withOpacity(0.2)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryTeal.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.music_note,
-                color: AppTheme.primaryTeal,
-                size: 16,
-              ),
+          if (_duration > Duration.zero) ...[
+            const SizedBox(height: 8),
+            LinearProgressIndicator(
+              value: _duration.inMilliseconds > 0
+                  ? _position.inMilliseconds / _duration.inMilliseconds
+                  : 0,
+              backgroundColor: theme.progressIndicatorTheme.color?.withOpacity(0.2),
+              color: theme.primaryColor,
             ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                  _formatDuration(_position),
+                  style: TextStyle(
+                    color: theme.textTheme.bodySmall?.color,
+                    fontSize: 10,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                if (artist != null)
-                  Text(
-                    artist!,
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 10,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                Text(
+                  _formatDuration(_duration),
+                  style: TextStyle(
+                    color: theme.textTheme.bodySmall?.color,
+                    fontSize: 10,
                   ),
+                ),
               ],
             ),
-            const SizedBox(width: 8),
-            Container(
-              width: 24,
-              height: 24,
-              decoration: const BoxDecoration(
-                color: AppTheme.primaryTeal,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.play_arrow,
-                color: Colors.white,
-                size: 14,
-              ),
-            ),
           ],
-        ),
+        ],
       ),
     );
   }

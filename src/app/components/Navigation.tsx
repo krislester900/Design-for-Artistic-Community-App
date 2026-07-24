@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Database, Gamepad2, Inbox, Menu, Palette, User, Workflow, X } from "lucide-react";
+import { Database, Gamepad2, Inbox, Menu, Music, Palette, User, Workflow, X } from "lucide-react";
 import {
   type CategorySlug,
   type SectionId,
@@ -78,6 +78,24 @@ export function Navigation({ selectedCategory, onNavigate }: NavigationProps) {
               <span className="inline-flex items-center gap-2">
                 <Gamepad2 className="h-4 w-4" />
                 Jeux
+              </span>
+            </Link>
+            <Link
+              to="/music-vynora"
+              className="hidden rounded-xl border border-border bg-card/60 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-foreground transition-colors hover:border-primary hover:text-primary md:block"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Music className="h-4 w-4" />
+                Musique
+              </span>
+            </Link>
+            <Link
+              to="/muse-carousel"
+              className="hidden rounded-xl border border-border bg-card/60 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-foreground transition-colors hover:border-primary hover:text-primary md:block"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Workflow className="h-4 w-4" />
+                Card Stack
               </span>
             </Link>
           </div>

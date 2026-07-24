@@ -15,7 +15,7 @@ class CloudinaryService {
 
   Future<void> initialize() async {
     try {
-      await dotenv.load(fileName: ".env");
+      await dotenv.load(fileName: "assets/.env");
       _cloudName = dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? 'leyyabsn';
       _uploadPreset = dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? 'Kris_ndri';
     } catch (e) {

@@ -3,7 +3,6 @@ import { useAppStore } from "../store/useAppStore";
 import { getCategoryLabel, isCategoryMatch } from "../data/community";
 import { ImageWithFallback } from "../components/ImageWithFallback";
 import { Palette, Heart, MessageCircle, Users } from "lucide-react";
-import { WelcomeBird } from "./WelcomeBird";
 
 export function MobileHome() {
   const { data, isLoading } = useCommunityDataQuery();
@@ -13,7 +12,6 @@ export function MobileHome() {
   if (isLoading) {
     return (
       <div className="mobile-home relative w-full h-full flex items-center justify-center">
-        <WelcomeBird />
         <div className="text-sm text-muted-foreground animate-pulse mt-20">Chargement...</div>
       </div>
     );
@@ -25,7 +23,6 @@ export function MobileHome() {
 
   return (
     <div className="mobile-home relative w-full h-full overflow-y-auto pb-24">
-      <WelcomeBird />
 
       <div className="p-4 space-y-6">
         {/* Header */}

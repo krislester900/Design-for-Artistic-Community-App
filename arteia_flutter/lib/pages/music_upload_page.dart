@@ -94,10 +94,10 @@ class _MusicUploadPageState extends State<MusicUploadPage> {
     try {
       final fileName = 'music_covers/${DateTime.now().millisecondsSinceEpoch}.jpg';
       await _supabase.client.storage
-          .from('posts')
+          .from('artworks')
           .upload(fileName, _coverImage!);
       _coverImageUrl = _supabase.client.storage
-          .from('posts')
+          .from('artworks')
           .getPublicUrl(fileName);
     } catch (e) {
       if (mounted) {
@@ -116,10 +116,10 @@ class _MusicUploadPageState extends State<MusicUploadPage> {
     try {
       final fileName = 'music_tracks/${DateTime.now().millisecondsSinceEpoch}.m4a';
       await _supabase.client.storage
-          .from('posts')
+          .from('artworks')
           .upload(fileName, _audioFile!);
       _audioUrl = _supabase.client.storage
-          .from('posts')
+          .from('artworks')
           .getPublicUrl(fileName);
     } catch (e) {
       if (mounted) {
@@ -176,7 +176,7 @@ class _MusicUploadPageState extends State<MusicUploadPage> {
 
       await _apiService.createPost({
         'user_id': user.id,
-        'category_slug': 'musique',
+        'category_slug': 'music',
         'title': _titleController.text.trim(),
         'description': _descriptionController.text.trim(),
         'image_url': _coverImageUrl ?? '',

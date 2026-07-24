@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import '../services/voice_recorder_service.dart';
 import '../services/word_predictor_service.dart';
+import '../services/local_chat_repository.dart';
 import '../widgets/thought_bubble_audio.dart';
 import '../widgets/suggestion_overlay.dart';
 
@@ -21,6 +22,7 @@ class _ChatPageState extends State<ChatPage> {
   final WordPredictorService _predictor = WordPredictorService();
   final SupabaseClient _supabase = Supabase.instance.client;
   final FocusNode _focusNode = FocusNode();
+  final LocalChatRepository _localRepo = LocalChatRepository();
 
   List<Map<String, dynamic>> _messages = [];
   bool _isRecording = false;
@@ -32,6 +34,8 @@ class _ChatPageState extends State<ChatPage> {
   String? _voiceRecordingPath;
   int _voiceRecordSeconds = 0;
   Timer? _voiceTimer;
+  StreamSubscription? _networkTick;
+  bool _isOnline = true;
 
   @override
   void initState() {
@@ -40,6 +44,14 @@ class _ChatPageState extends State<ChatPage> {
     _setupRealtimeSubscription();
     _focusNode.addListener(() {
       if (!_focusNode.hasFocus) setState(() => _showSuggestions = false);
+    });
+    _localRepo.init();
+    _listenToNetwork();
+  }
+
+  void _listenToNetwork() {
+    _networkTick = Stream.periodic(const Duration(seconds: 10)).listen((_) {
+      if (_isOnline) _syncPendingMessages();
     });
   }
 
@@ -58,9 +70,9 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _loadDefaultChannel() async {
     try {
       final channels = await _supabase
-          .from('channels')
+          .from('chat_channels')
           .select('id')
-          .eq('type', 'general')
+          .eq('slug', 'general')
           .limit(1);
       if (channels.isNotEmpty) {
         _defaultChannelId = channels[0]['id']?.toString();
@@ -70,24 +82,24 @@ class _ChatPageState extends State<ChatPage> {
 
   void _setupRealtimeSubscription() {
     _supabase
-        .channel('public:messages')
+        .channel('public:chat_messages')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
-          table: 'messages',
+          table: 'chat_messages',
           callback: (payload) {
             if (mounted) {
               final newMsg = payload.newRecord;
               setState(() {
                 _messages.add({
                   'id': newMsg['id'].toString(),
-                  'user': newMsg['user_name'] ?? 'Anonyme',
+                  'user': newMsg['author_name'] ?? 'Anonyme',
                   'text': newMsg['content'] ?? '',
                   'time': _formatTime(newMsg['created_at']?.toString() ?? ''),
-                  'isMe': newMsg['user_id'] == _currentUserId,
-                  'isVoice': newMsg['is_voice'] ?? false,
+                  'isMe': newMsg['author_id'] == _currentUserId,
+                  'isVoice': newMsg['message_type'] == 'voice',
                   'voiceUrl': newMsg['voice_url'],
-                  'voiceDuration': newMsg['voice_duration'] ?? 0,
+                  'voiceDuration': 0,
                 });
               });
               _scrollToBottom();
@@ -99,22 +111,44 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _loadMessages() async {
     try {
+      final localMessages = await _localRepo.getMessages(_defaultChannelId ?? 'general');
+      if (localMessages.isNotEmpty && mounted) {
+        setState(() {
+          _messages = localMessages.map((msg) {
+            final profile = msg['profiles'] as Map<String, dynamic>?;
+            return {
+              'id': msg['id'].toString(),
+              'user': profile?['display_name'] ?? _currentUserName ?? 'Anonyme',
+              'text': msg['content'] ?? '',
+              'time': _formatTime(msg['created_at']?.toString() ?? ''),
+              'isMe': msg['author_id'] == _currentUserId,
+              'isVoice': msg['message_type'] == 'voice',
+              'voiceUrl': msg['voice_url'],
+              'voiceDuration': msg['voice_duration'] ?? 0,
+            };
+          }).toList();
+          _isLoading = false;
+        });
+        _scrollToBottom();
+      }
+
       final response = await _supabase
-          .from('messages')
-          .select('*')
+          .from('chat_messages')
+          .select('*, profiles(display_name, avatar_url)')
           .order('created_at', ascending: true)
           .limit(50);
 
       if (mounted) {
         setState(() {
           _messages = (response as List).map((msg) {
+            final profile = msg['profiles'] as Map<String, dynamic>?;
             return {
               'id': msg['id'].toString(),
-              'user': msg['user_name'] ?? 'Anonyme',
+              'user': profile?['display_name'] ?? _currentUserName ?? 'Anonyme',
               'text': msg['content'] ?? '',
               'time': _formatTime(msg['created_at']?.toString() ?? ''),
-              'isMe': msg['user_id'] == _currentUserId,
-              'isVoice': msg['is_voice'] ?? false,
+              'isMe': msg['author_id'] == _currentUserId,
+              'isVoice': msg['message_type'] == 'voice',
               'voiceUrl': msg['voice_url'],
               'voiceDuration': msg['voice_duration'] ?? 0,
             };
@@ -124,48 +158,96 @@ class _ChatPageState extends State<ChatPage> {
         _scrollToBottom();
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
+    if (_currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connectez-vous pour envoyer un message')),
+      );
+      return;
+    }
 
     _predictor.learn(text);
     setState(() => _showSuggestions = false);
+    _messageController.clear();
+
+    final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+    final localMessage = {
+      'id': tempId,
+      'user': _currentUserName ?? 'Moi',
+      'text': text,
+      'time': DateTime.now().toString().substring(11, 16),
+      'isMe': true,
+      'isVoice': false,
+      'voiceUrl': null,
+      'voiceDuration': 0,
+      'channel_id': _defaultChannelId,
+      'author_id': _currentUserId,
+      'content': text,
+      'message_type': 'text',
+      'synced': false,
+    };
+
+    if (!_isOnline) {
+      await _localRepo.saveMessage(Map<String, dynamic>.from(localMessage));
+      await _localRepo.enqueuePending(localMessage);
+      if (mounted) {
+        setState(() => _messages.add(localMessage));
+        _scrollToBottom();
+      }
+      return;
+    }
 
     try {
-      await _supabase.from('messages').insert({
+      await _supabase.from('chat_messages').insert({
         'channel_id': _defaultChannelId,
-        'user_id': _currentUserId ?? 'anonymous',
-        'user_name': _currentUserName ?? 'Utilisateur',
+        'author_id': _currentUserId,
         'content': text,
-        'is_voice': false,
-        'created_at': DateTime.now().toIso8601String(),
+        'message_type': 'text',
       });
-      _messageController.clear();
+
+      await _localRepo.saveMessage(Map<String, dynamic>.from({
+        ...localMessage,
+        'synced': true,
+      }));
     } catch (e) {
+      await _localRepo.saveMessage(Map<String, dynamic>.from(localMessage));
+      await _localRepo.enqueuePending(localMessage);
       if (mounted) {
-        setState(() {
-          _messages.add({
-            'id': DateTime.now().toString(),
-            'user': _currentUserName ?? 'Moi',
-            'text': text,
-            'time': DateTime.now().toString().substring(11, 16),
-            'isMe': true,
-            'isVoice': false,
-          });
-        });
-        _messageController.clear();
+        setState(() => _messages.add(localMessage));
         _scrollToBottom();
       }
     }
   }
 
+  Future<void> _syncPendingMessages() async {
+    if (!_localRepo.isAvailable) return;
+    final pending = await _localRepo.drainPendingQueue();
+    for (final msg in pending) {
+      try {
+        await _supabase.from('chat_messages').insert({
+          'channel_id': msg['channel_id'] ?? _defaultChannelId,
+          'author_id': msg['author_id'] ?? _currentUserId,
+          'content': msg['content'] ?? msg['text'],
+          'message_type': msg['message_type'] ?? 'text',
+          'voice_url': msg['voice_url'],
+          'voice_duration': msg['voice_duration'] ?? 0,
+        });
+        await _localRepo.markSynced(msg['id'].toString());
+      } catch (_) {}
+    }
+  }
+
   void _startRecording() {
+    if (_isRecording) {
+      _stopRecording();
+      return;
+    }
     _voiceRecorder.startRecording().then((path) {
       if (path != null && mounted) {
         setState(() {
@@ -212,6 +294,34 @@ class _ChatPageState extends State<ChatPage> {
     try {
       final audioFile = File(_voiceRecordingPath!);
       final audioFileName = 'voice_messages/${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+
+      if (!_isOnline) {
+        final fallbackMessage = {
+          'id': tempId,
+          'user': _currentUserName ?? 'Moi',
+          'text': '🎤 Message vocal (${_voiceRecordSeconds}s)',
+          'time': DateTime.now().toString().substring(11, 16),
+          'isMe': true,
+          'isVoice': true,
+          'voiceUrl': null,
+          'voiceDuration': _voiceRecordSeconds,
+          'channel_id': _defaultChannelId,
+          'author_id': _currentUserId,
+          'content': '🎤 Message vocal',
+          'message_type': 'voice',
+          'voice_url': null,
+          'voice_duration': _voiceRecordSeconds,
+          'synced': false,
+        };
+        await _localRepo.saveMessage(Map<String, dynamic>.from(fallbackMessage));
+        await _localRepo.enqueuePending(fallbackMessage);
+        if (mounted) {
+          setState(() => _messages.add(fallbackMessage));
+          _scrollToBottom();
+        }
+        return;
+      }
 
       await _supabase.storage
           .from('voice-messages')
@@ -221,16 +331,26 @@ class _ChatPageState extends State<ChatPage> {
           .from('voice-messages')
           .getPublicUrl(audioFileName);
 
-      await _supabase.from('messages').insert({
+      await _supabase.from('chat_messages').insert({
         'channel_id': _defaultChannelId,
-        'user_id': _currentUserId ?? 'anonymous',
-        'user_name': _currentUserName ?? 'Utilisateur',
+        'author_id': _currentUserId,
         'content': '🎤 Message vocal',
-        'is_voice': true,
+        'message_type': 'voice',
+        'voice_url': voiceUrl,
+        'voice_duration': _voiceRecordSeconds,
+      });
+
+      await _localRepo.saveMessage(Map<String, dynamic>.from({
+        'id': tempId,
+        'channel_id': _defaultChannelId,
+        'author_id': _currentUserId,
+        'content': '🎤 Message vocal',
+        'message_type': 'voice',
         'voice_url': voiceUrl,
         'voice_duration': _voiceRecordSeconds,
         'created_at': DateTime.now().toIso8601String(),
-      });
+        'synced': true,
+      }));
 
       _voiceRecorder.deleteRecording();
       _voiceRecordingPath = null;
@@ -279,6 +399,7 @@ class _ChatPageState extends State<ChatPage> {
     _messageController.dispose();
     _scrollController.dispose();
     _voiceTimer?.cancel();
+    _networkTick?.cancel();
     _voiceRecorder.dispose();
     super.dispose();
   }
@@ -355,8 +476,7 @@ class _ChatPageState extends State<ChatPage> {
       child: Row(
         children: [
           GestureDetector(
-            onLongPress: _isRecording ? null : _startRecording,
-            onLongPressUp: _isRecording ? _stopRecording : null,
+            onTap: _isRecording ? null : _startRecording,
             child: Container(
               width: 44, height: 44,
               decoration: BoxDecoration(

@@ -38,15 +38,15 @@ class _ReadingModePageState extends State<ReadingModePage> {
 
   CategoryTheme _getThemeForCategory(String category) {
     switch (category.toLowerCase()) {
-      case 'musique':
+      case 'music':
         return CategoryThemes.music;
-      case 'films':
+      case 'film':
         return CategoryThemes.film;
-      case 'art visuel':
+      case 'visual-art':
         return CategoryThemes.visualArt;
       case 'manga':
         return CategoryThemes.manga;
-      case 'littérature':
+      case 'literature':
         return CategoryThemes.literature;
       case 'animation':
         return CategoryThemes.animation;

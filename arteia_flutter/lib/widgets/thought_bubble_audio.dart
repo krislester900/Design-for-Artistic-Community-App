@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../theme/app_theme.dart';
 
 class ThoughtBubbleAudio extends StatefulWidget {
   final String? audioUrl;
+  final String? cachedPath;
   final String? text;
   final String authorName;
   final String? authorAvatar;
@@ -15,6 +17,7 @@ class ThoughtBubbleAudio extends StatefulWidget {
   const ThoughtBubbleAudio({
     super.key,
     this.audioUrl,
+    this.cachedPath,
     this.text,
     required this.authorName,
     this.authorAvatar,
@@ -81,14 +84,17 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
   }
 
   Future<void> _togglePlayPause() async {
-    if (widget.audioUrl == null) return;
+    if (widget.audioUrl == null && widget.cachedPath == null) return;
 
     try {
       if (widget.isPlaying) {
         await _audioPlayer.pause();
       } else {
         setState(() => _isLoading = true);
-        await _audioPlayer.play(UrlSource(widget.audioUrl!));
+        final source = !kIsWeb && widget.cachedPath != null
+            ? DeviceFileSource(widget.cachedPath!)
+            : UrlSource(widget.audioUrl!);
+        await _audioPlayer.play(source);
         setState(() => _isLoading = false);
       }
       if (widget.onPlayPause != null) {
@@ -123,13 +129,13 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
           color: AppTheme.cardDark,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: widget.isPlaying 
-                ? Colors.white.withOpacity(0.5) 
-                : Colors.grey.withOpacity(0.2),
+            color: widget.isPlaying
+                ? Colors.white.withValues(alpha: 0.5)
+                : Colors.grey.withValues(alpha: 0.2),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withValues(alpha: 0.2),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -138,7 +144,6 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Author info
             Row(
               children: [
                 Container(
@@ -170,7 +175,7 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(
@@ -180,8 +185,7 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
                   ),
               ],
             ),
-            
-            // Thought text (if provided)
+
             if (widget.text != null && widget.text!.isNotEmpty) ...[
               const SizedBox(height: 12),
               Container(
@@ -210,14 +214,12 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
                 ),
               ),
             ],
-            
+
             const SizedBox(height: 12),
-            
-            // Audio player controls (only if audio exists)
-            if (widget.audioUrl != null) ...[
+
+            if (widget.audioUrl != null || widget.cachedPath != null) ...[
               Row(
                 children: [
-                  // Play/Pause button
                   GestureDetector(
                     onTap: _isLoading ? null : _togglePlayPause,
                     child: Container(
@@ -228,7 +230,7 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
                         borderRadius: BorderRadius.circular(22),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.white.withOpacity(0.3),
+                            color: Colors.white.withValues(alpha: 0.3),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -250,10 +252,9 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
                             ),
                     ),
                   ),
-                  
+
                   const SizedBox(width: 12),
-                  
-                  // Progress bar and time
+
                   Expanded(
                     child: Column(
                       children: [
@@ -287,10 +288,9 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
                       ],
                     ),
                   ),
-                  
+
                   const SizedBox(width: 12),
-                  
-                  // Audio wave icon
+
                   Icon(
                     Icons.graphic_eq,
                     size: 20,
@@ -308,6 +308,7 @@ class _ThoughtBubbleAudioState extends State<ThoughtBubbleAudio> {
 
 class ThoughtBubbleAudioPlayer extends StatefulWidget {
   final String audioUrl;
+  final String? cachedPath;
   final String? text;
   final String authorName;
   final String? authorAvatar;
@@ -316,6 +317,7 @@ class ThoughtBubbleAudioPlayer extends StatefulWidget {
   const ThoughtBubbleAudioPlayer({
     super.key,
     required this.audioUrl,
+    this.cachedPath,
     this.text,
     required this.authorName,
     this.authorAvatar,
@@ -363,7 +365,10 @@ class _ThoughtBubbleAudioPlayerState extends State<ThoughtBubbleAudioPlayer> {
       if (_isPlaying) {
         await _audioPlayer.pause();
       } else {
-        await _audioPlayer.play(UrlSource(widget.audioUrl));
+        final source = !kIsWeb && widget.cachedPath != null
+            ? DeviceFileSource(widget.cachedPath!)
+            : UrlSource(widget.audioUrl);
+        await _audioPlayer.play(source);
       }
     } catch (e) {
       if (mounted) {
@@ -374,16 +379,11 @@ class _ThoughtBubbleAudioPlayerState extends State<ThoughtBubbleAudioPlayer> {
     }
   }
 
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
-  }
-
   @override
   Widget build(BuildContext context) {
     return ThoughtBubbleAudio(
       audioUrl: widget.audioUrl,
+      cachedPath: widget.cachedPath,
       text: widget.text,
       authorName: widget.authorName,
       authorAvatar: widget.authorAvatar,
