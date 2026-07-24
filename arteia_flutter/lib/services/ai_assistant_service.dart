@@ -52,8 +52,19 @@ class AiAssistantService {
   ];
 
   String _selectModel(String message) {
-    // Toujours utiliser Qwen 2.5 Coder 7B
-    return 'qwen2.5-coder:7b';
+    final lower = message.toLowerCase();
+    final wordCount = lower.split(' ').where((w) => w.isNotEmpty).length;
+
+    final artisticKeywords = ['dessin', 'peinture', 'musique', 'compose', 'mélodie', 'sculpture', 'planche', 'bd', 'manga', 'anime', 'écrire', 'poème', 'haiku', 'roman', 'scénario', 'storyboard', ' illustration'];
+    final factualKeywords = ['qui est', 'qu\'est-ce que', 'c\'est quoi', 'définition', 'histoire de', 'origine', 'population', 'capitale', 'président', 'découverte', 'invention', 'météo', 'heure', 'date', 'capital of', 'president of', 'population of', 'weather', 'time in'];
+    final isArtistic = artisticKeywords.any(lower.contains);
+    final isFactual = factualKeywords.any(lower.contains) || lower.contains('?');
+
+    if (isFactual && wordCount > 15) return 'meta-llama/llama-3.1-70b';
+    if (isArtistic && wordCount > 10) return 'meta-llama/llama-3.1-70b';
+    if (isFactual || isArtistic) return 'meta-llama/llama-3.1-8b';
+    if (wordCount > 20) return 'meta-llama/llama-3.1-70b';
+    return 'meta-llama/llama-3.1-8b';
   }
 
   bool _needsWebSearch(String message) {
@@ -158,6 +169,7 @@ class AiAssistantService {
 
     await _loadConfig();
 
+    final selectedModel = _selectModel(message);
     final personalizationContext = _buildPersonalizationContext(prefs, relationshipMemory, habitsAnalysis);
 
     // 1. RAG : Récupérer les connaissances pertinentes
@@ -195,12 +207,12 @@ class AiAssistantService {
       } catch (_) {}
     }
 
-    // 5. Essayer OpenRouter (modèles open-source performants)
+    // 5. Essayer OpenRouter avec le modèle adapté à la complexité
     if (_openRouterApiKey.isNotEmpty) {
       try {
-        final openRouterResponse = await _tryOpenRouter(message, contentType, history, relevantKnowledge, webResults, personalizationContext);
+        final openRouterResponse = await _tryOpenRouter(message, contentType, history, relevantKnowledge, webResults, personalizationContext, model: selectedModel);
         if (openRouterResponse != null) {
-          await _saveConversation(message, openRouterResponse, contentType);
+          await _saveConversation(message, openRouterResponse, contentType, model: selectedModel);
           await _updateMemoryFromMessage(message, userId);
           return openRouterResponse;
         }
@@ -293,6 +305,7 @@ class AiAssistantService {
     if (_groqApiKey.isEmpty) return null;
 
     try {
+      debugPrint('[IA] Groq: trying model llama-3.1-8b-instant');
       final messages = <Map<String, dynamic>>[];
       
       final systemContent = StringBuffer();
@@ -337,19 +350,22 @@ class AiAssistantService {
           'Authorization': 'Bearer $_groqApiKey',
         },
         body: jsonEncode({
-          'model': 'llama-3.1-8b-instant', // Modèle rapide et gratuit
+          'model': 'llama-3.1-8b-instant',
           'messages': messages,
-          'temperature': 0.8, // Plus créatif et adaptatif
-          'max_tokens': 1000, // Réponses plus longues et complètes
+          'temperature': 0.8,
+          'max_tokens': 1000,
         }),
       ).timeout(const Duration(seconds: 15));
 
+      debugPrint('[IA] Groq status: ${response.statusCode}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final content = data['choices']?[0]?['message']?['content'] as String?;
         if (content != null && content.isNotEmpty) return content;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[IA] Groq error: $e');
+    }
     return null;
   }
 
@@ -362,6 +378,7 @@ class AiAssistantService {
     if (_hfApiKey.isEmpty) return null;
 
     try {
+      debugPrint('[IA] HuggingFace: trying model mistralai/Mistral-7B-Instruct-v0.3');
       final prompt = StringBuffer();
       if (knowledge.isNotEmpty) {
         prompt.write('Contexte : ${knowledge.first['content']}\n\n');
@@ -384,6 +401,7 @@ class AiAssistantService {
         }),
       ).timeout(const Duration(seconds: 30));
 
+      debugPrint('[IA] HuggingFace status: ${response.statusCode}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as List;
         if (data.isNotEmpty) {
@@ -395,7 +413,9 @@ class AiAssistantService {
           }
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[IA] HuggingFace error: $e');
+    }
     return null;
   }
 
@@ -405,8 +425,9 @@ class AiAssistantService {
     List<Map<String, String>>? history,
     List<Map<String, dynamic>> knowledge,
     String? webResults,
-    String personalizationContext,
-  ) async {
+    String personalizationContext, {
+    String? model,
+  }) async {
     if (_openRouterApiKey.isEmpty) return null;
 
     try {
@@ -447,6 +468,9 @@ class AiAssistantService {
       }
       messages.add({'role': 'user', 'content': message});
 
+      final selectedModel = model ?? _openRouterModel;
+      debugPrint('[IA] OpenRouter: trying model $selectedModel');
+
       final response = await http.post(
         Uri.parse(_buildOpenRouterUrl()),
         headers: {
@@ -456,19 +480,22 @@ class AiAssistantService {
           'X-Title': 'Arteia Muse',
         },
         body: jsonEncode({
-          'model': _openRouterModel,
+          'model': selectedModel,
           'messages': messages,
           'temperature': 0.8,
           'max_tokens': 1000,
         }),
       ).timeout(const Duration(seconds: 30));
 
+      debugPrint('[IA] OpenRouter status: ${response.statusCode}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final content = data['choices']?[0]?['message']?['content'] as String?;
         if (content != null && content.isNotEmpty) return content;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[IA] OpenRouter error: $e');
+    }
     return null;
   }
 
@@ -489,6 +516,7 @@ class AiAssistantService {
     for (final baseUrl in urls) {
       for (final model in _buildModelList(preferredModel)) {
         try {
+          debugPrint('[IA] Ollama: trying $model on $baseUrl');
           final ollamaMessages = <Map<String, dynamic>>[];
           
           final systemContent = StringBuffer();
@@ -538,8 +566,12 @@ class AiAssistantService {
             final data = jsonDecode(response.body) as Map<String, dynamic>;
             final content = data['message']?['content'] as String?;
             if (content != null && content.isNotEmpty) return content;
+          } else {
+            debugPrint('[IA] Ollama status: ${response.statusCode}');
           }
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('[IA] Ollama error: $e');
+        }
       }
     }
     return null;
@@ -593,7 +625,7 @@ class AiAssistantService {
   }
 
   /// Enregistrer la conversation dans la base de données
-  Future<void> _saveConversation(String userMessage, String assistantReply, String category) async {
+  Future<void> _saveConversation(String userMessage, String assistantReply, String category, {String? model}) async {
     try {
       final session = _supabase.client.auth.currentSession;
       if (session == null) return;
@@ -603,8 +635,8 @@ class AiAssistantService {
         'category': category,
         'user_message': userMessage,
         'assistant_reply': assistantReply,
-        'model_used': 'qwen3:8b', // Peut être amélioré
-        'response_time_ms': 0, // À mesurer
+        'model_used': model ?? 'unknown',
+        'response_time_ms': 0,
       });
     } catch (e) {
       // Silencieux : ne pas bloquer la conversation si l'enregistrement échoue
