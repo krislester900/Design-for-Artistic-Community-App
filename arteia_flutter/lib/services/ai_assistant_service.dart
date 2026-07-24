@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'supabase_service.dart';
 import 'memory_service.dart';
 
@@ -19,6 +20,20 @@ class AiAssistantService {
   // Inscrivez-vous sur https://huggingface.co pour obtenir un token
   static const String _hfApiKey = ''; // Ajoutez votre token HuggingFace ici
   static const String _hfUrl = 'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3';
+
+  String _openRouterApiKey = '';
+  String _openRouterModel = 'meta-llama/llama-3.1-70b';
+
+  Future<void> _loadOpenRouterConfig() async {
+    try {
+      final env = dotenv.env;
+      _openRouterApiKey = (env['OPENROUTER_API_KEY'] ?? '').trim();
+      final model = (env['OPENROUTER_MODEL'] ?? '').trim();
+      if (model.isNotEmpty) _openRouterModel = model;
+    } catch (_) {}
+  }
+
+  String _buildOpenRouterUrl() => 'https://openrouter.ai/api/v1/chat/completions';
   
   // Ollama (serveur local ou cloud)
   static const String _ollamaUrl = 'http://localhost:11434/api/chat';
@@ -140,12 +155,14 @@ class AiAssistantService {
       // Supabase not initialized or unavailable; continue without personalization
     }
 
+    await _loadOpenRouterConfig();
+
     final personalizationContext = _buildPersonalizationContext(prefs, relationshipMemory, habitsAnalysis);
 
     // 1. RAG : Récupérer les connaissances pertinentes
     final relevantKnowledge = await _getRelevantKnowledge(message, contentType);
 
-    final hasRemoteApi = _groqApiKey.isNotEmpty || _hfApiKey.isNotEmpty;
+    final hasRemoteApi = _groqApiKey.isNotEmpty || _hfApiKey.isNotEmpty || _openRouterApiKey.isNotEmpty;
 
     // 2. Recherche web seulement si un provider distant est actif
     String? webResults;
@@ -177,7 +194,19 @@ class AiAssistantService {
       } catch (_) {}
     }
 
-    // 5. Essayer Ollama seulement si un provider distant est actif et pas sur web
+    // 5. Essayer OpenRouter (modèles open-source performants)
+    if (_openRouterApiKey.isNotEmpty) {
+      try {
+        final openRouterResponse = await _tryOpenRouter(message, contentType, history, relevantKnowledge, webResults, personalizationContext);
+        if (openRouterResponse != null) {
+          await _saveConversation(message, openRouterResponse, contentType);
+          await _updateMemoryFromMessage(message, userId);
+          return openRouterResponse;
+        }
+      } catch (_) {}
+    }
+
+    // 6. Essayer Ollama seulement si un provider distant est actif et pas sur web
     if (hasRemoteApi && !kIsWeb) {
       try {
         final ollamaResponse = await _tryOllama(message, contentType, history, relevantKnowledge, webResults, personalizationContext);
@@ -332,7 +361,6 @@ class AiAssistantService {
     if (_hfApiKey.isEmpty) return null;
 
     try {
-      // Construire le prompt
       final prompt = StringBuffer();
       if (knowledge.isNotEmpty) {
         prompt.write('Contexte : ${knowledge.first['content']}\n\n');
@@ -360,12 +388,84 @@ class AiAssistantService {
         if (data.isNotEmpty) {
           final generated = data[0]['generated_text'] as String?;
           if (generated != null && generated.isNotEmpty) {
-            // Extraire seulement la réponse de l'assistant
             final parts = generated.split('Assistant :');
             if (parts.length > 1) return parts.last.trim();
             return generated;
           }
         }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<String?> _tryOpenRouter(
+    String message,
+    String contentType,
+    List<Map<String, String>>? history,
+    List<Map<String, dynamic>> knowledge,
+    String? webResults,
+    String personalizationContext,
+  ) async {
+    if (_openRouterApiKey.isEmpty) return null;
+
+    try {
+      final messages = <Map<String, String>>[];
+
+      final systemContent = StringBuffer();
+      systemContent.write('Tu es Arteïa Muse, une IA créative pour artistes.');
+      systemContent.write(' Tu parles français, ton style est poétique, visuel et inspirant.');
+      systemContent.write(' Tu réponds en 2-3 phrases max, avec des métaphores artistiques quand c\'est pertinent.');
+      systemContent.write(' Tu ne donnes pas de longs blocs de texte : préfère des phrases rythmées, imagées, musicales.');
+      systemContent.write(' Si on te demande du code, donne un exemple court et commenté.');
+      systemContent.write(' Si des résultats web sont fournis, utilise-les pour répondre précisément.');
+
+      if (personalizationContext.isNotEmpty) {
+        systemContent.write('\n\nContexte personnalisé : $personalizationContext');
+      }
+
+      if (knowledge.isNotEmpty) {
+        systemContent.write('\n\nConnaissances :\n');
+        for (final k in knowledge.take(2)) {
+          systemContent.write('- ${k['title']}: ${k['content']}\n');
+        }
+      }
+
+      if (webResults != null && webResults.isNotEmpty) {
+        systemContent.write('\n\nRésultats web :\n');
+        systemContent.write(webResults);
+        systemContent.write('\n\nBase-toi sur ces résultats pour répondre précisément.');
+      }
+
+      messages.add({'role': 'system', 'content': systemContent.toString()});
+
+      if (history != null) {
+        for (final msg in history.take(10)) {
+          final role = msg['role'] == 'assistant' ? 'assistant' : 'user';
+          messages.add({'role': role, 'content': msg['content'] ?? ''});
+        }
+      }
+      messages.add({'role': 'user', 'content': message});
+
+      final response = await http.post(
+        Uri.parse(_buildOpenRouterUrl()),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_openRouterApiKey',
+          'HTTP-Referer': 'https://arteia.app',
+          'X-Title': 'Arteia Muse',
+        },
+        body: jsonEncode({
+          'model': _openRouterModel,
+          'messages': messages,
+          'temperature': 0.8,
+          'max_tokens': 1000,
+        }),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final content = data['choices']?[0]?['message']?['content'] as String?;
+        if (content != null && content.isNotEmpty) return content;
       }
     } catch (_) {}
     return null;
