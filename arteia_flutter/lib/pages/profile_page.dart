@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../theme/app_theme.dart';
+import '../widgets/empty_state.dart';
 import 'auth_page.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -219,6 +220,34 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     }
   }
 
+  Future<void> _updatePhone() async {
+    final current = _profile?['phone_number']?.toString() ?? '';
+    final controller = TextEditingController(text: current);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Modifier le téléphone'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.phone,
+          decoration: const InputDecoration(hintText: '+33612345678'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: const Text('Enregistrer')),
+        ],
+      ),
+    );
+    if (result == null || result.isEmpty) return;
+    try {
+      await _supabase.from('profiles').update({'phone_number': result}).eq('id', _targetUserId);
+      setState(() => _profile?['phone_number'] = result);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Téléphone mis à jour'), backgroundColor: AppTheme.primaryTeal));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e'), backgroundColor: AppTheme.primaryPink));
+    }
+  }
+
   Future<void> _pickFont(BuildContext context) async {
     final fonts = ['Default', 'Roboto', 'Open Sans', 'Montserrat', 'Poppins', 'Lato', 'Oswald', 'Raleway', 'Nunito', 'Playfair Display', 'Bebas Neue', 'Work Sans', 'Space Grotesk', 'Inter', 'Permanent Marker', 'Caveat'];
     final selected = await showDialog<String>(
@@ -274,7 +303,15 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryViolet))
           : _profile == null
-              ? _buildNotFound()
+              ? EmptyState(
+                  icon: Icons.person_off_rounded,
+                  title: 'Profil introuvable',
+                  subtitle: 'Ce profil n\'existe pas ou a été supprimé.',
+                  actionLabel: 'Explorer',
+                  onAction: () {
+                    // TODO: navigation vers l'exploration
+                  },
+                )
               : _buildProfileView(),
     );
   }
@@ -282,48 +319,13 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   Widget _buildGuestView() {
     return Scaffold(
       backgroundColor: AppTheme.bgDark,
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 100, height: 100,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [AppTheme.primaryViolet, AppTheme.primaryTeal]),
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                child: const Icon(Icons.person, color: Colors.white, size: 50),
-              ),
-              const SizedBox(height: 24),
-              const Text('Rejoignez Artéïa', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
-              const SizedBox(height: 12),
-              Text(
-                'Connectez-vous pour accéder à votre profil, vos créations et interagir avec la communauté.',
-                style: TextStyle(color: AppTheme.textMuted, fontSize: 15),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: _goToAuth,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryViolet,
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                child: const Text('Se connecter / S\'inscrire', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-        ),
+      body: EmptyState(
+        icon: Icons.person_outline,
+        title: 'Rejoignez Artéïa',
+        subtitle: 'Connectez-vous pour accéder à votre profil, vos créations et interagir avec la communauté.',
+        actionLabel: 'Se connecter / S\'inscrire',
+        onAction: _goToAuth,
       ),
-    );
-  }
-
-  Widget _buildNotFound() {
-    return const Center(
-      child: Text('Profil introuvable', style: TextStyle(color: Colors.white54)),
     );
   }
 
@@ -548,6 +550,30 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                   const Text('Biographie', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 8),
                   Text(bio, style: TextStyle(color: AppTheme.textMuted, fontSize: 14, height: 1.6)),
+                  const SizedBox(height: 20),
+                ],
+                const Divider(color: Colors.white12),
+                const SizedBox(height: 16),
+                if (_isOwnProfile) ...[
+                  const Text('Téléphone', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _profile?['phone_number']?.toString().isEmpty ?? true
+                              ? 'Non renseigné'
+                              : _profile!['phone_number'].toString(),
+                          style: TextStyle(color: AppTheme.textMuted, fontSize: 14),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _updatePhone,
+                        icon: const Icon(Icons.edit_rounded, size: 16, color: Colors.white70),
+                        label: const Text('Modifier', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 20),
                 ],
                 if (_isOwnProfile) ...[

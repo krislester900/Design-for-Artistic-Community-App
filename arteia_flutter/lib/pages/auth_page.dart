@@ -23,6 +23,29 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  String _selectedCountryCode = '+33';
+  final List<_CountryCode> _countryCodes = [
+    _CountryCode('FR', '+33'),
+    _CountryCode('US', '+1'),
+    _CountryCode('GB', '+44'),
+    _CountryCode('DE', '+49'),
+    _CountryCode('CA', "+1"),
+    _CountryCode('AU', '+61'),
+    _CountryCode('BR', '+55'),
+    _CountryCode('IN', '+91'),
+    _CountryCode('JP', '+81'),
+    _CountryCode('CN', '+86'),
+    _CountryCode('RU', '+7'),
+    _CountryCode('MX', '+52'),
+    _CountryCode('ES', '+34'),
+    _CountryCode('IT', '+39'),
+    _CountryCode('AR', '+54'),
+    _CountryCode('ZA', '+27'),
+    _CountryCode('NG', '+234'),
+    _CountryCode('KE', '+254'),
+    _CountryCode('EG', '+20'),
+    _CountryCode('PH', '+63'),
+  ];
 
   final _supabaseService = SupabaseService();
   final _authAdvancedService = AuthAdvancedService();
@@ -38,6 +61,17 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
       CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
     _animationController.forward();
+    _detectCountryCode();
+  }
+
+  void _detectCountryCode() {
+    final locale = WidgetsBinding.instance.platformDispatcher.locale;
+    final country = locale.countryCode;
+    final match = _countryCodes.firstWhere(
+      (c) => c.code.toUpperCase() == (country ?? '').toUpperCase(),
+      orElse: () => _countryCodes.first,
+    );
+    setState(() => _selectedCountryCode = match.prefix);
   }
 
   @override
@@ -70,7 +104,8 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
           _passwordController.text,
         );
       } else {
-        final phone = _phoneController.text.trim();
+        final rawPhone = _phoneController.text.trim();
+        final phone = rawPhone.isEmpty ? '' : '$_selectedCountryCode${rawPhone.replaceAll(RegExp(r'^\+?00'), '')}';
         if (phone.isEmpty) {
           _showError('Le numéro de téléphone est obligatoire');
           return;
@@ -227,17 +262,40 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
 
                   // Phone number (signup only)
                   if (!_isLogin) ...[
-                    _buildField(
-                      controller: _phoneController,
-                      label: 'Numéro de téléphone',
-                      icon: Icons.phone_outlined,
-                      keyboardType: TextInputType.phone,
-                      validator: (v) {
-                        if (v!.trim().isEmpty) return 'Champ requis';
-                        final phone = v.trim();
-                        if (!phone.startsWith('+') && phone.length < 10) return 'Format invalide (ex: +33612345678)';
-                        return null;
-                      },
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.04), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white.withOpacity(0.1))),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _selectedCountryCode,
+                              isDense: true,
+                              style: const TextStyle(color: Colors.white, fontSize: 14),
+                              dropdownColor: AppTheme.cardDark,
+                              items: _countryCodes
+                                  .map((c) => DropdownMenuItem(value: c.prefix, child: Text(c.prefix)))
+                                  .toList(),
+                              onChanged: (v) => setState(() => _selectedCountryCode = v ?? _selectedCountryCode),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _phoneController,
+                            style: const TextStyle(color: Colors.white),
+                            keyboardType: TextInputType.phone,
+                            validator: (v) {
+                              if (v!.trim().isEmpty) return 'Champ requis';
+                              final phone = v.trim();
+                              if (!phone.startsWith('+') && phone.length < 10) return 'Format invalide (ex: +33612345678)';
+                              return null;
+                            },
+                            decoration: _inputDecoration('Numéro de téléphone', Icons.phone_outlined),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                   ],
@@ -422,4 +480,10 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
       ),
     );
   }
+}
+
+class _CountryCode {
+  final String code;
+  final String prefix;
+  const _CountryCode(this.code, this.prefix);
 }

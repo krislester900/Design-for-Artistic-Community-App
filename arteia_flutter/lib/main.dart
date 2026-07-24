@@ -24,6 +24,7 @@ import 'pages/search_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/universe_page.dart';
 import 'pages/notifications_page_enhanced.dart';
+import 'pages/onboarding_page.dart';
 import 'pages/auth_page.dart';
 import 'pages/chat_page.dart';
 import 'services/word_predictor_service.dart';
@@ -186,12 +187,27 @@ class _LoadingScreenWrapperState extends State<LoadingScreenWrapper> {
   Future<void> _checkInitialization() async {
     await Future.delayed(AppConstants.loadingScreenMinDuration);
     if (!mounted) return;
-    // Vérifie si l'utilisateur est déjà connecté
     final user = Supabase.instance.client.auth.currentUser;
     setState(() {
       _isAuthenticated = user != null;
       _isLoading = false;
     });
+  }
+
+  Future<bool> _isOnboardingDone() async {
+    try {
+      final box = await Hive.openBox('arteia_cache');
+      return box.get('onboarding_seen', defaultValue: false) as bool;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _markOnboardingDone() async {
+    try {
+      final box = await Hive.openBox('arteia_cache');
+      await box.put('onboarding_seen', true);
+    } catch (_) {}
   }
 
   @override
@@ -203,17 +219,29 @@ class _LoadingScreenWrapperState extends State<LoadingScreenWrapper> {
         },
       );
     }
-    // StreamBuilder pour réagir aux changements d'auth en temps réel
-    return StreamBuilder<AuthState>(
-      stream: Supabase.instance.client.auth.onAuthStateChange,
+
+    return FutureBuilder<bool>(
+      future: _isOnboardingDone(),
       builder: (context, snapshot) {
-        final session = snapshot.data?.session;
-        final isLoggedIn = session != null;
-        if (isLoggedIn || _isAuthenticated) {
-          return const MainScreen();
+        final onboardingDone = snapshot.data ?? true;
+        if (!onboardingDone) {
+          return OnboardingPage(onComplete: () async {
+            await _markOnboardingDone();
+            if (mounted) setState(() {});
+          });
         }
-        return const MainScreen(); // On laisse toujours accès à MainScreen
-        // L'AuthPage est accessible via le profil pour ne pas bloquer l'exploration
+
+        return StreamBuilder<AuthState>(
+          stream: Supabase.instance.client.auth.onAuthStateChange,
+          builder: (context, snapshot) {
+            final session = snapshot.data?.session;
+            final isLoggedIn = session != null || _isAuthenticated;
+            if (isLoggedIn) {
+              return const MainScreen();
+            }
+            return const MainScreen();
+          },
+        );
       },
     );
   }

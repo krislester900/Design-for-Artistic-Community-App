@@ -13,16 +13,23 @@ type FormState = {
   univers: string[];
 };
 
-export function ArtworkUploadForm() {
+interface ArtworkUploadFormProps {
+  authorName?: string;
+  authorEmail?: string;
+  onUploaded?: () => void;
+}
+
+export function ArtworkUploadForm({ authorName, authorEmail, onUploaded }: ArtworkUploadFormProps) {
   const [activeTab, setActiveTab] = useState<UploadTab>("artwork");
   const [profile, setProfile] = useState<FormState>(() => {
     const existing = getProfile();
-    return {
-      email: existing?.email || "",
-      displayName: existing?.displayName || "",
+    const seeded = {
+      email: existing?.email || authorEmail || "",
+      displayName: existing?.displayName || authorName || "",
       bio: existing?.bio || "",
       univers: existing?.univers || [],
     };
+    return seeded;
   });
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -64,6 +71,7 @@ export function ArtworkUploadForm() {
     }
     saveUserProfile(profile);
     showMessage("success", "Profil enregistré !");
+    onUploaded?.();
   }
 
   function handleArtworkSubmit(e: React.FormEvent) {
@@ -89,6 +97,7 @@ export function ArtworkUploadForm() {
       setArtworkTitle("");
       setArtworkMedium("");
       setArtworkImage("");
+      onUploaded?.();
     } catch {
       showMessage("error", "Erreur lors de la soumission.");
     } finally {
@@ -119,6 +128,7 @@ export function ArtworkUploadForm() {
       setArtistRole("");
       setArtistImage("");
       setArtistWork("");
+      onUploaded?.();
     } catch {
       showMessage("error", "Erreur lors de la soumission.");
     } finally {
@@ -147,6 +157,7 @@ export function ArtworkUploadForm() {
       showMessage("success", "Discussion soumise ! En attente de validation.");
       setDiscussionTitle("");
       setDiscussionAuthor("");
+      onUploaded?.();
     } catch {
       showMessage("error", "Erreur lors de la soumission.");
     } finally {
