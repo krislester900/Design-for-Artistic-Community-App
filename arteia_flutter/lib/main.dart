@@ -337,7 +337,7 @@ class MainScreenState extends State<MainScreen> {
               leading: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryViolet.withOpacity(0.2),
+                  color: AppTheme.primaryViolet.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.image, color: AppTheme.primaryViolet),
@@ -352,7 +352,7 @@ class MainScreenState extends State<MainScreen> {
               leading: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryTeal.withOpacity(0.2),
+                  color: AppTheme.primaryTeal.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.music_note, color: AppTheme.primaryTeal),
@@ -367,7 +367,7 @@ class MainScreenState extends State<MainScreen> {
               leading: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryPink.withOpacity(0.2),
+                  color: AppTheme.primaryPink.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.edit, color: AppTheme.primaryPink),
@@ -382,7 +382,7 @@ class MainScreenState extends State<MainScreen> {
               leading: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.2),
+                  color: Colors.orange.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.photo_library, color: Colors.orange),
@@ -420,10 +420,10 @@ class MainScreenState extends State<MainScreen> {
                   left: 16, right: 16, bottom: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).scaffoldBackgroundColor.withOpacity(0.95),
+                  color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.95),
                   border: Border(
                     bottom: BorderSide(
-                      color: Theme.of(context).dividerColor.withOpacity(0.3),
+                      color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
                     ),
                   ),
                 ),
@@ -434,9 +434,9 @@ class MainScreenState extends State<MainScreen> {
                       child: Container(
                         width: 36, height: 36,
                         decoration: BoxDecoration(
-                          color: Theme.of(context).cardColor.withOpacity(0.6),
+                          color: Theme.of(context).cardColor.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.3)),
+                          border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.3)),
                         ),
                         child: const Icon(Icons.menu, size: 18),
                       ),
@@ -469,7 +469,7 @@ class MainScreenState extends State<MainScreen> {
                       style: TextStyle(
                         fontSize: 10,
                         letterSpacing: 3,
-                        color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
+                        color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.6),
                       ),
                     ),
                   ],
@@ -503,10 +503,10 @@ class MainScreenState extends State<MainScreen> {
           bottom: MediaQuery.of(context).padding.bottom + 4,
         ),
         decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor.withOpacity(0.95),
+          color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.95),
           border: Border(
             top: BorderSide(
-              color: Theme.of(context).dividerColor.withOpacity(0.3),
+              color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
             ),
           ),
         ),
@@ -517,7 +517,7 @@ class MainScreenState extends State<MainScreen> {
           backgroundColor: Colors.transparent,
           elevation: 0,
           selectedItemColor: const Color(0xFF7C5CFC),
-          unselectedItemColor: Colors.grey.withOpacity(0.5),
+          unselectedItemColor: Colors.grey.withValues(alpha: 0.5),
           selectedLabelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
           unselectedLabelStyle: const TextStyle(fontSize: 10),
           items: const [

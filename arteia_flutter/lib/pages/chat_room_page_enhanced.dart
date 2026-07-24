@@ -283,7 +283,7 @@ class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
           if (_isEphemeralMode)
             Container(
               padding: const EdgeInsets.all(12),
-              color: Colors.red.withOpacity(0.1),
+              color: Colors.red.withValues(alpha: 0.1),
               child: Row(
                 children: [
                   const Icon(Icons.info_outline, size: 16, color: Colors.red),
@@ -339,7 +339,7 @@ class _ChatRoomPageEnhancedState extends State<ChatRoomPageEnhanced> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(24),
                     ),
                     child: Row(
@@ -463,7 +463,7 @@ class _MessageBubble extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(

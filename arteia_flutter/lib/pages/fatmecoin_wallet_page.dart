@@ -99,7 +99,7 @@ class _FatmecoinWalletPageState extends State<FatmecoinWalletPage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF7C5CFC).withOpacity(0.3),
+            color: const Color(0xFF7C5CFC).withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -190,7 +190,7 @@ class _FatmecoinWalletPageState extends State<FatmecoinWalletPage> {
         boxShadow: isPopular
             ? [
                 BoxShadow(
-                  color: const Color(0xFF7C5CFC).withOpacity(0.15),
+                  color: const Color(0xFF7C5CFC).withValues(alpha: 0.15),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -210,7 +210,7 @@ class _FatmecoinWalletPageState extends State<FatmecoinWalletPage> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF7C5CFC).withOpacity(0.1),
+                    color: const Color(0xFF7C5CFC).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Center(
@@ -302,7 +302,7 @@ class _FatmecoinWalletPageState extends State<FatmecoinWalletPage> {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: _selectedProvider == name ? const Color(0xFF7C5CFC).withOpacity(0.05) : Colors.grey[50],
+        color: _selectedProvider == name ? const Color(0xFF7C5CFC).withValues(alpha: 0.05) : Colors.grey[50],
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: _selectedProvider == name ? const Color(0xFF7C5CFC) : Colors.grey[200]!,
@@ -394,7 +394,7 @@ class _FatmecoinWalletPageState extends State<FatmecoinWalletPage> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: (config['color'] as Color).withOpacity(0.1),
+              color: (config['color'] as Color).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(config['icon'] as IconData, color: config['color'] as Color, size: 20),
@@ -467,7 +467,7 @@ class _FatmecoinWalletPageState extends State<FatmecoinWalletPage> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFF7C5CFC).withOpacity(0.1),
+                color: const Color(0xFF7C5CFC).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(

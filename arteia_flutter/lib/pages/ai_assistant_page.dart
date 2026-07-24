@@ -154,10 +154,10 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
-                        color: isSelected ? Colors.white.withOpacity(0.15) : Colors.transparent,
+                        color: isSelected ? Colors.white.withValues(alpha: 0.15) : Colors.transparent,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isSelected ? Colors.white.withOpacity(0.3) : Colors.grey.withOpacity(0.2),
+                          color: isSelected ? Colors.white.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.2),
                         ),
                       ),
                       child: Text(
@@ -202,7 +202,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
             ),
             decoration: BoxDecoration(
               color: AppTheme.cardDark,
-              border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.15))),
+              border: Border(top: BorderSide(color: Colors.grey.withValues(alpha: 0.15))),
             ),
             child: Row(
               children: [
@@ -212,7 +212,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                     decoration: BoxDecoration(
                       color: AppTheme.bgDark,
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                      border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
                     ),
                     child: TextField(
                       controller: _controller,
@@ -313,9 +313,9 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
+          color: Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey.withOpacity(0.2)),
+          border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
         ),
         child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 13)),
       ),
@@ -350,7 +350,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: bubble.isUser
-                    ? const Color(0xFF7C5CFC).withOpacity(0.3)
+                    ? const Color(0xFF7C5CFC).withValues(alpha: 0.3)
                     : AppTheme.cardDark,
                 borderRadius: BorderRadius.circular(16).copyWith(
                   bottomLeft: bubble.isUser ? const Radius.circular(16) : Radius.zero,
@@ -358,8 +358,8 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
                 ),
                 border: Border.all(
                   color: bubble.isUser
-                      ? const Color(0xFF7C5CFC).withOpacity(0.3)
-                      : Colors.grey.withOpacity(0.15),
+                      ? const Color(0xFF7C5CFC).withValues(alpha: 0.3)
+                      : Colors.grey.withValues(alpha: 0.15),
                 ),
               ),
               child: Column(
@@ -422,7 +422,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
               borderRadius: BorderRadius.circular(16).copyWith(
                 bottomLeft: Radius.zero,
               ),
-              border: Border.all(color: Colors.grey.withOpacity(0.15)),
+              border: Border.all(color: Colors.grey.withValues(alpha: 0.15)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -449,7 +449,7 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
           width: 8,
           height: 8,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(value),
+            color: Colors.white.withValues(alpha: value),
             shape: BoxShape.circle,
           ),
         );

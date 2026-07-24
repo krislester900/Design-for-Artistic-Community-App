@@ -234,7 +234,7 @@ class _MusicUploadPageState extends State<MusicUploadPage> {
                 decoration: BoxDecoration(
                   color: AppTheme.cardDarkLight,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
                 ),
                 child: _coverImage != null
                     ? ClipRRect(
@@ -262,14 +262,14 @@ class _MusicUploadPageState extends State<MusicUploadPage> {
                 decoration: BoxDecoration(
                   color: AppTheme.cardDarkLight,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(Icons.audio_file, color: Colors.white, size: 32),

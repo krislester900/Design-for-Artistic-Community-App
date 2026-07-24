@@ -162,7 +162,7 @@ class _WritingFullscreenPageState extends State<WritingFullscreenPage> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: AppTheme.cardDarkLight,
-                border: Border(bottom: BorderSide(color: Colors.grey.withOpacity(0.2))),
+                border: Border(bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.2))),
               ),
               child: Row(
                 children: [
@@ -234,7 +234,7 @@ class _WritingFullscreenPageState extends State<WritingFullscreenPage> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
                 color: AppTheme.cardDark,
-                border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.2))),
+                border: Border(top: BorderSide(color: Colors.grey.withValues(alpha: 0.2))),
               ),
               child: Row(
                 children: [

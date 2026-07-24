@@ -165,10 +165,10 @@ def train():
     vae = vae.to(accelerator.device)
 
     print(f"VRAM used: {torch.cuda.memory_allocated(0)/1e9:.2f}GB")
-    print("Starting training (15 epochs, 512px, tout fp16)...")
+    print("Starting training (10 epochs, 512px, tout fp16)...")
 
     step = 0
-    for epoch in range(15):
+    for epoch in range(10):
         for batch in loader:
             with accelerator.accumulate(unet):
                 px = batch["pixel_values"].to(accelerator.device, dtype=torch.float16)
@@ -201,12 +201,16 @@ def train():
             if step % 50 == 0: print(f"  step {step} | loss: {loss.item():.6f}")
             if step == 1: is_nan = "OK" if not torch.isnan(loss) else "NAN"; print(f"  First step loss: {loss.item():.6f} [{is_nan}]")
 
-        print(f"Epoch {epoch+1}/15 done")
+        print(f"Epoch {epoch+1}/10 done")
+        if (epoch + 1) % 5 == 0:
+            ckpt = out / f"lora_ckpt_epoch{epoch+1}"
+            accelerator.unwrap_model(unet).save_pretrained(str(ckpt))
+            print(f"  Checkpoint saved to {ckpt}")
 
     save_path = out / "lora_weights"
     accelerator.unwrap_model(unet).save_pretrained(str(save_path))
-    print(f"Saved to {save_path}")
-    print("✅ Training complete!")
+    print(f"Final weights saved to {save_path}")
+    print("[OK] Training complete!")
 
 if __name__ == "__main__":
     train()

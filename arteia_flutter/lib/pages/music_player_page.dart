@@ -129,7 +129,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.white.withOpacity(0.1),
+                            color: Colors.white.withValues(alpha: 0.1),
                             blurRadius: 40,
                             spreadRadius: 5,
                           ),
@@ -198,9 +198,9 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                               SliderTheme(
                                 data: SliderTheme.of(context).copyWith(
                                   activeTrackColor: Colors.white,
-                                  inactiveTrackColor: Colors.white.withOpacity(0.14),
+                                  inactiveTrackColor: Colors.white.withValues(alpha: 0.14),
                                   thumbColor: Colors.white,
-                                  overlayColor: Colors.white.withOpacity(0.16),
+                                  overlayColor: Colors.white.withValues(alpha: 0.16),
                                   trackHeight: 4,
                                 ),
                                 child: Slider(
@@ -269,12 +269,12 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: isMain ? Colors.white : Colors.white.withOpacity(0.1),
+          color: isMain ? Colors.white : Colors.white.withValues(alpha: 0.1),
           shape: BoxShape.circle,
           boxShadow: isMain
               ? [
                   BoxShadow(
-                    color: Colors.white.withOpacity(0.3),
+                    color: Colors.white.withValues(alpha: 0.3),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
@@ -290,3 +290,4 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     );
   }
 }
+

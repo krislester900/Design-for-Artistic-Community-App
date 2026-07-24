@@ -198,7 +198,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
               Container(
                 width: 40, height: 40,
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryViolet.withOpacity(0.2),
+                  color: AppTheme.primaryViolet.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
@@ -368,7 +368,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
       ),
       decoration: BoxDecoration(
         color: AppTheme.cardDark,
-        border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.2))),
+        border: Border(top: BorderSide(color: Colors.grey.withValues(alpha: 0.2))),
       ),
       child: Row(
         children: [
@@ -450,10 +450,10 @@ class _ActionButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? activeColor.withOpacity(0.2) : AppTheme.cardDarkLight,
+          color: isActive ? activeColor.withValues(alpha: 0.2) : AppTheme.cardDarkLight,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isActive ? activeColor : Colors.grey.withOpacity(0.3),
+            color: isActive ? activeColor : Colors.grey.withValues(alpha: 0.3),
           ),
         ),
         child: Row(
@@ -477,3 +477,4 @@ class _ActionButton extends StatelessWidget {
 }
 
 // CommentTile is now imported from comment_service.dart
+

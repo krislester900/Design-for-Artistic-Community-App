@@ -73,7 +73,7 @@ class _QuestsPageState extends State<QuestsPage> {
                   width: 60,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
                   child: Center(
@@ -163,7 +163,7 @@ class _QuestCard extends StatelessWidget {
         color: AppTheme.cardDark,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: quest.isCompleted ? Colors.green.withOpacity(0.3) : Colors.grey.withOpacity(0.2),
+          color: quest.isCompleted ? Colors.green.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.2),
         ),
       ),
       child: Column(
@@ -177,8 +177,8 @@ class _QuestCard extends StatelessWidget {
                 height: 40,
                 decoration: BoxDecoration(
                   color: quest.isCompleted 
-                      ? Colors.green.withOpacity(0.2)
-                      : AppTheme.primaryViolet.withOpacity(0.2),
+                      ? Colors.green.withValues(alpha: 0.2)
+                      : AppTheme.primaryViolet.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
@@ -215,7 +215,7 @@ class _QuestCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.2),
+                    color: Colors.green.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -250,7 +250,7 @@ class _QuestCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryTeal.withOpacity(0.2),
+                  color: AppTheme.primaryTeal.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(

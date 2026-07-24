@@ -258,7 +258,7 @@ class _MuseAssistantPageState extends State<MuseAssistantPage> with SingleTicker
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: _theme.border.withOpacity(0.15))),
+                border: Border(bottom: BorderSide(color: _theme.border.withValues(alpha: 0.15))),
               ),
               child: Row(
                 children: [
@@ -364,11 +364,11 @@ class _MuseAssistantPageState extends State<MuseAssistantPage> with SingleTicker
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: _theme.surface.withOpacity(0.9),
+              color: _theme.surface.withValues(alpha: 0.9),
               borderRadius: BorderRadius.circular(16).copyWith(
                 bottomLeft: Radius.zero,
               ),
-              border: Border.all(color: _theme.border.withOpacity(0.15)),
+              border: Border.all(color: _theme.border.withValues(alpha: 0.15)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -395,7 +395,7 @@ class _MuseAssistantPageState extends State<MuseAssistantPage> with SingleTicker
           width: 8,
           height: 8,
           decoration: BoxDecoration(
-            color: _theme.text.withOpacity(value),
+            color: _theme.text.withValues(alpha: value),
             shape: BoxShape.circle,
           ),
         );
@@ -430,8 +430,8 @@ class _TopicCardStack extends StatelessWidget {
             margin: const EdgeInsets.only(right: 16),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: theme.border.withOpacity(0.2)),
-              color: theme.surface.withOpacity(0.95),
+              border: Border.all(color: theme.border.withValues(alpha: 0.2)),
+              color: theme.surface.withValues(alpha: 0.95),
               boxShadow: [
                 BoxShadow(
                   color: theme.glow,
@@ -510,7 +510,7 @@ class _MessageBubble extends StatelessWidget {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: message.isUser
-                    ? theme.surface.withOpacity(0.9)
+                    ? theme.surface.withValues(alpha: 0.9)
                     : Color.lerp(theme.surface, theme.background, 0.1),
                 borderRadius: BorderRadius.circular(16).copyWith(
                   bottomLeft: message.isUser ? const Radius.circular(16) : Radius.zero,
@@ -518,8 +518,8 @@ class _MessageBubble extends StatelessWidget {
                 ),
                 border: Border.all(
                   color: message.isUser
-                      ? theme.border.withOpacity(0.3)
-                      : theme.border.withOpacity(0.2),
+                      ? theme.border.withValues(alpha: 0.3)
+                      : theme.border.withValues(alpha: 0.2),
                 ),
               ),
               child: Column(
@@ -576,7 +576,7 @@ class _ThemeSwordButton extends StatelessWidget {
         height: 36,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          border: Border.all(color: theme.border.withOpacity(0.3)),
+          border: Border.all(color: theme.border.withValues(alpha: 0.3)),
         ),
         child: CustomPaint(
           painter: _ZeldaSwordPainter(theme: theme),
@@ -650,8 +650,8 @@ class _BottomBar extends StatelessWidget {
         top: 14,
       ),
       decoration: BoxDecoration(
-        color: theme.background.withOpacity(0.95),
-        border: Border(top: BorderSide(color: theme.border.withOpacity(0.15))),
+        color: theme.background.withValues(alpha: 0.95),
+        border: Border(top: BorderSide(color: theme.border.withValues(alpha: 0.15))),
       ),
       child: Row(
         children: [
@@ -681,8 +681,8 @@ class _BottomBar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 18),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: theme.border.withOpacity(0.2)),
-                color: theme.surface.withOpacity(0.5),
+                border: Border.all(color: theme.border.withValues(alpha: 0.2)),
+                color: theme.surface.withValues(alpha: 0.5),
               ),
               child: Row(
                 children: [
@@ -751,8 +751,8 @@ class _ActionButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: theme.border.withOpacity(0.2)),
-          color: theme.surface.withOpacity(0.6),
+          border: Border.all(color: theme.border.withValues(alpha: 0.2)),
+          color: theme.surface.withValues(alpha: 0.6),
         ),
         child: Row(
           children: [

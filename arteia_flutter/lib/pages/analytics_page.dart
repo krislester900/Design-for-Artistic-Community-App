@@ -77,7 +77,7 @@ class _StatCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [AppTheme.primaryViolet.withOpacity(0.3), AppTheme.cardDark],
+            colors: [AppTheme.primaryViolet.withValues(alpha: 0.3), AppTheme.cardDark],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),

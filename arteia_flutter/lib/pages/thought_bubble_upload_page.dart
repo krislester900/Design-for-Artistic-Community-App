@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../services/supabase_service.dart';
 import '../services/image_upload_service.dart';
@@ -30,14 +29,11 @@ class _ThoughtBubbleUploadPageState extends State<ThoughtBubbleUploadPage> {
   String? _imageUrl;
   String? _audioPath;
   bool _isRecording = false;
-  bool _isUploading = false;
   bool _isSubmitting = false;
   Duration _recordingDuration = Duration.zero;
-  Duration? _actualAudioDuration;
   bool get _isWeb => kIsWeb;
   bool _hasMicPermission = false;
   int _recordSeconds = 0;
-  bool get _canRecord => _hasMicPermission || _isWeb;
 
   @override
   void initState() {
@@ -116,11 +112,7 @@ class _ThoughtBubbleUploadPageState extends State<ThoughtBubbleUploadPage> {
   }
 
   Future<void> _stopRecording() async {
-    final path = await _voiceRecorder.stopRecording();
-    if (path != null) {
-      _audioPath = path;
-      _actualAudioDuration = Duration(seconds: _recordSeconds);
-    }
+    await _voiceRecorder.stopRecording();
     setState(() => _isRecording = false);
   }
 
@@ -285,7 +277,7 @@ class _ThoughtBubbleUploadPageState extends State<ThoughtBubbleUploadPage> {
                 decoration: BoxDecoration(
                   color: AppTheme.cardDarkLight,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
                 ),
                 child: _selectedImage != null
                     ? Stack(
@@ -334,7 +326,7 @@ class _ThoughtBubbleUploadPageState extends State<ThoughtBubbleUploadPage> {
                 decoration: BoxDecoration(
                   color: AppTheme.cardDarkLight,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
                 ),
                 child: Column(
                   children: [
@@ -342,7 +334,7 @@ class _ThoughtBubbleUploadPageState extends State<ThoughtBubbleUploadPage> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.2),
+                          color: Colors.red.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
@@ -373,7 +365,7 @@ class _ThoughtBubbleUploadPageState extends State<ThoughtBubbleUploadPage> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.2),
+                            color: Colors.green.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -413,9 +405,9 @@ class _ThoughtBubbleUploadPageState extends State<ThoughtBubbleUploadPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.primaryTeal.withOpacity(0.1),
+                color: AppTheme.primaryTeal.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.primaryTeal.withOpacity(0.3)),
+                border: Border.all(color: AppTheme.primaryTeal.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [

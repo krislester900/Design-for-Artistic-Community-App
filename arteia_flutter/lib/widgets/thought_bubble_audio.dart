@@ -331,18 +331,10 @@ class ThoughtBubbleAudioPlayer extends StatefulWidget {
 class _ThoughtBubbleAudioPlayerState extends State<ThoughtBubbleAudioPlayer> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
-  double _currentPosition = 0.0;
 
   @override
   void initState() {
     super.initState();
-    _audioPlayer.onPositionChanged.listen((position) {
-      if (mounted) {
-        setState(() {
-          _currentPosition = position.inSeconds.toDouble();
-        });
-      }
-    });
     _audioPlayer.onPlayerStateChanged.listen((state) {
       if (mounted) {
         setState(() {
@@ -353,7 +345,6 @@ class _ThoughtBubbleAudioPlayerState extends State<ThoughtBubbleAudioPlayer> {
     _audioPlayer.onPlayerComplete.listen((_) {
       if (mounted) {
         setState(() {
-          _currentPosition = 0.0;
           _isPlaying = false;
         });
       }

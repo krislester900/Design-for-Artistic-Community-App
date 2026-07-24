@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import '../theme/app_theme.dart';
 import '../widgets/empty_state.dart';
 import 'auth_page.dart';
@@ -30,36 +29,9 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   bool get _isOwnProfile => widget.userId == null || widget.userId == _supabase.auth.currentUser?.id;
 
   String _profileFont = 'Default';
-  final List<String> _fontChoices = [
-    'Default',
-    'Roboto',
-    'Open Sans',
-    'Montserrat',
-    'Poppins',
-    'Lato',
-    'Oswald',
-    'Raleway',
-    'Nunito',
-    'Playfair Display',
-    'Bebas Neue',
-    'Work Sans',
-    'Space Grotesk',
-    'Inter',
-    'Permanent Marker',
-    'Caveat',
-  ];
-
-  TextStyle get _displayNameStyle =>
-      _profileFont == 'Default' ? const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white) : GoogleFonts.getFont(_profileFont, fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white);
 
   TextStyle get _bioStyle =>
       _profileFont == 'Default' ? const TextStyle(fontSize: 14, color: Colors.white70, height: 1.5) : GoogleFonts.getFont(_profileFont, fontSize: 14, color: Colors.white70, height: 1.5);
-
-  TextStyle get _statValueStyle =>
-      _profileFont == 'Default' ? const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white) : GoogleFonts.getFont(_profileFont, fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white);
-
-  TextStyle get _statLabelStyle =>
-      _profileFont == 'Default' ? const TextStyle(fontSize: 12, color: Colors.white70) : GoogleFonts.getFont(_profileFont, fontSize: 12, color: Colors.white70);
 
   @override
   void initState() {
@@ -270,18 +242,6 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     );
     if (selected != null) {
       setState(() => _profileFont = selected);
-    }
-  }
-
-  Future<void> _updateArtworkVisibility(String artId, String visibility) async {
-    try {
-      await _supabase.from('artworks').update({'visibility': visibility}).eq('id', artId);
-      setState(() {
-        final art = _artworks.firstWhere((a) => a['id'] == artId, orElse: () => {});
-        if (art.isNotEmpty) art['visibility'] = visibility;
-      });
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e'), backgroundColor: AppTheme.primaryPink));
     }
   }
 

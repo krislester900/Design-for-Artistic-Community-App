@@ -226,7 +226,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                         ),
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [BoxShadow(
-                          color: AppTheme.primaryViolet.withOpacity(0.5),
+                          color: AppTheme.primaryViolet.withValues(alpha: 0.5),
                           blurRadius: 32, spreadRadius: 4,
                         )],
                       ),
@@ -266,7 +266,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.04), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white.withOpacity(0.1))),
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
                               value: _selectedCountryCode,
@@ -354,7 +354,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                     onPressed: _isLoading ? null : _signInWithGoogle,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
-                      side: BorderSide(color: Colors.white.withOpacity(0.3)),
+                      side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
@@ -376,12 +376,12 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                   // Divider
                   Row(
                     children: [
-                      Expanded(child: Divider(color: Colors.white.withOpacity(0.2))),
+                      Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.2))),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text('ou', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
                       ),
-                      Expanded(child: Divider(color: Colors.white.withOpacity(0.2))),
+                      Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.2))),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -397,7 +397,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                         padding: const EdgeInsets.symmetric(vertical: 18),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         elevation: 8,
-                        shadowColor: AppTheme.primaryViolet.withOpacity(0.5),
+                        shadowColor: AppTheme.primaryViolet.withValues(alpha: 0.5),
                       ),
                       child: _isLoading
                           ? const SizedBox(height: 20, width: 20,
@@ -457,14 +457,14 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
       labelStyle: TextStyle(color: AppTheme.textMuted),
       prefixIcon: Icon(icon, color: AppTheme.primaryViolet, size: 20),
       filled: true,
-      fillColor: Colors.white.withOpacity(0.04),
+      fillColor: Colors.white.withValues(alpha: 0.04),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),

@@ -100,7 +100,7 @@ class _ArtworkUploadPageState extends State<ArtworkUploadPage> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryViolet.withOpacity(0.2),
+                    color: AppTheme.primaryViolet.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.camera_alt, color: AppTheme.primaryViolet),
@@ -115,7 +115,7 @@ class _ArtworkUploadPageState extends State<ArtworkUploadPage> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryTeal.withOpacity(0.2),
+                    color: AppTheme.primaryTeal.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.photo_library, color: AppTheme.primaryTeal),
@@ -279,7 +279,7 @@ class _ArtworkUploadPageState extends State<ArtworkUploadPage> {
                   decoration: BoxDecoration(
                     color: AppTheme.cardDarkLight,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.grey.withOpacity(0.3), style: BorderStyle.solid),
+                    border: Border.all(color: Colors.grey.withValues(alpha: 0.3), style: BorderStyle.solid),
                   ),
                   child: _selectedImage != null
                       ? ClipRRect(
@@ -302,7 +302,7 @@ class _ArtworkUploadPageState extends State<ArtworkUploadPage> {
                             Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: AppTheme.primaryViolet.withOpacity(0.2),
+                                color: AppTheme.primaryViolet.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: const Icon(Icons.add_photo_alternate, size: 48, color: AppTheme.primaryViolet),
@@ -320,7 +320,7 @@ class _ArtworkUploadPageState extends State<ArtworkUploadPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.2),
+                    color: Colors.green.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Row(
@@ -419,9 +419,9 @@ class _ArtworkUploadPageState extends State<ArtworkUploadPage> {
                   children: _suggestedTags.map((tag) => Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryViolet.withOpacity(0.2),
+                      color: AppTheme.primaryViolet.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppTheme.primaryViolet.withOpacity(0.3)),
+                      border: Border.all(color: AppTheme.primaryViolet.withValues(alpha: 0.3)),
                     ),
                     child: Text(tag, style: const TextStyle(color: AppTheme.primaryViolet, fontSize: 12)),
                   )).toList(),
@@ -431,7 +431,7 @@ class _ArtworkUploadPageState extends State<ArtworkUploadPage> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryTeal.withOpacity(0.2),
+                      color: AppTheme.primaryTeal.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -453,3 +453,4 @@ class _ArtworkUploadPageState extends State<ArtworkUploadPage> {
     );
   }
 }
+

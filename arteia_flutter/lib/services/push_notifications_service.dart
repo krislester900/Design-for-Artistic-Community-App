@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 
 class PushNotificationsService {
@@ -10,18 +9,6 @@ class PushNotificationsService {
   PushNotificationsService._();
 
   Future<void> initialize() async {}
-
-  Future<void> _updateTokenInDatabase(String token) async {
-    final user = _supabase.currentUser;
-    if (user == null) return;
-
-    try {
-      await _supabase.client
-          .from('profiles')
-          .update({'fcm_token': token})
-          .eq('id', user.id);
-    } catch (_) {}
-  }
 
   Future<void> subscribeToTopic(String topic) async {}
 

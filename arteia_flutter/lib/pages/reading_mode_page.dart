@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/category_themes.dart';
 
 class ReadingModePage extends StatefulWidget {
   final String title;
@@ -25,7 +24,6 @@ class _ReadingModePageState extends State<ReadingModePage> {
   bool _showControls = true;
   double _fontSize = 18;
   bool _isDarkMode = true;
-  late CategoryTheme _categoryTheme;
 
   final List<String> _pages = [];
 
@@ -34,25 +32,6 @@ class _ReadingModePageState extends State<ReadingModePage> {
     super.initState();
     _pageController = PageController();
     _splitContentIntoPages();
-  }
-
-  CategoryTheme _getThemeForCategory(String category) {
-    switch (category.toLowerCase()) {
-      case 'music':
-        return CategoryThemes.music;
-      case 'film':
-        return CategoryThemes.film;
-      case 'visual-art':
-        return CategoryThemes.visualArt;
-      case 'manga':
-        return CategoryThemes.manga;
-      case 'literature':
-        return CategoryThemes.literature;
-      case 'animation':
-        return CategoryThemes.animation;
-      default:
-        return CategoryThemes.music;
-    }
   }
 
   void _splitContentIntoPages() {
@@ -258,7 +237,7 @@ class _ReadingModePageState extends State<ReadingModePage> {
                 color: bgColor,
                 border: Border(
                   top: BorderSide(
-                    color: (secondaryTextColor as Color?) ?? Colors.grey.withOpacity(0.3),
+                    color: (secondaryTextColor as Color?) ?? Colors.grey.withValues(alpha: 0.3),
                     width: 0.5,
                   ),
                 ),

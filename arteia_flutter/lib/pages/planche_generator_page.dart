@@ -215,7 +215,7 @@ class _PlancheGeneratorPageState extends State<PlancheGeneratorPage> {
                           borderRadius: BorderRadius.circular(14),
                           gradient: selected
                               ? const LinearGradient(colors: [Color(0xFF7C5CFC), Color(0xFF5B3FE0)])
-                              : LinearGradient(colors: [theme.cardColor, theme.cardColor.withOpacity(0.6)]),
+                              : LinearGradient(colors: [theme.cardColor, theme.cardColor.withValues(alpha: 0.6)]),
                           border: selected ? Border.all(color: const Color(0xFF7C5CFC), width: 2) : null,
                         ),
                         child: Column(
@@ -264,8 +264,8 @@ class _PlancheGeneratorPageState extends State<PlancheGeneratorPage> {
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
-                          color: selected ? const Color(0xFF7C5CFC).withOpacity(0.15) : theme.cardColor,
-                          border: Border.all(color: selected ? const Color(0xFF7C5CFC) : Colors.grey.withOpacity(0.3)),
+                          color: selected ? const Color(0xFF7C5CFC).withValues(alpha: 0.15) : theme.cardColor,
+                          border: Border.all(color: selected ? const Color(0xFF7C5CFC) : Colors.grey.withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -293,7 +293,7 @@ class _PlancheGeneratorPageState extends State<PlancheGeneratorPage> {
 
   Widget _buildLayoutMini(int count) {
     if (count == 1) {
-      return Container(width: 24, height: 32, decoration: BoxDecoration(color: const Color(0xFF7C5CFC).withOpacity(0.3), borderRadius: BorderRadius.circular(3)));
+      return Container(width: 24, height: 32, decoration: BoxDecoration(color: const Color(0xFF7C5CFC).withValues(alpha: 0.3), borderRadius: BorderRadius.circular(3)));
     }
     if (count == 4) {
       return SizedBox(
@@ -472,9 +472,9 @@ class _PlancheGeneratorPageState extends State<PlancheGeneratorPage> {
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
+        color: Colors.red.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.red.withOpacity(0.3)),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -660,7 +660,7 @@ class _PlancheGeneratorPageState extends State<PlancheGeneratorPage> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF7C5CFC).withOpacity(0.15),
+                                    color: const Color(0xFF7C5CFC).withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text('Case ${i + 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF7C5CFC))),
@@ -715,3 +715,4 @@ class _PlancheGeneratorPageState extends State<PlancheGeneratorPage> {
     );
   }
 }
+

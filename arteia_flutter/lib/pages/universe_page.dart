@@ -18,7 +18,6 @@ class UniversePage extends StatefulWidget {
 class _UniversePageState extends State<UniversePage> {
   final ApiService _api = ApiService();
   List<Map<String, dynamic>> _posts = [];
-  List<Map<String, dynamic>> _categories = [];
   bool _isLoading = true;
 
   @override
@@ -35,7 +34,6 @@ class _UniversePageState extends State<UniversePage> {
       ]);
       if (mounted) {
         setState(() {
-          _categories = results[0];
           _posts = results[1];
           _isLoading = false;
         });

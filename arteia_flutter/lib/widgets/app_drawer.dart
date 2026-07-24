@@ -35,7 +35,7 @@ class AppDrawer extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
         border: Border(
-          right: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.3)),
+          right: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.3)),
         ),
       ),
       child: Column(
@@ -52,7 +52,7 @@ class AppDrawer extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.2)),
+          bottom: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.2)),
         ),
       ),
       child: Row(
@@ -212,7 +212,7 @@ class AppDrawer extends StatelessWidget {
           ? Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFF7C5CFC).withOpacity(0.15),
+                color: const Color(0xFF7C5CFC).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text('$badge', style: const TextStyle(fontSize: 10, color: Color(0xFF7C5CFC), fontWeight: FontWeight.bold)),

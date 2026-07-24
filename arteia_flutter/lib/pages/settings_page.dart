@@ -120,8 +120,8 @@ class _SettingsPageState extends State<SettingsPage> {
           Switch(
             value: isDark,
             onChanged: (_) => _themeService.toggleDarkMode(),
-            activeColor: Colors.black,
-            activeTrackColor: Colors.black.withOpacity(0.3),
+            activeThumbColor: Colors.black,
+            activeTrackColor: Colors.black.withValues(alpha: 0.3),
           ),
         ],
       ),
@@ -204,8 +204,8 @@ class _SettingsPageState extends State<SettingsPage> {
             trailing: Switch(
               value: true,
               onChanged: (_) {},
-              activeColor: Colors.black,
-              activeTrackColor: Colors.black.withOpacity(0.3),
+              activeThumbColor: Colors.black,
+              activeTrackColor: Colors.black.withValues(alpha: 0.3),
             ),
           ),
           const Divider(height: 1),
@@ -216,8 +216,8 @@ class _SettingsPageState extends State<SettingsPage> {
             trailing: Switch(
               value: true,
               onChanged: (_) {},
-              activeColor: Colors.black,
-              activeTrackColor: Colors.black.withOpacity(0.3),
+              activeThumbColor: Colors.black,
+              activeTrackColor: Colors.black.withValues(alpha: 0.3),
             ),
           ),
           const Divider(height: 1),
@@ -228,8 +228,8 @@ class _SettingsPageState extends State<SettingsPage> {
             trailing: Switch(
               value: true,
               onChanged: (_) {},
-              activeColor: Colors.black,
-              activeTrackColor: Colors.black.withOpacity(0.3),
+              activeThumbColor: Colors.black,
+              activeTrackColor: Colors.black.withValues(alpha: 0.3),
             ),
           ),
           const Divider(height: 1),
@@ -240,8 +240,8 @@ class _SettingsPageState extends State<SettingsPage> {
             trailing: Switch(
               value: true,
               onChanged: (_) {},
-              activeColor: Colors.black,
-              activeTrackColor: Colors.black.withOpacity(0.3),
+              activeThumbColor: Colors.black,
+              activeTrackColor: Colors.black.withValues(alpha: 0.3),
             ),
           ),
         ],
@@ -280,8 +280,8 @@ class _SettingsPageState extends State<SettingsPage> {
             trailing: Switch(
               value: true,
               onChanged: (_) {},
-              activeColor: Colors.black,
-              activeTrackColor: Colors.black.withOpacity(0.3),
+              activeThumbColor: Colors.black,
+              activeTrackColor: Colors.black.withValues(alpha: 0.3),
             ),
           ),
         ],
@@ -300,8 +300,8 @@ class _SettingsPageState extends State<SettingsPage> {
             trailing: Switch(
               value: true,
               onChanged: (_) {},
-              activeColor: Colors.black,
-              activeTrackColor: Colors.black.withOpacity(0.3),
+              activeThumbColor: Colors.black,
+              activeTrackColor: Colors.black.withValues(alpha: 0.3),
             ),
           ),
           const Divider(height: 1),
@@ -312,8 +312,8 @@ class _SettingsPageState extends State<SettingsPage> {
             trailing: Switch(
               value: false,
               onChanged: (_) {},
-              activeColor: Colors.black,
-              activeTrackColor: Colors.black.withOpacity(0.3),
+              activeThumbColor: Colors.black,
+              activeTrackColor: Colors.black.withValues(alpha: 0.3),
             ),
           ),
           const Divider(height: 1),
@@ -437,7 +437,7 @@ class _SettingsPageState extends State<SettingsPage> {
               color: isDark ? palette.cardDark : palette.cardLight,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isSelected ? Colors.black : Colors.grey.withOpacity(0.2),
+                color: isSelected ? Colors.black : Colors.grey.withValues(alpha: 0.2),
                 width: isSelected ? 2 : 1,
               ),
             ),
@@ -507,7 +507,7 @@ class _SettingsPageState extends State<SettingsPage> {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.05),
+        color: Colors.black.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Icon(icon, color: Colors.black, size: 22),
@@ -571,7 +571,7 @@ class _SettingsPageState extends State<SettingsPage> {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1),
       ),
     );
   }

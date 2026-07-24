@@ -103,10 +103,10 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.chat_bubble_outline, size: 48, color: AppTheme.textMuted.withOpacity(0.3)),
+                        Icon(Icons.chat_bubble_outline, size: 48, color: AppTheme.textMuted.withValues(alpha: 0.3)),
                         const SizedBox(height: 12),
                         Text('Aucun message', style: TextStyle(color: AppTheme.textMuted)),
-                        Text('Envoyez le premier message !', style: TextStyle(fontSize: 12, color: AppTheme.textMuted.withOpacity(0.6))),
+                        Text('Envoyez le premier message !', style: TextStyle(fontSize: 12, color: AppTheme.textMuted.withValues(alpha: 0.6))),
                       ],
                     ),
                   )
@@ -133,7 +133,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
             ),
             decoration: BoxDecoration(
               color: AppTheme.cardDark,
-              border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.5))),
+              border: Border(top: BorderSide(color: Colors.grey.withValues(alpha: 0.5))),
             ),
             child: Row(
               children: [
@@ -147,14 +147,14 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                     decoration: BoxDecoration(
                       color: AppTheme.cardDarkLight,
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                      border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
                     ),
                     child: TextField(
                       controller: _messageController,
                       style: const TextStyle(color: AppTheme.textLight, fontSize: 14),
                       decoration: InputDecoration(
                         hintText: 'Message...',
-                        hintStyle: TextStyle(color: AppTheme.textMuted.withOpacity(0.5), fontSize: 14),
+                        hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5), fontSize: 14),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(vertical: 12),
                       ),
@@ -234,7 +234,7 @@ class _MessageBubble extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             _formatTime(time),
-            style: TextStyle(fontSize: 10, color: AppTheme.textMuted.withOpacity(0.5)),
+            style: TextStyle(fontSize: 10, color: AppTheme.textMuted.withValues(alpha: 0.5)),
           ),
         ],
       ),

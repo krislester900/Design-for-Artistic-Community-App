@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
-import '../theme/app_theme.dart';
 
 class MusicPlayerWidget extends StatefulWidget {
   final String audioUrl;
@@ -127,7 +126,7 @@ class _MusicPlayerWidgetState extends State<MusicPlayerWidget> {
                           fit: BoxFit.cover,
                         )
                       : null,
-                  color: theme.primaryColor.withOpacity(0.2),
+                  color: theme.primaryColor.withValues(alpha: 0.2),
                 ),
                 child: widget.coverUrl == null
                     ? Icon(Icons.music_note, color: theme.primaryColor)
@@ -190,7 +189,7 @@ class _MusicPlayerWidgetState extends State<MusicPlayerWidget> {
               value: _duration.inMilliseconds > 0
                   ? _position.inMilliseconds / _duration.inMilliseconds
                   : 0,
-              backgroundColor: theme.progressIndicatorTheme.color?.withOpacity(0.2),
+              backgroundColor: theme.progressIndicatorTheme.color?.withValues(alpha: 0.2),
               color: theme.primaryColor,
             ),
             const SizedBox(height: 4),

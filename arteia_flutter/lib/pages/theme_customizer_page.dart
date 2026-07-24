@@ -48,7 +48,7 @@ class ThemeCustomizerPage extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryViolet.withOpacity(0.2),
+                      color: AppTheme.primaryViolet.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -79,7 +79,7 @@ class ThemeCustomizerPage extends StatelessWidget {
                     onChanged: (_) {
                       themeService.toggleDarkMode();
                     },
-                    activeColor: AppTheme.primaryViolet,
+                    activeThumbColor: AppTheme.primaryViolet,
                   ),
                 ],
               ),
@@ -120,11 +120,11 @@ class ThemeCustomizerPage extends StatelessWidget {
                       color: AppTheme.cardDark,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: isSelected ? palette.primaryViolet : Colors.grey.withOpacity(0.2),
+                        color: isSelected ? palette.primaryViolet : Colors.grey.withValues(alpha: 0.2),
                         width: isSelected ? 2 : 1,
                       ),
                       boxShadow: isSelected
-                          ? [BoxShadow(color: palette.primaryViolet.withOpacity(0.3), blurRadius: 12)]
+                          ? [BoxShadow(color: palette.primaryViolet.withValues(alpha: 0.3), blurRadius: 12)]
                           : [],
                     ),
                     child: Column(
@@ -285,7 +285,7 @@ class _ColorPreview extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
     );
   }

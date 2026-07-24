@@ -234,7 +234,7 @@ class GamesHubPage extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: gradient.colors.first.withOpacity(0.3),
+              color: gradient.colors.first.withValues(alpha: 0.3),
               blurRadius: 20,
               offset: const Offset(0, 8),
             )
@@ -245,7 +245,7 @@ class GamesHubPage extends StatelessWidget {
             Positioned(
               right: -20,
               bottom: -20,
-              child: Icon(icon, size: 120, color: Colors.white.withOpacity(0.2)),
+              child: Icon(icon, size: 120, color: Colors.white.withValues(alpha: 0.2)),
             ),
             Padding(
               padding: const EdgeInsets.all(24),
@@ -274,7 +274,7 @@ class GamesHubPage extends StatelessWidget {
                     description,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                     ),
                   ),
                 ],
@@ -286,3 +286,4 @@ class GamesHubPage extends StatelessWidget {
     );
   }
 }
+

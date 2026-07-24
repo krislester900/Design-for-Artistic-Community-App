@@ -162,13 +162,13 @@ class _MangaTrainingPageState extends State<MangaTrainingPage> {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
             child: Icon(icon, color: color, size: 22),
           ),
           const SizedBox(width: 16),
@@ -220,7 +220,7 @@ class _MangaTrainingPageState extends State<MangaTrainingPage> {
                 children: [
                   Flexible(
                     flex: total,
-                    child: Container(color: Colors.blue.withOpacity(0.5)),
+                    child: Container(color: Colors.blue.withValues(alpha: 0.5)),
                   ),
                   if (total == 0) Expanded(child: Container(color: Colors.grey[800])),
                 ],
@@ -270,7 +270,7 @@ class _MangaTrainingPageState extends State<MangaTrainingPage> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              color: selected ? const Color(0xFF7C5CFC).withOpacity(0.2) : theme.cardColor,
+              color: selected ? const Color(0xFF7C5CFC).withValues(alpha: 0.2) : theme.cardColor,
               border: selected ? Border.all(color: const Color(0xFF7C5CFC), width: 2) : null,
             ),
             child: Column(
@@ -299,7 +299,7 @@ class _MangaTrainingPageState extends State<MangaTrainingPage> {
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: config.$1.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: config.$1.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
       child: Text(config.$2, style: TextStyle(fontSize: 9, color: config.$1)),
     );
   }
@@ -367,7 +367,7 @@ class _MangaTrainingPageState extends State<MangaTrainingPage> {
           if (hasLora)
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green.withOpacity(0.3))),
+              decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green.withValues(alpha: 0.3))),
               child: Row(
                 children: [
                   const Icon(Icons.check_circle, color: Colors.green),
@@ -536,3 +536,4 @@ class _MangaTrainingPageState extends State<MangaTrainingPage> {
     );
   }
 }
+

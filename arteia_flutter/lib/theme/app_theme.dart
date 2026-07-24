@@ -28,7 +28,7 @@ class AppTheme {
 
   // Ombres minimalistes
   static List<BoxShadow> shadowCard = [
-    BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, 2)),
+    BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 2)),
   ];
 
   // Thème clair - Noir & Blanc pur
@@ -41,7 +41,6 @@ class AppTheme {
       primary: Color(0xFF000000),
       secondary: Color(0xFF000000),
       surface: Color(0xFFFFFFFF),
-      background: Color(0xFFFFFFFF),
       error: Color(0xFFDC2626),
     ),
     textTheme: const TextTheme(
@@ -90,11 +89,11 @@ class AppTheme {
       elevation: 0,
     ),
     dividerTheme: DividerThemeData(
-      color: const Color(0xFFE5E7EB).withOpacity(0.5),
+      color: const Color(0xFFE5E7EB).withValues(alpha: 0.5),
       thickness: 1,
     ),
     chipTheme: ChipThemeData(
-      backgroundColor: Colors.black.withOpacity(0.05),
+      backgroundColor: Colors.black.withValues(alpha: 0.05),
       labelStyle: const TextStyle(color: Color(0xFF000000), fontSize: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       side: BorderSide.none,
@@ -111,7 +110,6 @@ class AppTheme {
       primary: Color(0xFFFFFFFF),
       secondary: Color(0xFFFFFFFF),
       surface: Color(0xFF1A1A1A),
-      background: Color(0xFF000000),
       error: Color(0xFFDC2626),
     ),
     textTheme: const TextTheme(

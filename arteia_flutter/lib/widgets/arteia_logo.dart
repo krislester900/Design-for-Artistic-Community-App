@@ -59,7 +59,7 @@ class _ArteiaLogoState extends State<ArteiaLogo> with SingleTickerProviderStateM
                 color: isDark ? Colors.white : Colors.black,
                 boxShadow: [
                   BoxShadow(
-                    color: (isDark ? Colors.white : Colors.black).withOpacity(0.15 * (pulse * 0.5 + 0.5)),
+                    color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.15 * (pulse * 0.5 + 0.5)),
                     blurRadius: 6 + (pulse * 3),
                     spreadRadius: 0,
                   ),

@@ -224,14 +224,14 @@ class _WritingPageState extends State<WritingPage> {
                   decoration: BoxDecoration(
                     color: AppTheme.cardDarkLight,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                    border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryPink.withOpacity(0.2),
+                          color: AppTheme.primaryPink.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(Icons.description, color: AppTheme.primaryPink, size: 32),
@@ -289,10 +289,10 @@ class _ModeButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryViolet.withOpacity(0.2) : AppTheme.cardDarkLight,
+          color: isSelected ? AppTheme.primaryViolet.withValues(alpha: 0.2) : AppTheme.cardDarkLight,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? AppTheme.primaryViolet : Colors.grey.withOpacity(0.3),
+            color: isSelected ? AppTheme.primaryViolet : Colors.grey.withValues(alpha: 0.3),
             width: isSelected ? 2 : 1,
           ),
         ),

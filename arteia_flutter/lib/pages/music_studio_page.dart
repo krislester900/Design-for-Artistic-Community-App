@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -306,7 +305,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> with TickerProviderSt
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [theme.primaryColor.withOpacity(0.3), Colors.transparent],
+          colors: [theme.primaryColor.withValues(alpha: 0.3), Colors.transparent],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -357,12 +356,12 @@ class _MusicStudioPageState extends State<MusicStudioPage> with TickerProviderSt
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [theme.primaryColor.withOpacity(0.2), theme.secondaryColor.withOpacity(0.1)],
+          colors: [theme.primaryColor.withValues(alpha: 0.2), theme.secondaryColor.withValues(alpha: 0.1)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.primaryColor.withOpacity(0.3)),
+        border: Border.all(color: theme.primaryColor.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -379,7 +378,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> with TickerProviderSt
                         height: 100,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.red.withOpacity(0.2),
+                          color: Colors.red.withValues(alpha: 0.2),
                           border: Border.all(color: Colors.red, width: 3),
                         ),
                         child: const Icon(
@@ -431,7 +430,7 @@ class _MusicStudioPageState extends State<MusicStudioPage> with TickerProviderSt
                 Icon(
                   Icons.mic_none_rounded,
                   size: 60,
-                  color: theme.primaryColor.withOpacity(0.6),
+                  color: theme.primaryColor.withValues(alpha: 0.6),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -472,11 +471,11 @@ class _MusicStudioPageState extends State<MusicStudioPage> with TickerProviderSt
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
         decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [color, color.withOpacity(0.8)]),
+          gradient: LinearGradient(colors: [color, color.withValues(alpha: 0.8)]),
           borderRadius: BorderRadius.circular(30),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.4),
+              color: color.withValues(alpha: 0.4),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -530,9 +529,9 @@ class _MusicStudioPageState extends State<MusicStudioPage> with TickerProviderSt
           Container(
             padding: const EdgeInsets.all(40),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.03),
+              color: Colors.white.withValues(alpha: 0.03),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
             ),
             child: Column(
               children: [
@@ -568,10 +567,10 @@ class _MusicStudioPageState extends State<MusicStudioPage> with TickerProviderSt
               return Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isPlaying ? theme.primaryColor.withOpacity(0.5) : Colors.white.withOpacity(0.08),
+                    color: isPlaying ? theme.primaryColor.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.08),
                   ),
                 ),
                 child: Row(
@@ -626,3 +625,4 @@ class _MusicStudioPageState extends State<MusicStudioPage> with TickerProviderSt
     );
   }
 }
+

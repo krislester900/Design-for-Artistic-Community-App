@@ -162,7 +162,7 @@ class _ComicsUploadPageState extends State<ComicsUploadPage> {
                 decoration: BoxDecoration(
                   color: AppTheme.cardDarkLight,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -185,14 +185,14 @@ class _ComicsUploadPageState extends State<ComicsUploadPage> {
                 decoration: BoxDecoration(
                   color: AppTheme.cardDarkLight,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppTheme.primaryPink.withOpacity(0.2),
+                        color: AppTheme.primaryPink.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(Icons.photo_library, color: AppTheme.primaryPink, size: 32),
@@ -232,7 +232,7 @@ class _ComicsUploadPageState extends State<ComicsUploadPage> {
                       margin: const EdgeInsets.only(right: 8),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                        border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),

@@ -213,7 +213,7 @@ class _NotificationsPageEnhancedState extends State<NotificationsPageEnhanced> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppTheme.primaryViolet.withOpacity(0.1),
+                color: AppTheme.primaryViolet.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(30),
               ),
               child: const Icon(Icons.notifications_none, size: 64, color: AppTheme.primaryViolet),
@@ -279,10 +279,10 @@ class _NotificationTile extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isUnread ? AppTheme.primaryViolet.withOpacity(0.08) : Colors.transparent,
+          color: isUnread ? AppTheme.primaryViolet.withValues(alpha: 0.08) : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
           border: isUnread
-              ? Border.all(color: AppTheme.primaryViolet.withOpacity(0.2))
+              ? Border.all(color: AppTheme.primaryViolet.withValues(alpha: 0.2))
               : null,
         ),
         child: Row(
@@ -292,7 +292,7 @@ class _NotificationTile extends StatelessWidget {
               width: 40, height: 40,
               decoration: BoxDecoration(
                 color: isUnread 
-                    ? AppTheme.primaryViolet.withOpacity(0.2)
+                    ? AppTheme.primaryViolet.withValues(alpha: 0.2)
                     : AppTheme.cardDarkLight,
                 borderRadius: BorderRadius.circular(12),
               ),

@@ -91,7 +91,6 @@ class CategoryTheme {
         primary: primaryColor,
         secondary: accentColor,
         surface: cardColor,
-        background: backgroundColor,
       ),
       textTheme: const TextTheme(
         bodyLarge: TextStyle(color: Colors.white),

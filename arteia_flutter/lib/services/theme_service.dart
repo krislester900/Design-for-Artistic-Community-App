@@ -196,7 +196,7 @@ class ThemeService extends ChangeNotifier {
         selectedItemColor: palette.primaryViolet,
         unselectedItemColor: textSecondary,
       ),
-      dividerColor: textSecondary.withOpacity(0.2),
+      dividerColor: textSecondary.withValues(alpha: 0.2),
       textTheme: TextTheme(
         bodyLarge: TextStyle(color: textColor),
         bodyMedium: TextStyle(color: textColor),
