@@ -1,5 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import '../services/ai_assistant_service.dart';
+import '../services/voice_recorder_service.dart';
+import 'drawing_canvas_page.dart';
 
 class MuseTheme {
   final String id;
@@ -137,7 +142,8 @@ class _MuseAssistantPageState extends State<MuseAssistantPage> with SingleTicker
   VoiceActivityState _voiceState = VoiceActivityState.idle;
   final AiAssistantService _assistant = AiAssistantService();
   String _selectedCategory = 'general';
-
+  final VoiceRecorderService _voiceRecorder = VoiceRecorderService();
+  bool _isRecording = false;
   static const _welcomeMessage = 'Bonjour créateur ! ✨ Je suis Arteïa Muse, ton assistant artistique. Comment puis-je t\'inspirer aujourd\'hui ?';
 
   @override
@@ -155,6 +161,7 @@ class _MuseAssistantPageState extends State<MuseAssistantPage> with SingleTicker
   void dispose() {
     _textController.dispose();
     _scrollController.dispose();
+    _voiceRecorder.dispose();
     super.dispose();
   }
 
@@ -247,6 +254,156 @@ class _MuseAssistantPageState extends State<MuseAssistantPage> with SingleTicker
     });
   }
 
+
+  Future<void> _onDraw() async {
+    final imagePath = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const DrawingCanvasPage()),
+    );
+    if (imagePath != null && imagePath.isNotEmpty) {
+      await _sendMessageWithImage(imagePath);
+    }
+  }
+
+  void _onLotus() {
+    final prompts = [
+      'Peins-moi un souvenir d\'enfance sous la pluie, en aquarelle.',
+      'Écris un haïku sur la lumière dorée du crépuscule.',
+      'Compose une mélodie de 4 accords qui évoque la fin d\'un été.',
+      'Dessine un personnage dont le pouvoir vient de la nature.',
+      'Invente une planche de BD muette : un chat découvre une ville cosmique.',
+      'Donne-moi une idée de sculpture en 3 mots.',
+    ];
+    final prompt = prompts[DateTime.now().millisecondsSinceEpoch % prompts.length];
+    _textController.text = prompt;
+    _sendMessage();
+  }
+
+  Future<void> _onAddAttachment() async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: _theme.background,
+      builder: (_) {
+        return Container(
+          decoration: BoxDecoration(
+            color: _theme.background,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: _theme.muted,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                leading: Icon(Icons.photo_library, color: _theme.accent),
+                title: Text('Galerie', style: TextStyle(color: _theme.text)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final picker = ImagePicker();
+                  final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+                  if (picked == null) return;
+                  await _sendMessageWithImage(picked.path);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.camera_alt, color: _theme.accent),
+                title: Text('Appareil photo', style: TextStyle(color: _theme.text)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final picker = ImagePicker();
+                  final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
+                  if (picked == null) return;
+                  await _sendMessageWithImage(picked.path);
+                },
+              ),
+              ListTile(
+                leading: Icon(_isRecording ? Icons.stop : Icons.mic, color: Colors.red),
+                title: Text(_isRecording ? 'Arrêter l\'enregistrement' : 'Enregistrement vocal', style: TextStyle(color: _theme.text)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  if (_isRecording) return;
+                  try {
+                    final hasPermission = await _voiceRecorder.requestPermission();
+                    if (!hasPermission) return;
+                    final path = await _voiceRecorder.startRecording();
+                    if (path == null) return;
+                    setState(() => _isRecording = true);
+                    await Future.delayed(const Duration(seconds: 5));
+                    if (!mounted) return;
+                    final stoppedPath = await _voiceRecorder.stopRecording();
+                    setState(() => _isRecording = false);
+                    if (stoppedPath != null) {
+                      _addMessage('🎙️ Message vocal', isUser: true);
+                      await _sendTextMessage('Message vocal enregistré');
+                    }
+                  } catch (e) {
+                    setState(() => _isRecording = false);
+                  }
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.attach_file, color: _theme.accent),
+                title: Text('Document', style: TextStyle(color: _theme.text)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final result = await FilePicker.platform.pickFiles();
+                  if (result == null || result.files.isEmpty) return;
+                  final file = result.files.first;
+                  _addMessage('📎 ${file.name}', isUser: true);
+                  await _sendTextMessage('Document joint : ${file.name}');
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _sendMessageWithImage(String imagePath) async {
+    _textController.clear();
+    _addMessage('Regarde cette image', isUser: true, imageUrl: imagePath);
+    setState(() => _isLoading = true);
+    try {
+      final text = await _assistant.sendMessage(
+        message: 'Regarde cette image',
+        contentType: _selectedCategory,
+      );
+      _addMessage(text, isUser: false);
+    } catch (e) {
+      _addMessage('Désolé, une erreur est survenue. Réessaie ! 🙏', isUser: false);
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _sendTextMessage(String text) async {
+    setState(() => _isLoading = true);
+    try {
+      final history = List<Map<String, String>>.from(
+        _messages.whereType<_ChatBubble>().map((m) => {'role': m.isUser ? 'user' : 'assistant', 'content': m.text})
+      );
+      final result = await _assistant.sendMessageWithImage(
+        message: text,
+        contentType: _selectedCategory,
+        history: history,
+      );
+      _addMessage(result['text'] as String, isUser: false, imageUrl: result['image_url'] as String?);
+    } catch (e) {
+      _addMessage('Désolé, une erreur est survenue. Réessaie ! 🙏', isUser: false);
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -335,6 +492,9 @@ class _MuseAssistantPageState extends State<MuseAssistantPage> with SingleTicker
               onSend: (_) => _sendMessage(),
               controller: _textController,
               isLoading: _isLoading,
+              onDraw: _onDraw,
+              onLotus: _onLotus,
+              onAdd: _onAddAttachment,
             ),
           ],
         ),
@@ -526,19 +686,26 @@ class _MessageBubble extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (message.imageUrl != null) ...[
+                  if (message.imageUrl != null && message.imageUrl!.isNotEmpty) ...[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        message.imageUrl!,
-                        width: 240,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                        loadingBuilder: (_, child, progress) {
-                          if (progress == null) return child;
-                          return Container(width: 240, height: 180, color: theme.background, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: theme.accent)));
-                        },
-                      ),
+                      child: message.imageUrl!.startsWith('http')
+                          ? Image.network(
+                              message.imageUrl!,
+                              width: 240,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                              loadingBuilder: (_, child, progress) {
+                                if (progress == null) return child;
+                                return Container(width: 240, height: 180, color: theme.background, child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: theme.accent)));
+                              },
+                            )
+                          : Image.file(
+                              File(message.imageUrl!),
+                              width: 240,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                            ),
                     ),
                     const SizedBox(height: 8),
                   ],
@@ -637,8 +804,19 @@ class _BottomBar extends StatelessWidget {
   final ValueChanged<String> onSend;
   final TextEditingController controller;
   final bool isLoading;
+  final VoidCallback onDraw;
+  final VoidCallback onLotus;
+  final VoidCallback onAdd;
 
-  const _BottomBar({required this.theme, required this.onSend, required this.controller, this.isLoading = false});
+  const _BottomBar({
+    required this.theme,
+    required this.onSend,
+    required this.controller,
+    this.isLoading = false,
+    required this.onDraw,
+    required this.onLotus,
+    required this.onAdd,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -658,21 +836,21 @@ class _BottomBar extends StatelessWidget {
           _ActionButton(
             icon: Icons.brush_rounded,
             theme: theme,
-            onTap: () {},
+            onTap: onDraw,
             label: 'Dessiner',
           ),
           const SizedBox(width: 10),
           _ActionButton(
             icon: Icons.local_florist_rounded,
             theme: theme,
-            onTap: () {},
+            onTap: onLotus,
             label: 'Lotus',
           ),
           const SizedBox(width: 10),
           _ActionButton(
             icon: Icons.add_rounded,
             theme: theme,
-            onTap: () {},
+            onTap: onAdd,
             label: 'Ajouter',
           ),
           const SizedBox(width: 12),
