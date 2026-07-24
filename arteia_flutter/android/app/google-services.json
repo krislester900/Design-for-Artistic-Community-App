@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "647092041559",
+    "project_id": "arteia-b28f6",
+    "storage_bucket": "arteia-b28f6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:647092041559:android:45218708caa724f76b3012",
+        "android_client_info": {
+          "package_name": "com.arteia.arteia_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1n_AFr0lWiez2gjzpkKb-adC_v6iofYQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
