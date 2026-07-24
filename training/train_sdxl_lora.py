@@ -1,5 +1,6 @@
 """
-Train SDXL LoRA — tout en fp16, 8-bit Adam, gradient clipping.
+SDXL LoRA training — clean version, PyTorch AMP, gradient scaling.
+UNet fp16 + LoRA fp32 = stable training via GradScaler.
 """
 import json, os, requests, gc
 from pathlib import Path
@@ -8,24 +9,20 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 SUPABASE_URL = "https://wzewlweghntnqyfvhgan.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6ZXdsd2VnaG50bnF5ZnZoZ2FuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTAwOTgzMSwiZXhwIjoyMDk2NTg1ODMxfQ.9dK3ytQBBulDTx0MHdD5qY5M0BGpCJ6wOw-V3Oh5pEM"
 
-def fetch_references(style_slug: str):
-    headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
-    mapping = {"masashi-kishimoto": 4, "tite-kubo": 1, "akira-toriyama": 5, "junji-ito": 7}
-    sid = mapping.get(style_slug)
-    if sid is None: raise ValueError(f"Unknown style: {style_slug}")
-    q = f"/rest/v1/ai_manga_references?select=id,image_url,style_id&style_id=eq.{sid}&limit=500"
-    r = requests.get(SUPABASE_URL + q, headers=headers); r.raise_for_status()
-    return r.json()
-
-def download_images(refs, out_dir: Path):
+def download_images(out_dir: Path, style="masashi-kishimoto"):
     os.makedirs(out_dir, exist_ok=True)
+    mapping = {"masashi-kishimoto": 4, "tite-kubo": 1, "akira-toriyama": 5, "junji-ito": 7}
+    sid = mapping.get(style)
+    if sid is None: raise ValueError(f"Unknown style: {style}")
+    headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+    q = f"/rest/v1/ai_manga_references?select=id,image_url,style_id&style_id=eq.{sid}&limit=500"
+    refs = requests.get(SUPABASE_URL + q, headers=headers).json()
     captions, downloaded = [], 0
     def dl_one(ref):
         url = ref["image_url"]
-        ext = url.split(".")[-1].split("?")[0][:4]
+        ext = (url.split(".")[-1].split("?")[0][:4]) or "jpg"
         if ext not in ("png", "jpg", "jpeg", "webp"): ext = "jpg"
-        fname = f"{ref['id']:05d}.{ext}"
-        path = out_dir / fname
+        fname = f"{ref['id']:05d}.{ext}"; path = out_dir / fname
         if path.exists(): return fname, True
         try:
             r = requests.get(url, timeout=30); r.raise_for_status()
@@ -33,27 +30,25 @@ def download_images(refs, out_dir: Path):
             return fname, True
         except: return fname, False
     with ThreadPoolExecutor(max_workers=8) as ex:
-        futures = {ex.submit(dl_one, r): r for r in refs}
-        for f in as_completed(futures):
+        for f in as_completed({ex.submit(dl_one, r): r for r in refs}):
             fname, ok = f.result()
             if ok:
                 downloaded += 1
-                captions.append(f'{{"image": "{fname}", "caption": "masterpiece, best quality, naruto manga panel art style by Masashi Kishimoto, manga panel, monochrome, lineart, screentone"}}')
+                captions.append(f'{{"image":"{fname}","caption":"naruto manga panel by Masashi Kishimoto, masterpiece, best quality, monochrome, lineart, screentone"}}')
     with open(out_dir / "metadata.jsonl", "w") as f: f.write("\n".join(captions))
-    return downloaded
+    print(f"Downloaded {downloaded}/{len(refs)} images")
 
 def train():
     import torch, gc
-    from accelerate import Accelerator
-    from accelerate.utils import ProjectConfiguration
+    import torch.nn as nn
+    from torch.utils.data import Dataset, DataLoader
+    from torch.amp import autocast, GradScaler
     from diffusers import AutoencoderKL, DDPMScheduler, UNet2DConditionModel
     from diffusers.optimization import get_scheduler
-    from peft import LoraConfig
-    from torch.utils.data import Dataset, DataLoader
+    from peft import LoraConfig, get_peft_model_state_dict
     from PIL import Image
     from transformers import CLIPTokenizer, CLIPTextModel, CLIPTextModelWithProjection
     import numpy as np
-    import bitsandbytes as bnb
 
     device = torch.device("cuda")
     gb = torch.cuda.get_device_properties(0).total_memory / 1e9
@@ -61,6 +56,7 @@ def train():
 
     out = Path("C:/Users/PC/Downloads/Design for Artistic Community App/training/naruto")
 
+    # ── Dataset ──
     class MangaDataset(Dataset):
         def __init__(self, img_dir, size=512):
             self.img_dir = Path(img_dir); self.size = size; self.images = []
@@ -86,26 +82,19 @@ def train():
             img = img.resize((self.size, self.size), Image.LANCZOS)
             arr = np.array(img).astype(np.float32) / 127.5 - 1.0
             t = torch.from_numpy(arr).permute(2, 0, 1).float()
-            out = {"pixel_values": t, "original_size": (h, w)}
-            if hasattr(self, "prompt_embeds"):
-                out["prompt_embeds"] = self.prompt_embeds[idx]
-                out["pooled_embeds"] = self.pooled_embeds[idx]
-            return out
+            out_d = {"px": t, "original_size": (h, w)}
+            if hasattr(self, "embeds"):
+                out_d["eh"] = self.embeds[idx]; out_d["pool"] = self.pooled[idx]
+            return out_d
 
-    # ── Download if missing ──
+    # Download + load dataset
     if not list(out.glob("*.jpg")) and not list(out.glob("*.png")):
-        print("Downloading images from Supabase...")
-        refs = fetch_references("masashi-kishimoto")
-        n = download_images(refs, out)
-        print(f"Downloaded {n} images")
-    else:
-        print(f"Images already present in {out}")
-
+        download_images(out)
     dataset = MangaDataset(out, size=512)
     if len(dataset) < 10: print(f"Not enough ({len(dataset)})"); return
-    print(f"Dataset: {len(dataset)} images")
+    print(f"Dataset: {len(dataset)} images 512x512")
 
-    # ── Pre-encode captions ──
+    # ── Pre-encode text ──
     tokenizer = CLIPTokenizer.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", subfolder="tokenizer")
     tokenizer_2 = CLIPTokenizer.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", subfolder="tokenizer_2")
     noise_scheduler = DDPMScheduler.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", subfolder="scheduler")
@@ -119,98 +108,95 @@ def train():
         bc = caps[i:i+8]
         toks = tokenizer(bc, padding="max_length", max_length=77, truncation=True, return_tensors="pt").input_ids.to(device)
         toks2 = tokenizer_2(bc, padding="max_length", max_length=77, truncation=True, return_tensors="pt").input_ids.to(device)
-        with torch.no_grad():
+        with torch.no_grad(), autocast(device_type="cuda"):
             pe = tc1(toks)[0].cpu().float()
             o2 = tc2(toks2)
             pe2 = o2.last_hidden_state.cpu().float()
             po = o2.text_embeds.cpu().float()
         embeds.append(torch.cat([pe, pe2], dim=-1)); pooled.append(po)
-    dataset.prompt_embeds = torch.cat(embeds)
-    dataset.pooled_embeds = torch.cat(pooled)
+    dataset.embeds = torch.cat(embeds); dataset.pooled = torch.cat(pooled)
     del tc1, tc2; gc.collect(); torch.cuda.empty_cache()
 
     def collate_fn(batch):
         return {
-            "pixel_values": torch.stack([b["pixel_values"] for b in batch]),
-            "prompt_embeds": torch.stack([b["prompt_embeds"] for b in batch]),
-            "pooled_embeds": torch.stack([b["pooled_embeds"] for b in batch]),
-            "original_size": [b["original_size"] for b in batch],
+            "px": torch.stack([b["px"] for b in batch]),
+            "eh": torch.stack([b["eh"] for b in batch]),
+            "pool": torch.stack([b["pool"] for b in batch]),
+            "osz": [b["original_size"] for b in batch],
         }
 
-    loader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=0, collate_fn=collate_fn)
+    # ── Models ──
+    vae = AutoencoderKL.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", subfolder="vae", torch_dtype=torch.float32)
+    vae.requires_grad_(False); vae.eval(); vae.to(device)
 
-    # ── VAE fp16 ──
-    vae = AutoencoderKL.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", subfolder="vae", torch_dtype=torch.float16)
-    vae.requires_grad_(False); vae.eval()
-
-    # ── UNet fp16 + LoRA fp16 (pas de mixing !) ──
-    print("Loading UNet fp16 + LoRA...")
     unet = UNet2DConditionModel.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", subfolder="unet", torch_dtype=torch.float16)
     unet.requires_grad_(False)
     unet.add_adapter(LoraConfig(r=32, lora_alpha=32,
         target_modules=["to_q", "to_k", "to_v", "to_out.0", "ff.net.0.proj", "ff.net.2"],
         lora_dropout=0.1, bias="none"))
-    # LoRA reste en fp16 (identique au base model)
+    # UNet → fp16, LoRA → fp32 (via autocast, pas de mix manuel)
     unet.enable_gradient_checkpointing()
     unet.train()
-    n_trainable = sum(p.numel() for p in unet.parameters() if p.requires_grad)
-    print(f"Trainable: {n_trainable} params ({n_trainable*4/1e6:.1f}MB)")
+    n_t = sum(p.numel() for p in unet.parameters() if p.requires_grad)
+    print(f"Trainable: {n_t} params ({n_t*4/1e6:.1f}MB)")
+    for p in unet.parameters():
+        if p.requires_grad: p.data = p.data.float()
 
-    opt = bnb.optim.Adam8bit(filter(lambda p: p.requires_grad, unet.parameters()), lr=5e-5, weight_decay=1e-2)
-    sched = get_scheduler("constant", optimizer=opt, num_warmup_steps=50, num_training_steps=len(loader)*15)
+    opt = torch.optim.AdamW(filter(lambda p: p.requires_grad, unet.parameters()), lr=5e-5, weight_decay=1e-2)
+    scaler = GradScaler(device="cuda")
+    loader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=0, collate_fn=collate_fn)
+    sched = get_scheduler("constant", optimizer=opt, num_warmup_steps=50, num_training_steps=len(loader)*10)
 
-    accelerator = Accelerator(gradient_accumulation_steps=1,
-        project_config=ProjectConfiguration(project_dir=str(out / "logs")))
-    unet, opt, loader, sched = accelerator.prepare(unet, opt, loader, sched)
-    vae = vae.to(accelerator.device)
+    unet.to(device)
+    print(f"VRAM: {torch.cuda.memory_allocated(0)/1e9:.2f}GB")
 
-    print(f"VRAM used: {torch.cuda.memory_allocated(0)/1e9:.2f}GB")
-    print("Starting training (10 epochs, 512px, tout fp16)...")
-
+    # ── Train ──
+    n_epochs = 10
+    print(f"Starting ({n_epochs} epochs, 512px, AMP GradScaler)...")
     step = 0
-    for epoch in range(10):
+    for epoch in range(n_epochs):
         for batch in loader:
-            with accelerator.accumulate(unet):
-                px = batch["pixel_values"].to(accelerator.device, dtype=torch.float16)
-                eh = batch["prompt_embeds"].to(accelerator.device, dtype=torch.float16)
-                pp = batch["pooled_embeds"].to(accelerator.device, dtype=torch.float16)
-                osz = batch["original_size"]
+            px = batch["px"].to(device, dtype=torch.float16)
+            eh = batch["eh"].to(device, dtype=torch.float16)
+            pool = batch["pool"].to(device, dtype=torch.float16)
+            osz = batch["osz"]
 
-                with torch.no_grad():
-                    lat = vae.encode(px).latent_dist.sample() * vae.config.scaling_factor
+            with torch.no_grad():
+                latents = vae.encode(px.float()).latent_dist.sample() * vae.config.scaling_factor
+                latents = latents.half()
 
-                noise = torch.randn_like(lat)
-                ts = torch.randint(0, noise_scheduler.config.num_train_timesteps, (lat.shape[0],), device=lat.device).long()
-                nlat = noise_scheduler.add_noise(lat, noise, ts)
+            noise = torch.randn_like(latents)
+            ts = torch.randint(0, noise_scheduler.config.num_train_timesteps, (latents.shape[0],), device=device).long()
+            noisy = noise_scheduler.add_noise(latents, noise, ts)
 
-                tid = torch.tensor([[h, w, 0, 0, 512, 512] for h, w in osz], dtype=torch.long, device=accelerator.device)
-                ac = {"text_embeds": pp, "time_ids": tid}
+            tid = torch.tensor([[h, w, 0, 0, 512, 512] for h, w in osz], dtype=torch.long, device=device)
 
-                pred = unet(nlat, ts, eh, added_cond_kwargs=ac).sample
-
+            with autocast(device_type="cuda"):
+                pred = unet(noisy, ts, eh, added_cond_kwargs={"text_embeds": pool, "time_ids": tid}).sample
                 loss = torch.nn.functional.mse_loss(pred.float(), noise.float())
 
-                accelerator.backward(loss)
-                # Gradient clipping for stability
-                torch.nn.utils.clip_grad_norm_(unet.parameters(), max_norm=1.0)
-                opt.step()
-                sched.step()
-                opt.zero_grad()
+            scaler.scale(loss).backward()
+            scaler.unscale_(opt)
+            torch.nn.utils.clip_grad_norm_(unet.parameters(), max_norm=1.0)
+            scaler.step(opt)
+            scaler.update()
+            opt.zero_grad()
 
             step += 1
+            if step == 1: print(f"  First loss: {loss.item():.6f}")
             if step % 50 == 0: print(f"  step {step} | loss: {loss.item():.6f}")
-            if step == 1: is_nan = "OK" if not torch.isnan(loss) else "NAN"; print(f"  First step loss: {loss.item():.6f} [{is_nan}]")
 
         print(f"Epoch {epoch+1}/10 done")
         if (epoch + 1) % 5 == 0:
             ckpt = out / f"lora_ckpt_epoch{epoch+1}"
-            accelerator.unwrap_model(unet).save_pretrained(str(ckpt))
-            print(f"  Checkpoint saved to {ckpt}")
+            ckpt.mkdir(parents=True, exist_ok=True)
+            torch.save(get_peft_model_state_dict(unet), str(ckpt / "lora_weights.pth"))
+            print(f"  Saved checkpoint")
 
-    save_path = out / "lora_weights"
-    accelerator.unwrap_model(unet).save_pretrained(str(save_path))
-    print(f"Final weights saved to {save_path}")
-    print("[OK] Training complete!")
+    final_dir = out / "lora_final"
+    final_dir.mkdir(parents=True, exist_ok=True)
+    torch.save(get_peft_model_state_dict(unet), str(final_dir / "lora_weights.pth"))
+    print("Done!")
 
 if __name__ == "__main__":
     train()

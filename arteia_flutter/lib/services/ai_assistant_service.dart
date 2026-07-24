@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import 'supabase_service.dart';
 import 'memory_service.dart';
 
@@ -82,7 +83,7 @@ class AiAssistantService {
     try {
       final response = await http.get(
         Uri.parse('https://api.duckduckgo.com/?q=${Uri.encodeQueryComponent(query)}&format=json&skip_disambig=1'),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -143,10 +144,12 @@ class AiAssistantService {
 
     // 1. RAG : Récupérer les connaissances pertinentes
     final relevantKnowledge = await _getRelevantKnowledge(message, contentType);
-    
-    // 2. Recherche web SYSTÉMATIQUE pour les questions factuelles
+
+    final hasRemoteApi = _groqApiKey.isNotEmpty || _hfApiKey.isNotEmpty;
+
+    // 2. Recherche web seulement si un provider distant est actif
     String? webResults;
-    if (_needsWebSearch(message) || _isFactualQuestion(message)) {
+    if (hasRemoteApi && (_needsWebSearch(message) || _isFactualQuestion(message))) {
       webResults = await _searchWeb(message);
     }
 
@@ -174,15 +177,17 @@ class AiAssistantService {
       } catch (_) {}
     }
 
-    // 5. Essayer Ollama (si serveur disponible)
-    try {
-      final ollamaResponse = await _tryOllama(message, contentType, history, relevantKnowledge, webResults, personalizationContext);
-      if (ollamaResponse != null) {
-        await _saveConversation(message, ollamaResponse, contentType);
-        await _updateMemoryFromMessage(message, userId);
-        return ollamaResponse;
-      }
-    } catch (_) {}
+    // 5. Essayer Ollama seulement si un provider distant est actif et pas sur web
+    if (hasRemoteApi && !kIsWeb) {
+      try {
+        final ollamaResponse = await _tryOllama(message, contentType, history, relevantKnowledge, webResults, personalizationContext);
+        if (ollamaResponse != null) {
+          await _saveConversation(message, ollamaResponse, contentType);
+          await _updateMemoryFromMessage(message, userId);
+          return ollamaResponse;
+        }
+      } catch (_) {}
+    }
 
     // 6. Fallback : Edge Function Supabase
     try {
@@ -216,7 +221,7 @@ class AiAssistantService {
               'habits': habitsAnalysis['habits'],
             },
           }),
-        ).timeout(const Duration(seconds: 30));
+        ).timeout(const Duration(seconds: 10));
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -376,6 +381,7 @@ class AiAssistantService {
     String? webResults,
     String personalizationContext,
   ) async {
+    if (kIsWeb) return null;
     final preferredModel = _selectModel(message);
     final urls = [_ollamaUrl, _ollamaUrlBackup];
 
@@ -425,7 +431,7 @@ class AiAssistantService {
                 'num_predict': 500,
               },
             }),
-          ).timeout(const Duration(seconds: 30));
+          ).timeout(const Duration(seconds: 5));
 
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -463,7 +469,8 @@ class AiAssistantService {
           .eq('category', category)
           .or('title.ilike.%${keywords.first}%,content.ilike.%${keywords.first}%')
           .order('helpful_count', ascending: false)
-          .limit(_ragTopK);
+          .limit(_ragTopK)
+          .timeout(const Duration(seconds: 5));
 
       return (response as List).cast<Map<String, dynamic>>();
     } catch (e) {

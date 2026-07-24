@@ -1,0 +1,7 @@
+Device: cuda | VRAM: 8.6GB
+Dataset: 499 images 512x512
+Pre-encoding captions...
+Trainable: 83722240 params (334.9MB)
+VRAM: 5.93GB
+Starting (1 epochs, 512px, AMP GradScaler)...
+  First loss: 0.220403
