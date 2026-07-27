@@ -86,7 +86,8 @@ class AiAssistantService {
         m.contains('latest') || m.contains('current') ||
         m.contains('who is') || m.contains('what is') || m.contains('definition') ||
         m.contains('history of') || m.contains('capital of') || m.contains('president of') ||
-        m.contains('population of') || m.contains('weather') || m.contains('time in')) {
+        m.contains('population of') || m.contains('weather') || m.contains('time in') ||
+        m.contains('recherche') || m.contains('cherche') || m.contains('google') || m.contains('internet')) {
       return true;
     }
     return false;

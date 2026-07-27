@@ -284,11 +284,9 @@ class _MuseAssistantPageState extends State<MuseAssistantPage> with SingleTicker
       context: context,
       backgroundColor: _theme.background,
       builder: (_) {
-        return Container(
-          decoration: BoxDecoration(
-            color: _theme.background,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
+        return Material(
+          color: _theme.background,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
