@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseConfig {
   static const String supabaseUrl = 'https://wzewlweghntnqyfvhgan.supabase.co';
-  static const String supabaseAnonKey = 'sb_publishable_AEgvzQeXUmhEpO7fGQPyvQ_fnzZZJNV';
+  static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6ZXdsd2VnaG50bnF5ZnZoZ2FuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMDk4MzEsImV4cCI6MjA5NjU4NTgzMX0.sbvgeXqbobhUJGDkttOdPYJhchZXHQUMP8QWZLAqUeM';
 }
 
 class AuthResult {
