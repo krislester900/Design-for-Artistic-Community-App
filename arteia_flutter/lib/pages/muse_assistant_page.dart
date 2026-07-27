@@ -368,11 +368,11 @@ class _MuseAssistantPageState extends State<MuseAssistantPage> with SingleTicker
 
   Future<void> _sendMessageWithImage(String imagePath) async {
     _textController.clear();
-    _addMessage('Regarde cette image', isUser: true, imageUrl: imagePath);
+    _addMessage('Image jointe', isUser: true, imageUrl: imagePath);
     setState(() => _isLoading = true);
     try {
       final text = await _assistant.sendMessage(
-        message: 'Regarde cette image',
+        message: 'L\'utilisateur a joint une image. Réponds en tenant compte de ce contexte visuel si possible, sinon propose une piste de réflexion créative adaptée.',
         contentType: _selectedCategory,
       );
       _addMessage(text, isUser: false);
