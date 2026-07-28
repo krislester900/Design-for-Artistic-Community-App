@@ -18,7 +18,7 @@ class _VynoraMusicPageState extends State<VynoraMusicPage> {
     _controller = WebViewController();
       
     if (kIsWeb) {
-      _controller.loadRequest(Uri.base.resolve('assets/assets/games/vynora/index.html'));
+      _controller.loadRequest(Uri.base.resolve('assets/games/vynora/index.html'));
     } else {
       _controller.setBackgroundColor(Colors.black);
       _controller.setJavaScriptMode(JavaScriptMode.unrestricted);

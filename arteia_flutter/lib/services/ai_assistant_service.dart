@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:path_provider/path_provider.dart';
 import 'supabase_service.dart';
 import 'memory_service.dart';
 
@@ -23,6 +25,7 @@ class AiAssistantService {
 
   String _openRouterApiKey = '';
   String _openRouterModel = 'meta-llama/llama-3.1-70b';
+  String _openRouterVisionModel = 'meta-llama/llama-3.2-90b-vision-preview';
 
   Future<void> _loadConfig() async {
     try {
@@ -32,7 +35,9 @@ class AiAssistantService {
       _openRouterApiKey = (env['OPENROUTER_API_KEY'] ?? '').trim();
       final model = (env['OPENROUTER_MODEL'] ?? '').trim();
       if (model.isNotEmpty) _openRouterModel = model;
-      debugPrint('[IA] Config loaded: groq=${_groqApiKey.isNotEmpty}, openrouter=${_openRouterApiKey.isNotEmpty}, model=$_openRouterModel');
+      final visionModel = (env['OPENROUTER_VISION_MODEL'] ?? '').trim();
+      if (visionModel.isNotEmpty) _openRouterVisionModel = visionModel;
+      debugPrint('[IA] Config loaded: groq=${_groqApiKey.isNotEmpty}, openrouter=${_openRouterApiKey.isNotEmpty}, model=$_openRouterModel, vision=$_openRouterVisionModel');
     } catch (e) {
       debugPrint('[IA] Config load error: $e');
     }
@@ -50,12 +55,15 @@ class AiAssistantService {
   // RAG : Base de connaissances
   static const int _ragTopK = 3; // Nombre de connaissances à récupérer
   
-  // Modèle principal : Qwen 2.5 Coder 7B (gratuit, rapide, performant)
+  // Modèles par priorité et spécialité
   static const _modelPriority = [
     'qwen2.5-coder:7b',  // Modèle principal pour le code et l'IA
   ];
 
-  String _selectModel(String message) {
+  String _selectModel(String message, {bool needsVision = false}) {
+    if (needsVision) {
+      return _openRouterVisionModel;
+    }
     final lower = message.toLowerCase();
     final wordCount = lower.split(' ').where((w) => w.isNotEmpty).length;
 
@@ -125,7 +133,7 @@ class AiAssistantService {
         final source = data['AbstractSource'] as String?;
 
         if (answer != null && answer.isNotEmpty) results.add('Réponse: $answer');
-        if (abstract != null && abstract.isNotEmpty) results.add('$abstract');
+        if (abstract != null && abstract.isNotEmpty) results.add(abstract);
         if (source != null && source.isNotEmpty) results.add('Source: $source');
 
         final topics = data['RelatedTopics'] as List<dynamic>?;
@@ -292,13 +300,327 @@ class AiAssistantService {
     return localResponse;
   }
 
+  /// Envoie un message avec analyse d'image (vision)
   Future<Map<String, dynamic>> sendMessageWithImage({
     required String message,
+    String? imageUrl,
     String contentType = 'general',
     List<Map<String, String>>? history,
   }) async {
-    final text = await sendMessage(message: message, contentType: contentType, history: history);
-    return {'text': text, 'image_url': null, 'planche_id': null};
+    if (message.trim().isEmpty && imageUrl == null) {
+      return {'text': '', 'image_url': null, 'planche_id': null};
+    }
+
+    debugPrint('[IA] sendMessageWithImage: "$message" image=$imageUrl');
+
+    String? userId;
+    Map<String, String> prefs = {};
+    List<Map<String, dynamic>> relationshipMemory = [];
+    Map<String, dynamic> habitsAnalysis = {'habits': <String, dynamic>{}, 'confidence': 0.5};
+
+    try {
+      userId = _supabase.currentUser?.id;
+      if (userId != null) {
+        prefs = await _supabase.getInteractionPreferences();
+        relationshipMemory = await _memory.getRelationshipMemory(userId);
+      }
+      habitsAnalysis = _memory.trackHabits(message);
+    } on Exception catch (_) {}
+
+    await _loadConfig();
+
+    // Utiliser le backend unifié si configuré
+    final backendUrl = dotenv.env['MUSE_BACKEND_URL']?.trim();
+    if (backendUrl != null && backendUrl.isNotEmpty) {
+      try {
+        final backendResponse = await _callUnifiedBackend(
+          message,
+          imageUrl,
+          history,
+          contentType,
+          userId,
+          prefs,
+          relationshipMemory,
+          habitsAnalysis,
+          backendUrl,
+        );
+        if (backendResponse != null) {
+          await _saveConversation(message, backendResponse['text'] ?? '', contentType);
+          await _updateMemoryFromMessage(message, userId);
+          return backendResponse;
+        }
+      } catch (e) {
+        debugPrint('[IA] Unified backend error: $e');
+      }
+    }
+
+    final personalizationContext = _buildPersonalizationContext(prefs, relationshipMemory, habitsAnalysis);
+    final relevantKnowledge = await _getRelevantKnowledge(message, contentType);
+
+    // 1. Essayer Groq avec vision
+    if (_groqApiKey.isNotEmpty && imageUrl != null) {
+      try {
+        final groqResponse = await _tryGroqVision(message, imageUrl, history, relevantKnowledge, personalizationContext);
+        if (groqResponse != null) {
+          await _saveConversation(message, groqResponse['text'] ?? '', contentType);
+          await _updateMemoryFromMessage(message, userId);
+          return groqResponse;
+        }
+      } catch (_) {}
+    }
+
+    // 2. Essayer OpenRouter avec vision
+    if (_openRouterApiKey.isNotEmpty && imageUrl != null) {
+      try {
+        final openRouterResponse = await _tryOpenRouterVision(message, imageUrl, contentType, history, relevantKnowledge, personalizationContext);
+        if (openRouterResponse != null) {
+          await _saveConversation(message, openRouterResponse['text'] ?? '', contentType);
+          await _updateMemoryFromMessage(message, userId);
+          return openRouterResponse;
+        }
+      } catch (_) {}
+    }
+
+    // 3. Fallback : analyse textuelle de l'image
+    if (imageUrl != null) {
+      final fallbackResponse = await _analyzeImageFallback(message, imageUrl);
+      if (fallbackResponse != null) {
+        await _saveConversation(message, fallbackResponse['text'] ?? '', contentType);
+        await _updateMemoryFromMessage(message, userId);
+        return fallbackResponse;
+      }
+    }
+
+    // 4. Sans image, utiliser le mode texte normal
+    final textResponse = await sendMessage(message: message, contentType: contentType, history: history);
+    return {'text': textResponse, 'image_url': imageUrl, 'planche_id': null};
+  }
+
+  Future<Map<String, dynamic>?> _callUnifiedBackend(
+    String message,
+    String? imageUrl,
+    List<Map<String, String>>? history,
+    String contentType,
+    String? userId,
+    Map<String, String> prefs,
+    List<Map<String, dynamic>> relationshipMemory,
+    Map<String, dynamic> habitsAnalysis,
+    String backendUrl,
+  ) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$backendUrl/api/muse/chat'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'message': message,
+          'imageUrl': imageUrl,
+          'history': history,
+          'contentType': contentType,
+          'userId': userId,
+          'prefs': prefs,
+          'relationshipMemory': relationshipMemory,
+          'habits': habitsAnalysis['habits'],
+        }),
+      ).timeout(const Duration(seconds: 30));
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final reply = data['reply'] as String?;
+        if (reply != null && reply.isNotEmpty) {
+          return {'text': reply, 'image_url': imageUrl, 'planche_id': null};
+        }
+      }
+    } catch (e) {
+      debugPrint('[IA] Unified backend call error: $e');
+    }
+    return null;
+  }
+
+  // ==================== VISION METHODS ====================
+
+  Future<Map<String, dynamic>?> _tryGroqVision(
+    String message,
+    String imageUrl,
+    List<Map<String, String>>? history,
+    List<Map<String, dynamic>> knowledge,
+    String personalizationContext,
+  ) async {
+    if (_groqApiKey.isEmpty) return null;
+
+    try {
+      debugPrint('[IA] Groq Vision: trying llama-3.2-90b-vision-preview');
+      final messages = <Map<String, dynamic>>[];
+
+      final systemContent = StringBuffer();
+      systemContent.write('Tu es Arteïa Muse, une IA créative pour artistes.');
+      systemContent.write(' Tu parles français, ton style est poétique, visuel et inspirant.');
+      systemContent.write(' Tu réponds en 2-3 phrases max, avec des métaphores artistiques.');
+      systemContent.write(' Analyse l\'image avec attention et décris-la de manière artistique.');
+      systemContent.write(' Si des connaissances sont fournies, base-toi dessus.');
+      if (personalizationContext.isNotEmpty) {
+        systemContent.write('\n\nContexte personnalisé : $personalizationContext');
+      }
+      if (knowledge.isNotEmpty) {
+        systemContent.write('\n\nConnaissances :\n');
+        for (final k in knowledge.take(2)) {
+          systemContent.write('- ${k['title']}: ${k['content']}\n');
+        }
+      }
+
+      messages.add({'role': 'system', 'content': systemContent.toString()});
+
+      if (history != null) {
+        for (final msg in history.take(10)) {
+          final role = msg['role'] == 'assistant' ? 'assistant' : 'user';
+          messages.add({'role': role, 'content': msg['content'] ?? ''});
+        }
+      }
+
+      messages.add({
+        'role': 'user',
+        'content': [
+          {'type': 'text', 'text': message},
+          {'type': 'image_url', 'image_url': {'url': imageUrl, 'detail': 'auto'}},
+        ],
+      });
+
+      final response = await http.post(
+        Uri.parse(_groqUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_groqApiKey',
+        },
+        body: jsonEncode({
+          'model': 'llama-3.2-90b-vision-preview',
+          'messages': messages,
+          'temperature': 0.8,
+          'max_tokens': 1000,
+        }),
+      ).timeout(const Duration(seconds: 20));
+
+      debugPrint('[IA] Groq Vision status: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final content = data['choices']?[0]?['message']?['content'] as String?;
+        if (content != null && content.isNotEmpty) {
+          return {'text': content, 'image_url': imageUrl, 'planche_id': null};
+        }
+      }
+    } catch (e) {
+      debugPrint('[IA] Groq Vision error: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> _tryOpenRouterVision(
+    String message,
+    String imageUrl,
+    String contentType,
+    List<Map<String, String>>? history,
+    List<Map<String, dynamic>> knowledge,
+    String personalizationContext,
+  ) async {
+    if (_openRouterApiKey.isEmpty) return null;
+
+    try {
+      debugPrint('[IA] OpenRouter Vision: trying llama-3.2-90b-vision-preview');
+      final messages = <Map<String, dynamic>>[];
+
+      final systemContent = StringBuffer();
+      systemContent.write('Tu es Arteïa Muse, une IA créative pour artistes.');
+      systemContent.write(' Tu parles français, ton style est poétique, visuel et inspirant.');
+      systemContent.write(' Tu réponds en 2-3 phrases max, avec des métaphores artistiques.');
+      systemContent.write(' Analyse l\'image avec attention et décris-la de manière artistique.');
+      if (personalizationContext.isNotEmpty) {
+        systemContent.write('\n\nContexte personnalisé : $personalizationContext');
+      }
+      if (knowledge.isNotEmpty) {
+        systemContent.write('\n\nConnaissances :\n');
+        for (final k in knowledge.take(2)) {
+          systemContent.write('- ${k['title']}: ${k['content']}\n');
+        }
+      }
+
+      messages.add({'role': 'system', 'content': systemContent.toString()});
+
+      if (history != null) {
+        for (final msg in history.take(10)) {
+          final role = msg['role'] == 'assistant' ? 'assistant' : 'user';
+          messages.add({'role': role, 'content': msg['content'] ?? ''});
+        }
+      }
+
+      messages.add({
+        'role': 'user',
+        'content': [
+          {'type': 'text', 'text': message},
+          {'type': 'image_url', 'image_url': {'url': imageUrl, 'detail': 'auto'}},
+        ],
+      });
+
+      final response = await http.post(
+        Uri.parse(_buildOpenRouterUrl()),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_openRouterApiKey',
+          'HTTP-Referer': 'https://arteia.app',
+          'X-Title': 'Arteia Muse Vision',
+        },
+        body: jsonEncode({
+          'model': 'meta-llama/llama-3.2-90b-vision-preview',
+          'messages': messages,
+          'temperature': 0.8,
+          'max_tokens': 1000,
+        }),
+      ).timeout(const Duration(seconds: 30));
+
+      debugPrint('[IA] OpenRouter Vision status: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final content = data['choices']?[0]?['message']?['content'] as String?;
+        if (content != null && content.isNotEmpty) {
+          return {'text': content, 'image_url': imageUrl, 'planche_id': null};
+        }
+      }
+    } catch (e) {
+      debugPrint('[IA] OpenRouter Vision error: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> _analyzeImageFallback(
+    String message,
+    String imageUrl,
+  ) async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://api.openai.com/v1/chat/completions'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_openRouterApiKey',
+        },
+        body: jsonEncode({
+          'model': 'gpt-4o-mini',
+          'messages': [
+            {'role': 'system', 'content': 'You are an art critic. Describe images poetically in French.'},
+            {'role': 'user', 'content': 'Describe this image: $message'},
+          ],
+          'temperature': 0.7,
+          'max_tokens': 300,
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final content = data['choices']?[0]?['message']?['content'] as String?;
+        if (content != null && content.isNotEmpty) {
+          return {'text': content, 'image_url': imageUrl, 'planche_id': null};
+        }
+      }
+    } catch (e) {
+      debugPrint('[IA] Image fallback error: $e');
+    }
+    return null;
   }
 
   // ==================== GROQ (100% GRATUIT, ULTRA RAPIDE) ====================
@@ -670,7 +992,7 @@ class AiAssistantService {
         'feedback_text': feedbackText,
       });
     } catch (e) {
-      print('Erreur feedback: $e');
+      debugPrint('Erreur feedback: $e');
     }
   }
 
@@ -821,5 +1143,147 @@ class AiAssistantService {
         }, message);
       }
     } catch (_) {}
+  }
+
+  /// Appelle les outils créatifs du backend unifié (idées, style, critique, describe)
+  Future<String?> getCreativeResponse({
+    required String tool,
+    String? prompt,
+    String? imageUrl,
+  }) async {
+    final backendUrl = dotenv.env['MUSE_BACKEND_URL']?.trim();
+    if (backendUrl == null || backendUrl.isEmpty) return null;
+
+    try {
+      final res = await http.post(
+        Uri.parse('$backendUrl/api/muse/creative'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          tool: tool,
+          prompt: prompt,
+          imageUrl: imageUrl,
+        }),
+      ).timeout(const Duration(seconds: 30));
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return data['result'] as String?;
+      }
+    } catch (e) {
+      debugPrint('[IA] Creative tool error: $e');
+    }
+    return null;
+  }
+
+  /// Génère un fichier PDF via le backend unifié
+  Future<String?> generatePDF({
+    required String content,
+    String title = "Document Muse",
+  }) async {
+    final backendUrl = dotenv.env['MUSE_BACKEND_URL']?.trim();
+    if (backendUrl == null || backendUrl.isEmpty) return null;
+
+    try {
+      final res = await http.post(
+        Uri.parse('$backendUrl/api/muse/generate/pdf'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'content': content, 'title': title}),
+      ).timeout(const Duration(seconds: 30));
+
+      if (res.statusCode == 200) {
+        final bytes = res.bodyBytes;
+        final dir = await getApplicationDocumentsDirectory();
+        final file = File('${dir.path}/$title.pdf');
+        await file.writeAsBytes(bytes);
+        return file.path;
+      }
+    } catch (e) {
+      debugPrint('[IA] PDF generation error: $e');
+    }
+    return null;
+  }
+
+  /// Génère un fichier Word via le backend unifié
+  Future<String?> generateWord({
+    required String content,
+    String title = "Document Muse",
+  }) async {
+    final backendUrl = dotenv.env['MUSE_BACKEND_URL']?.trim();
+    if (backendUrl == null || backendUrl.isEmpty) return null;
+
+    try {
+      final res = await http.post(
+        Uri.parse('$backendUrl/api/muse/generate/word'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'content': content, 'title': title}),
+      ).timeout(const Duration(seconds: 30));
+
+      if (res.statusCode == 200) {
+        final bytes = res.bodyBytes;
+        final dir = await getApplicationDocumentsDirectory();
+        final file = File('${dir.path}/$title.docx');
+        await file.writeAsBytes(bytes);
+        return file.path;
+      }
+    } catch (e) {
+      debugPrint('[IA] Word generation error: $e');
+    }
+    return null;
+  }
+
+  /// Génère un fichier Excel via le backend unifié
+  Future<String?> generateExcel({
+    required List<Map<String, dynamic>> data,
+    String title = "Feuille Muse",
+  }) async {
+    final backendUrl = dotenv.env['MUSE_BACKEND_URL']?.trim();
+    if (backendUrl == null || backendUrl.isEmpty) return null;
+
+    try {
+      final res = await http.post(
+        Uri.parse('$backendUrl/api/muse/generate/excel'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'data': data, 'title': title}),
+      ).timeout(const Duration(seconds: 30));
+
+      if (res.statusCode == 200) {
+        final bytes = res.bodyBytes;
+        final dir = await getApplicationDocumentsDirectory();
+        final file = File('${dir.path}/$title.xlsx');
+        await file.writeAsBytes(bytes);
+        return file.path;
+      }
+    } catch (e) {
+      debugPrint('[IA] Excel generation error: $e');
+    }
+    return null;
+  }
+
+  /// Génère une vidéo via le backend unifié
+  Future<String?> generateVideo({
+    required String prompt,
+    String title = "Video Muse",
+  }) async {
+    final backendUrl = dotenv.env['MUSE_BACKEND_URL']?.trim();
+    if (backendUrl == null || backendUrl.isEmpty) return null;
+
+    try {
+      final res = await http.post(
+        Uri.parse('$backendUrl/api/muse/generate/video'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'prompt': prompt, 'title': title}),
+      ).timeout(const Duration(seconds: 60));
+
+      if (res.statusCode == 200) {
+        final bytes = res.bodyBytes;
+        final dir = await getApplicationDocumentsDirectory();
+        final file = File('${dir.path}/$title.mp4');
+        await file.writeAsBytes(bytes);
+        return file.path;
+      }
+    } catch (e) {
+      debugPrint('[IA] Video generation error: $e');
+    }
+    return null;
   }
 }

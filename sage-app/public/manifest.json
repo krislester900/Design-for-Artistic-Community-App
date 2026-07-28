@@ -1,0 +1,19 @@
+{
+  "name": "Sage - Ton IA Multi-Personnalités",
+  "short_name": "Sage",
+  "description": "Psychologue, Chef, Professeur, Coach Langues, Ami, Savant - Ton assistant IA gratuit",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0a1e",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "/sage-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "orientation": "portrait",
+  "categories": ["education", "lifestyle", "health", "productivity"]
+}

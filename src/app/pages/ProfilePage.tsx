@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getCurrentSession, type AuthUser } from "../services/auth";
+import { supabase, hasSupabaseEnv } from "../lib/supabase";
 import { ProfileBird } from "./ProfileBird";
 import { getFavorites, type Favorite } from "../services/favorites";
 import { ArtworkUploadForm } from "../profile/ArtworkUploadForm";
@@ -91,7 +92,18 @@ export default function ProfilePage({ user: initialUser }: ProfilePageProps) {
     setSaving(true);
     setProfileError(null);
     try {
-      await new Promise((r) => setTimeout(r, 500));
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Non connecté");
+
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          display_name: displayName,
+          bio: bio,
+        },
+      });
+
+      if (error) throw error;
+
       setSaved(true);
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
       savedTimerRef.current = setTimeout(() => setSaved(false), 2000);

@@ -86,7 +86,9 @@ class _CarouselStackState extends State<CarouselStack> {
               alignment: Alignment.center,
               transform: Matrix4.identity()
                 ..setEntry(3, 2, 0.001)
+                // ignore: deprecated_member_use
                 ..scale(scales[i])
+                // ignore: deprecated_member_use
                 ..translate(xOffsets[i], yOffsets[i])
                 ..rotateZ(rotations[i] * 3.14159265359 / 180),
               child: GestureDetector(

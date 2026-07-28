@@ -43,7 +43,7 @@ class _GamePlayerPageState extends State<GamePlayerPage> {
 
     if (widget.localAssetPath != null) {
       if (kIsWeb) {
-        _controller.loadRequest(Uri.base.resolve('assets/assets/${widget.localAssetPath}'));
+        _controller.loadRequest(Uri.base.resolve('assets/${widget.localAssetPath}'));
       } else {
         _controller.loadRequest(Uri.parse(
           LocalWebServer.getUrl('assets/${widget.localAssetPath}'),
